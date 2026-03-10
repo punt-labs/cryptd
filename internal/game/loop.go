@@ -5,6 +5,7 @@ package game
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/punt-labs/cryptd/internal/engine"
 	"github.com/punt-labs/cryptd/internal/model"
@@ -48,9 +49,12 @@ func (l *Loop) Run(ctx context.Context, state *model.GameState) error {
 			// Route all events — including renderer-emitted quits — through
 			// dispatch so the quit narration is rendered before returning.
 			var action model.EngineAction
-			if ev.Type == "quit" {
+			switch ev.Type {
+			case "quit":
 				action = model.EngineAction{Type: "quit"}
-			} else {
+			case "error":
+				return fmt.Errorf("renderer error: %s", ev.Payload)
+			default:
 				action, err = l.interp.Interpret(ctx, ev.Payload, *state)
 				if err != nil {
 					return err

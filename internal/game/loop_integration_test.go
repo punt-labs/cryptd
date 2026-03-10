@@ -174,6 +174,21 @@ func TestLoop_RenderErrorInLoop(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "render in loop boom")
 }
+func TestLoop_RendererErrorEventPropagates(t *testing.T) {
+	eng := engine.New(loadScenario(t))
+	interp := interpreter.NewRules()
+	narr := narrator.NewTemplate()
+
+	ch := make(chan model.InputEvent, 1)
+	ch <- model.InputEvent{Type: "error", Payload: "scanner blew up"}
+	fake := &fakeRenderer{events: ch}
+
+	state := newState(t, eng)
+	err := game.NewLoop(eng, interp, narr, fake).Run(context.Background(), &state)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "scanner blew up")
+}
+
 func TestLoop_MoveInternalErrorPropagates(t *testing.T) {
 	eng := engine.New(loadScenario(t))
 	interp := interpreter.NewRules()

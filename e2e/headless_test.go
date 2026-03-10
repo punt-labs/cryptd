@@ -33,7 +33,7 @@ func repoRoot(t *testing.T) string {
 	return filepath.Dir(wd)
 }
 
-func TestHeadless_MinimalRunScript(t *testing.T) {
+func TestHeadless_MinimalRunCommands(t *testing.T) {
 	bin := binary(t)
 	root := repoRoot(t)
 
@@ -51,7 +51,7 @@ func TestHeadless_MinimalRunScript(t *testing.T) {
 	cmd.Stderr = &stderr
 
 	err := cmd.Run()
-	require.NoError(t, err, "crypt headless exited non-zero; stderr: %s", stderr.String())
+	require.NoError(t, err, "cryptd headless exited non-zero; stderr: %s", stderr.String())
 
 	out := stdout.String()
 	assert.Contains(t, out, "goblin_lair", "expected goblin_lair in output after moving south")

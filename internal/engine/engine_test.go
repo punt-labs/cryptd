@@ -135,6 +135,31 @@ func TestMove_HiddenIsNoExit(t *testing.T) {
 	assert.Equal(t, "north", noExit.Direction)
 }
 
+func TestMove_UnknownConnectionType(t *testing.T) {
+	// Build a synthetic scenario with a "bogus" connection type.
+	s := &scenario.Scenario{
+		ID:           "synthetic",
+		StartingRoom: "start",
+		Rooms: map[string]*scenario.Room{
+			"start": {
+				Name: "Start",
+				Connections: map[string]*scenario.Connection{
+					"south": {Room: "end", Type: "bogus"},
+				},
+			},
+			"end": {Name: "End"},
+		},
+	}
+	e := engine.New(s)
+	char := model.Character{ID: "c1", Name: "Test", Class: "fighter", Level: 1, HP: 10, MaxHP: 10}
+	state, err := e.NewGame(char)
+	require.NoError(t, err)
+
+	_, err = e.Move(&state, "south")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "bogus")
+}
+
 func TestLook_ReturnsRoomInfo(t *testing.T) {
 	e, state := newGame(t)
 	result := e.Look(&state)

@@ -86,13 +86,16 @@ func (e *Engine) Move(state *model.GameState, direction string) (MoveResult, err
 		return MoveResult{}, &NoExitError{Direction: direction}
 	}
 
-	if conn.Type == "locked" {
+	switch conn.Type {
+	case "locked":
 		return MoveResult{}, &LockedError{Direction: direction, Room: conn.Room}
-	}
-
-	// Hidden connections are undiscoverable until revealed; treat as no exit.
-	if conn.Type == "hidden" {
+	case "hidden":
+		// Hidden connections are undiscoverable until revealed; treat as no exit.
 		return MoveResult{}, &NoExitError{Direction: direction}
+	case "open", "stairway":
+		// traversable — continue
+	default:
+		return MoveResult{}, fmt.Errorf("unknown connection type %q to the %s", conn.Type, direction)
 	}
 
 	// Validate destination before mutating state so a broken scenario ref
