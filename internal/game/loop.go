@@ -81,10 +81,14 @@ func (l *Loop) dispatch(ctx context.Context, state *model.GameState, action mode
 		result, err := l.eng.Move(state, action.Direction)
 		if err != nil {
 			var locked *engine.LockedError
-			if errors.As(err, &locked) {
+			var noExit *engine.NoExitError
+			switch {
+			case errors.As(err, &locked):
 				event = model.EngineEvent{Type: "locked_door", Details: map[string]any{"direction": locked.Direction}}
-			} else {
+			case errors.As(err, &noExit):
 				event = model.EngineEvent{Type: "no_exit"}
+			default:
+				return model.EngineEvent{}, "", err
 			}
 		} else {
 			event = model.EngineEvent{Type: "moved", Room: result.NewRoom}

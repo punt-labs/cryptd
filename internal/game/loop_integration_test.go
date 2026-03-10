@@ -174,6 +174,25 @@ func TestLoop_RenderErrorInLoop(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "render in loop boom")
 }
+func TestLoop_MoveInternalErrorPropagates(t *testing.T) {
+	eng := engine.New(loadScenario(t))
+	interp := interpreter.NewRules()
+	narr := narrator.NewTemplate()
+
+	ch := make(chan model.InputEvent, 1)
+	ch <- model.InputEvent{Type: "input", Payload: "go north"}
+	fake := &fakeRenderer{events: ch}
+
+	state := newState(t, eng)
+	// Corrupt current room to trigger an internal engine error (not a NoExitError
+	// or LockedError) when dispatch calls Move.
+	state.Dungeon.CurrentRoom = "nonexistent_room"
+
+	err := game.NewLoop(eng, interp, narr, fake).Run(context.Background(), &state)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "nonexistent_room")
+}
+
 type fakeRenderer struct {
 	events  chan model.InputEvent
 	renders []string
