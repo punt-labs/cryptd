@@ -1,5 +1,13 @@
 # Copilot Instructions — cryptd
 
+## No "Pre-existing" Excuse
+
+There is no such thing as a "pre-existing" issue. If you see a problem — in code
+you wrote, code a reviewer flagged, or code you happen to be reading — you fix it.
+Do not classify issues as "pre-existing" to justify ignoring them. Do not suggest
+that something is "outside the scope of this change." If it is broken and you can
+see it, it is your problem now.
+
 ## Project State
 
 This repo is at **design stage** — no Go source code exists yet. All content is
@@ -195,6 +203,71 @@ is added.
   `FakeLuxServer` integration test explicitly guards against.
 - Navigation and combat button presses route directly to the engine via `lux.recv()`
   with no LLM round-trip (~50ms total).
+
+## Documentation Maintenance
+
+Three documents must stay current — updated **in the same commit that changes
+behavior**, not retroactively:
+
+| Document | What It Tracks | When to Update |
+|---|---|---|
+| `CHANGELOG.md` | User-visible changes (features, fixes, breaking changes) | Every PR that changes behavior. Entry goes under `## [Unreleased]`. |
+| `README.md` | User-facing docs (commands, flags, config, examples) | Every PR that changes user-facing behavior — new flags, renamed commands, changed defaults. |
+
+**CHANGELOG is mandatory for every behavior-changing PR.** A PR that changes
+user-facing behavior without a CHANGELOG entry is not ready to merge.
+
+## Standards Authority
+
+**`../punt-kit/`** is the Punt Labs standards repo. The following standards apply
+to this project:
+
+- [`punt-kit/standards/github.md`](../punt-kit/standards/github.md) — branch
+  protection, PR workflow, Copilot review
+- [`punt-kit/standards/workflow.md`](../punt-kit/standards/workflow.md) — beads,
+  branch discipline, micro-commits, session close protocol
+
+Go-specific standards do not yet exist in punt-kit. Until they do, follow the
+quality gates in the **Build and Test Commands** section above. When there is a
+conflict between a child repo decision and punt-kit standards, the child repo
+decision wins (it may have project-specific overrides).
+
+## Quality Gates
+
+Every PR must pass all of these before merge. No exceptions for "minor" changes.
+
+```bash
+go vet ./...
+staticcheck ./...
+go test -race -count=1 ./...
+go test -race -tags integration -count=1 ./...
+go test -cover -coverprofile=coverage.out ./internal/engine/...
+go tool cover -func=coverage.out           # must be ≥ 90%
+npx markdownlint-cli2 "**/*.md" "#node_modules"
+# Once .sh files exist:
+shellcheck -x install.sh hooks/*.sh scripts/*.sh
+```
+
+## Issue Tracking (Beads)
+
+```bash
+bd ready          # see what's next in this project
+bd done <id>      # close a bead
+```
+
+Org-wide issues (touching 2+ repos or changing a punt-kit standard) go in
+`../punt-kit/`. Project-specific bugs, features, and tech debt go here.
+
+## Workspace Conventions
+
+- **`.tmp/`** — use for scratch files, diffs, analysis output, or any throwaway
+  data during a session. Contents are gitignored. Always use `.tmp/` instead of
+  `/tmp` to keep temp files visible and workspace-local.
+- **`../.bin/`** — cross-repo scripts for repeated operations. Write durable
+  scripts there for things you'd otherwise repeat across sessions.
+- **Quarry** — all punt-labs repos are indexed in the `punt-labs` quarry database.
+  Use `/find` or `quarry search "concept" --db punt-labs` for semantic search
+  across the org's standards, docs, and source.
 
 ## Documentation Map
 
