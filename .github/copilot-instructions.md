@@ -265,9 +265,11 @@ Org-wide issues (touching 2+ repos or changing a punt-kit standard) go in
   `/tmp` to keep temp files visible and workspace-local.
 - **`../.bin/`** — cross-repo scripts for repeated operations. Write durable
   scripts there for things you'd otherwise repeat across sessions.
-- **Quarry** — all punt-labs repos are indexed in the `punt-labs` quarry database.
-  Use `/find` or `quarry search "concept" --db punt-labs` for semantic search
-  across the org's standards, docs, and source.
+- **Quarry** — semantic search is available via MCP tools (`quarry-find`,
+  `quarry-list`, `quarry-show`, etc.), connected to the `punt-labs` database
+  (903+ documents across all org repos). This repo is indexed as the `cryptd`
+  collection. Search this repo's docs with `collection: "cryptd"`; search
+  org-wide (standards, other repos) without a collection filter.
 
 ## Documentation Map
 
