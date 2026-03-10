@@ -53,6 +53,25 @@ func TestHeadlessLoop_NewGameMoveLookMove(t *testing.T) {
 	assert.GreaterOrEqual(t, len(state.AdventureLog), 2)
 }
 
+func TestLoop_LockedDoorAndNoExit(t *testing.T) {
+	eng := engine.New(loadScenario(t))
+	interp := interpreter.NewRules()
+	narr := narrator.NewTemplate()
+
+	// "go west" hits the locked door; "go east" has no exit; "quit" ends the loop.
+	inputs := []string{"go west", "go east", "xyzzy", "quit"}
+	fake := &fakeRenderer{events: make(chan model.InputEvent, len(inputs))}
+	for _, inp := range inputs {
+		fake.events <- model.InputEvent{Type: "input", Payload: inp}
+	}
+
+	state := newState(t, eng)
+	err := game.NewLoop(eng, interp, narr, fake).Run(context.Background(), &state)
+	require.NoError(t, err)
+	// Player should still be at entrance — none of the moves succeeded.
+	assert.Equal(t, "entrance", state.Dungeon.CurrentRoom)
+}
+
 func TestLoop_ContextCancellation(t *testing.T) {
 	eng := engine.New(loadScenario(t))
 	interp := interpreter.NewRules()
@@ -166,18 +185,6 @@ func (f *fakeRenderer) Render(_ context.Context, _ model.GameState, narration st
 }
 
 func (f *fakeRenderer) Events() <-chan model.InputEvent { return f.events }
-
-// errRenderer returns an error on first Render call.
-type errRenderer struct {
-	err    error
-	events chan model.InputEvent
-}
-
-func (r *errRenderer) Render(_ context.Context, _ model.GameState, _ string) error {
-	return r.err
-}
-
-func (r *errRenderer) Events() <-chan model.InputEvent { return r.events }
 
 // countingErrNarrator succeeds for the first failAfter calls then returns err.
 type countingErrNarrator struct {

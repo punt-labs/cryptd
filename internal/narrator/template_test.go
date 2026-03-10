@@ -14,7 +14,7 @@ func TestTemplateNarrator_AllEventTypes(t *testing.T) {
 	n := narrator.NewTemplate()
 	state := model.GameState{}
 
-	events := []string{"moved", "looked", "unknown_action", "quit"}
+	events := []string{"moved", "looked", "unknown_action", "quit", "locked_door", "no_exit"}
 	for _, evType := range events {
 		t.Run(evType, func(t *testing.T) {
 			text, err := n.Narrate(context.Background(), model.EngineEvent{Type: evType}, state)

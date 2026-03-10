@@ -4,6 +4,7 @@ package game
 
 import (
 	"context"
+	"errors"
 
 	"github.com/punt-labs/cryptd/internal/engine"
 	"github.com/punt-labs/cryptd/internal/model"
@@ -43,13 +44,17 @@ func (l *Loop) Run(ctx context.Context, state *model.GameState) error {
 			if !ok {
 				return nil
 			}
-			if ev.Type == "quit" {
-				return nil
-			}
 
-			action, err := l.interp.Interpret(ctx, ev.Payload, *state)
-			if err != nil {
-				return err
+			// Route all events — including renderer-emitted quits — through
+			// dispatch so the quit narration is rendered before returning.
+			var action model.EngineAction
+			if ev.Type == "quit" {
+				action = model.EngineAction{Type: "quit"}
+			} else {
+				action, err = l.interp.Interpret(ctx, ev.Payload, *state)
+				if err != nil {
+					return err
+				}
 			}
 
 			event, narration, err := l.dispatch(ctx, state, action)
@@ -57,12 +62,12 @@ func (l *Loop) Run(ctx context.Context, state *model.GameState) error {
 				return err
 			}
 
-			if event.Type == "quit" {
-				return nil
-			}
-
 			if err := l.rend.Render(ctx, *state, narration); err != nil {
 				return err
+			}
+
+			if event.Type == "quit" {
+				return nil
 			}
 		}
 	}
@@ -75,7 +80,12 @@ func (l *Loop) dispatch(ctx context.Context, state *model.GameState, action mode
 	case "move":
 		result, err := l.eng.Move(state, action.Direction)
 		if err != nil {
-			event = model.EngineEvent{Type: "unknown_action"}
+			var locked *engine.LockedError
+			if errors.As(err, &locked) {
+				event = model.EngineEvent{Type: "locked_door", Details: map[string]any{"direction": locked.Direction}}
+			} else {
+				event = model.EngineEvent{Type: "no_exit"}
+			}
 		} else {
 			event = model.EngineEvent{Type: "moved", Room: result.NewRoom}
 		}

@@ -5,6 +5,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/punt-labs/cryptd/internal/model"
 	"github.com/punt-labs/cryptd/internal/renderer"
@@ -37,9 +38,14 @@ func TestCLIRenderer_EventsChannelReceivesInput(t *testing.T) {
 	err := r.Render(context.Background(), state, "")
 	require.NoError(t, err)
 
-	ev := <-r.Events()
-	assert.Equal(t, "input", ev.Type)
-	assert.Equal(t, "go south", ev.Payload)
+	// Goroutine reads input asynchronously; wait with a short timeout.
+	select {
+	case ev := <-r.Events():
+		assert.Equal(t, "input", ev.Type)
+		assert.Equal(t, "go south", ev.Payload)
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for input event")
+	}
 }
 
 func TestCLIRenderer_EOFClosesEvents(t *testing.T) {
@@ -49,9 +55,14 @@ func TestCLIRenderer_EOFClosesEvents(t *testing.T) {
 
 	_ = r.Render(context.Background(), model.GameState{}, "")
 
-	ev, ok := <-r.Events()
-	// Channel should either be closed or emit a quit event.
-	if ok {
-		assert.Equal(t, "quit", ev.Type)
+	// With an empty reader the goroutine closes the channel on EOF.
+	select {
+	case ev, ok := <-r.Events():
+		if ok {
+			assert.Equal(t, "quit", ev.Type)
+		}
+		// ok==false means channel closed — that's the expected path.
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for events channel to close")
 	}
 }

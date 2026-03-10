@@ -25,8 +25,10 @@ func (t *Template) Narrate(_ context.Context, event model.EngineEvent, _ model.G
 			return fmt.Sprintf("You look around %s.", event.Room), nil
 		}
 		return "You look around.", nil
-	case "unknown_action":
-		return "You're not sure how to do that.", nil
+	case "locked_door":
+		return "That way is locked.", nil
+	case "no_exit":
+		return "You can't go that way.", nil
 	case "quit":
 		return "Farewell, adventurer.", nil
 	default:

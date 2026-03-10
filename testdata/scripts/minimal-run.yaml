@@ -1,7 +1,6 @@
 # minimal-run.yaml — M2 E2E acceptance script
-# Run with: crypt headless --script testdata/scripts/minimal-run.yaml
-#
-# Steps are sent as stdin lines; assertions check stdout contains expected text.
+# Consumed by the headless acceptance test runner (not a direct CLI entrypoint).
+# It exercises the "minimal" scenario used by `cryptd headless --scenario minimal`.
 
 scenario: minimal
 

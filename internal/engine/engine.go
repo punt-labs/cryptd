@@ -86,8 +86,20 @@ func (e *Engine) Move(state *model.GameState, direction string) (MoveResult, err
 		return MoveResult{}, &NoExitError{Direction: direction}
 	}
 
-	if conn.Type == "locked" || conn.Type == "hidden" {
+	if conn.Type == "locked" {
 		return MoveResult{}, &LockedError{Direction: direction, Room: conn.Room}
+	}
+
+	// Hidden connections are undiscoverable until revealed; treat as no exit.
+	if conn.Type == "hidden" {
+		return MoveResult{}, &NoExitError{Direction: direction}
+	}
+
+	// Validate destination before mutating state so a broken scenario ref
+	// cannot corrupt the in-progress game state.
+	dest, ok := e.s.Rooms[conn.Room]
+	if !ok {
+		return MoveResult{}, fmt.Errorf("destination room %q not found in scenario", conn.Room)
 	}
 
 	state.Dungeon.CurrentRoom = conn.Room
@@ -97,11 +109,6 @@ func (e *Engine) Move(state *model.GameState, direction string) (MoveResult, err
 		Text:      fmt.Sprintf("You move %s and enter %s.", direction, conn.Room),
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
 	})
-
-	dest, ok := e.s.Rooms[conn.Room]
-	if !ok {
-		return MoveResult{}, fmt.Errorf("destination room %q not found in scenario", conn.Room)
-	}
 
 	return MoveResult{
 		NewRoom: conn.Room,

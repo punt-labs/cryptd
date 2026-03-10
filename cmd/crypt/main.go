@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/punt-labs/cryptd/internal/engine"
 	"github.com/punt-labs/cryptd/internal/game"
@@ -17,7 +18,7 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: crypt <command> [args]")
+		fmt.Fprintln(os.Stderr, "usage: cryptd <command> [args]")
 		fmt.Fprintln(os.Stderr, "commands: headless, validate")
 		os.Exit(1)
 	}
@@ -39,7 +40,7 @@ func runHeadless(args []string) {
 	_ = fs.Parse(args)
 
 	if *scenarioID == "" {
-		fmt.Fprintln(os.Stderr, "usage: crypt headless --scenario <id>")
+		fmt.Fprintln(os.Stderr, "usage: cryptd headless --scenario <id>")
 		os.Exit(1)
 	}
 
@@ -47,7 +48,7 @@ func runHeadless(args []string) {
 	if scenarioDir == "" {
 		scenarioDir = "scenarios"
 	}
-	path := fmt.Sprintf("%s/%s.yaml", scenarioDir, *scenarioID)
+	path := filepath.Join(scenarioDir, *scenarioID+".yaml")
 	s, err := scenario.Load(path)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error loading scenario: %v\n", err)
@@ -75,7 +76,7 @@ func runHeadless(args []string) {
 
 func runValidate(args []string) {
 	if len(args) != 1 {
-		fmt.Fprintln(os.Stderr, "usage: crypt validate <scenario-file>")
+		fmt.Fprintln(os.Stderr, "usage: cryptd validate <scenario-file>")
 		os.Exit(1)
 	}
 	path := args[0]

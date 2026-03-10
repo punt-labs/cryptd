@@ -14,10 +14,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// binary returns the path to the compiled crypt binary, building it if needed.
+// binary returns the path to the compiled cryptd binary, building it if needed.
 func binary(t *testing.T) string {
 	t.Helper()
-	bin := filepath.Join(t.TempDir(), "crypt")
+	bin := filepath.Join(t.TempDir(), "cryptd")
 	cmd := exec.Command("go", "build", "-o", bin, "./cmd/crypt")
 	cmd.Dir = repoRoot(t)
 	out, err := cmd.CombinedOutput()
