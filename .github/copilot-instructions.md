@@ -10,12 +10,27 @@ see it, it is your problem now.
 
 ## Project State
 
-This repo is at **design stage** — no Go source code exists yet. All content is
-architecture documentation. The intended first implementation step is Milestone 0
-in `docs/build-plan.md` (test infrastructure scaffold).
+**M0 and M1 are complete.** M2 (thin E2E slice) is the next milestone.
+See `bd ready` for the current unblocked issue (`cryptd-7uw`).
 
 The binary is named `cryptd` (repo name). The CLI subcommands are `crypt dm`,
 `crypt solo`, `crypt headless`, and `crypt serve`.
+
+## Workflow
+
+**Always follow the punt-kit workflow standards (`../punt-kit/standards/workflow.md`):**
+
+- **Feature branches** — never commit directly to `main`. Branch naming:
+  `feat/m2-thin-e2e`, `fix/combat-initiative`, `refactor/interpreter`, etc.
+- **Beads** (`bd`) for issue tracking. Before starting any milestone:
+  1. `bd ready` — confirm the issue is unblocked
+  2. `bd update <id> --status in_progress` — claim it
+  3. `git checkout -b feat/m<N>-short-desc main` — work on a branch
+  4. Commit with conventional commit format: `feat(engine): add move command`
+  5. `bd close <id>` after merge
+- **Conventional commits**: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`
+- **Quality gates before every commit**: `go vet ./...`, `go test -race ./...`, markdownlint 0 errors
+- **Never commit directly to `main`** — this includes chore/docs changes
 
 ## Architecture
 
