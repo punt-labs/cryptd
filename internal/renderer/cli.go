@@ -14,7 +14,8 @@ import (
 
 // CLI renders to a writer (stdout) and reads input from a reader (stdin).
 // Stdin scanning runs in a dedicated goroutine so Render never blocks on
-// input, and context cancellation in the game loop is honoured promptly.
+// input. The goroutine reads until EOF; it does not stop on context
+// cancellation (the game loop exits its select on ctx.Done independently).
 type CLI struct {
 	out       io.Writer
 	in        *bufio.Scanner
@@ -35,10 +36,13 @@ func NewCLI(out io.Writer, in io.Reader) *CLI {
 func (c *CLI) startScanner() {
 	c.startOnce.Do(func() {
 		go func() {
+			defer close(c.events)
 			for c.in.Scan() {
 				c.events <- model.InputEvent{Type: "input", Payload: strings.TrimSpace(c.in.Text())}
 			}
-			close(c.events)
+			if err := c.in.Err(); err != nil {
+				c.events <- model.InputEvent{Type: "error", Payload: err.Error()}
+			}
 		}()
 	})
 }

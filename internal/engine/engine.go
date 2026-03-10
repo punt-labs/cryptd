@@ -95,6 +95,12 @@ func (e *Engine) Move(state *model.GameState, direction string) (MoveResult, err
 		return MoveResult{}, &NoExitError{Direction: direction}
 	}
 
+	// Reject unknown connection types so typos in scenario YAML fail loudly
+	// rather than silently behaving like open exits.
+	if conn.Type != "open" {
+		return MoveResult{}, fmt.Errorf("unknown connection type %q to the %s", conn.Type, direction)
+	}
+
 	// Validate destination before mutating state so a broken scenario ref
 	// cannot corrupt the in-progress game state.
 	dest, ok := e.s.Rooms[conn.Room]

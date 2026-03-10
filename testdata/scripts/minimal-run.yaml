@@ -2,16 +2,16 @@
 # Consumed by the headless acceptance test runner (not a direct CLI entrypoint).
 # It exercises the "minimal" scenario used by `cryptd headless --scenario minimal`.
 
-scenario: minimal
+name: minimal-run
 
 steps:
   - input: "go south"
-    expect_output: "goblin_lair"
+    expect: "goblin_lair"
 
   - input: "look"
-    expect_output: "goblin_lair"
+    expect: "goblin_lair"
 
   - input: "go north"
-    expect_output: "entrance"
+    expect: "entrance"
 
   - input: "quit"

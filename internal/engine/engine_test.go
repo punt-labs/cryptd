@@ -1,6 +1,7 @@
 package engine_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/punt-labs/cryptd/internal/engine"
@@ -141,4 +142,24 @@ func TestLook_ReturnsRoomInfo(t *testing.T) {
 	assert.Equal(t, "entrance", result.Room)
 	assert.NotEmpty(t, result.Description)
 	assert.Contains(t, result.Exits, "south")
+}
+
+func TestMove_UnknownConnectionTypeErrors(t *testing.T) {
+	s := loadMinimal(t)
+	// Inject a connection with an unknown type to simulate a scenario typo.
+	s.Rooms["entrance"].Connections["east"] = &scenario.Connection{Room: "goblin_lair", Type: "opne"}
+
+	e := engine.New(s)
+	char := model.Character{ID: "c1", Name: "Test", Class: "fighter", Level: 1, HP: 10, MaxHP: 10}
+	state, err := e.NewGame(char)
+	require.NoError(t, err)
+
+	_, err = e.Move(&state, "east")
+	require.Error(t, err)
+	// Should NOT be NoExitError or LockedError — it's a scenario corruption error.
+	var noExit *engine.NoExitError
+	var locked *engine.LockedError
+	assert.False(t, errors.As(err, &noExit), "unexpected unknown type should not be NoExitError")
+	assert.False(t, errors.As(err, &locked), "unexpected unknown type should not be LockedError")
+	assert.Contains(t, err.Error(), "unknown connection type")
 }
