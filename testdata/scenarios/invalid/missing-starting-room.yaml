@@ -1,0 +1,7 @@
+title: "No Starting Room"
+# starting_room is intentionally absent to trigger MissingFieldError
+
+rooms:
+  entrance:
+    name: "Entrance Hall"
+    description_seed: "A cold stone hall."

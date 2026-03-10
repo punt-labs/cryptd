@@ -3,13 +3,12 @@ package model
 import "context"
 
 // EngineAction is the result of interpreting a player's command.
-// Fields are populated in Milestone 1; the struct exists here so testutil
-// fakes can compile.
 type EngineAction struct {
-	Action    string
-	Direction string
-	Target    string
-	ItemID    string
+	Action      string
+	Direction   string
+	Target      string
+	ItemID      string
+	CharacterID string // optional; for party-ready multi-character support (DES-021)
 }
 
 // EngineEvent is emitted by the engine after resolving an action.
@@ -17,10 +16,6 @@ type EngineEvent struct {
 	Type    string
 	Details map[string]any
 }
-
-// GameState represents the full, serialisable state of a game session.
-// Fields are added in Milestone 1.
-type GameState struct{}
 
 // InputEvent is an event received from the renderer (e.g. a keypress or
 // button click in Lux).

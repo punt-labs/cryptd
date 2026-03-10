@@ -1,0 +1,46 @@
+{
+  "schema_version": "1.0",
+  "play_mode": "headless",
+  "scenario": "minimal",
+  "timestamp": "2026-03-10T18:00:00Z",
+  "party": [
+    {
+      "id": "aldric",
+      "name": "Aldric",
+      "class": "fighter",
+      "level": 3,
+      "hp": 45,
+      "max_hp": 60,
+      "xp": 1240,
+      "gold": 48,
+      "stats": {
+        "str": 16,
+        "int": 10,
+        "dex": 12,
+        "con": 14,
+        "wis": 9,
+        "cha": 11
+      },
+      "inventory": [],
+      "equipped": {
+        "weapon": "rusty_sword",
+        "armor": "",
+        "ring": "",
+        "amulet": ""
+      },
+      "conditions": []
+    }
+  ],
+  "dungeon": {
+    "current_room": "goblin_lair",
+    "visited_rooms": ["entrance", "corridor_a", "goblin_lair"],
+    "room_state": {
+      "goblin_lair": { "cleared": true }
+    }
+  },
+  "adventure_log": [
+    { "text": "You enter the dungeon.", "timestamp": "2026-03-10T18:00:00Z" },
+    { "text": "You move south into the Goblin Lair.", "timestamp": "2026-03-10T18:01:00Z" },
+    { "text": "The goblin falls dead. You gain 40 XP.", "timestamp": "2026-03-10T18:02:00Z" }
+  ]
+}

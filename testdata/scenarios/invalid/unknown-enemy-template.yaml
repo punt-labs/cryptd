@@ -1,0 +1,15 @@
+title: "Unknown Enemy Template"
+starting_room: entrance
+
+rooms:
+  entrance:
+    name: "Entrance Hall"
+    description_seed: "A cold stone hall."
+    enemies: [dragon]  # 'dragon' is not defined in the enemies map
+
+enemies:
+  goblin:
+    name: Goblin
+    hp: 8
+    attack: "1d4"
+    ai: aggressive

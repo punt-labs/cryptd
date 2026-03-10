@@ -1,0 +1,7 @@
+title: "Missing Room Name"
+starting_room: entrance
+
+rooms:
+  entrance:
+    # name is intentionally absent to trigger MissingFieldError
+    description_seed: "A cold stone hall."

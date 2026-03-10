@@ -1,0 +1,15 @@
+title: "Invalid Dice Enemy"
+starting_room: entrance
+
+rooms:
+  entrance:
+    name: "Entrance Hall"
+    description_seed: "A cold stone hall."
+    enemies: [goblin]
+
+enemies:
+  goblin:
+    name: Goblin
+    hp: 8
+    attack: "2x6"  # invalid dice notation — should be 2d6
+    ai: aggressive

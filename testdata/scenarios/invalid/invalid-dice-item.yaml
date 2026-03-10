@@ -1,0 +1,16 @@
+title: "Invalid Dice Item"
+starting_room: entrance
+
+rooms:
+  entrance:
+    name: "Entrance Hall"
+    description_seed: "A cold stone hall."
+    items: [cursed_blade]
+
+items:
+  cursed_blade:
+    name: "Cursed Blade"
+    type: weapon
+    damage: "abc"  # invalid dice notation
+    weight: 2.0
+    value: 0

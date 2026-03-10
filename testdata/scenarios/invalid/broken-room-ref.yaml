@@ -1,0 +1,11 @@
+title: "Broken Room Reference"
+starting_room: entrance
+
+rooms:
+  entrance:
+    name: "Entrance Hall"
+    description_seed: "A cold stone hall."
+    connections:
+      south:
+        room: nonexistent_room
+        type: open
