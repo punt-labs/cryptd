@@ -1,0 +1,27 @@
+# Build output
+cryptd
+dist/
+
+# Go
+*.test
+*.out
+coverage.out
+
+# Save files
+.dungeon/
+
+# Scratch
+.tmp/
+
+# LaTeX build artifacts
+docs/*.aux
+docs/*.log
+docs/*.out
+docs/*.toc
+prfaq.aux
+prfaq.log
+prfaq.out
+prfaq.run.xml
+prfaq.blg
+prfaq.bbl
+prfaq.bcf
