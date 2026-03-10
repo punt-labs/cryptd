@@ -49,12 +49,16 @@ func (c *CLI) startScanner() {
 // prompt. Input arrives asynchronously via Events().
 func (c *CLI) Render(_ context.Context, state model.GameState, narration string) error {
 	c.startScanner()
-	fmt.Fprintf(c.out, "\n[%s]\n", state.Dungeon.CurrentRoom)
-	if narration != "" {
-		fmt.Fprintln(c.out, narration)
+	if _, err := fmt.Fprintf(c.out, "\n[%s]\n", state.Dungeon.CurrentRoom); err != nil {
+		return err
 	}
-	fmt.Fprint(c.out, "> ")
-	return nil
+	if narration != "" {
+		if _, err := fmt.Fprintln(c.out, narration); err != nil {
+			return err
+		}
+	}
+	_, err := fmt.Fprint(c.out, "> ")
+	return err
 }
 
 // Events returns the channel on which InputEvents are sent.

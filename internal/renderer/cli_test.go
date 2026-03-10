@@ -3,6 +3,7 @@ package renderer_test
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -65,4 +66,19 @@ func TestCLIRenderer_EOFClosesEvents(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("timed out waiting for events channel to close")
 	}
+}
+
+// errWriter always returns an error on write.
+type errWriter struct{ err error }
+
+func (w *errWriter) Write([]byte) (int, error) { return 0, w.err }
+
+func TestCLIRenderer_RenderReturnsWriteError(t *testing.T) {
+	ew := &errWriter{err: fmt.Errorf("write failed")}
+	in := strings.NewReader("")
+	r := renderer.NewCLI(ew, in)
+
+	err := r.Render(context.Background(), model.GameState{Dungeon: model.DungeonState{CurrentRoom: "entrance"}}, "")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "write failed")
 }
