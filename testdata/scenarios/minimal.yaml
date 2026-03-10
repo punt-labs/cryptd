@@ -13,6 +13,9 @@ rooms:
       west:
         room: vault
         type: locked
+      north:
+        room: secret_room
+        type: hidden
   goblin_lair:
     name: "Goblin Lair"
     description_seed: "Damp and foul-smelling. Bones crunch underfoot."
@@ -22,6 +25,14 @@ rooms:
         type: open
     enemies: [goblin]
     items: [rusty_key]
+
+  secret_room:
+    name: "Secret Room"
+    description_seed: "A hidden chamber behind the entrance."
+    connections:
+      south:
+        room: entrance
+        type: open
 
   vault:
     name: "Vault"

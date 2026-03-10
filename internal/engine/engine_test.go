@@ -116,6 +116,25 @@ func TestLook_UnknownRoomReturnsBareResult(t *testing.T) {
 	assert.Empty(t, result.Exits)
 }
 
+func TestLook_HiddenConnectionsNotInExits(t *testing.T) {
+	e, state := newGame(t)
+	result := e.Look(&state)
+	// entrance has north (hidden) — should not appear in exits
+	for _, exit := range result.Exits {
+		assert.NotEqual(t, "north", exit, "hidden connection 'north' should not appear in exits")
+	}
+	assert.Contains(t, result.Exits, "south")
+}
+
+func TestMove_HiddenIsNoExit(t *testing.T) {
+	e, state := newGame(t)
+	_, err := e.Move(&state, "north")
+	require.Error(t, err)
+	var noExit *engine.NoExitError
+	require.ErrorAs(t, err, &noExit)
+	assert.Equal(t, "north", noExit.Direction)
+}
+
 func TestLook_ReturnsRoomInfo(t *testing.T) {
 	e, state := newGame(t)
 	result := e.Look(&state)

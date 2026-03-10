@@ -136,7 +136,11 @@ func (e *Engine) Look(state *model.GameState) LookResult {
 
 func exitList(room *scenario.Room) []string {
 	exits := make([]string, 0, len(room.Connections))
-	for dir := range room.Connections {
+	for dir, conn := range room.Connections {
+		// Hidden connections are undiscoverable until revealed; omit from exits.
+		if conn.Type == "hidden" {
+			continue
+		}
 		exits = append(exits, dir)
 	}
 	return exits
