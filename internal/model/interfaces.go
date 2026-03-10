@@ -4,7 +4,7 @@ import "context"
 
 // EngineAction is the result of interpreting a player's command.
 type EngineAction struct {
-	Action      string
+	Type        string
 	Direction   string
 	Target      string
 	ItemID      string
@@ -14,7 +14,8 @@ type EngineAction struct {
 // EngineEvent is emitted by the engine after resolving an action.
 type EngineEvent struct {
 	Type    string
-	Details map[string]any
+	Room    string         // destination room for "moved"; current room for "looked"
+	Details map[string]any // additional context for narrators and renderers
 }
 
 // InputEvent is an event received from the renderer (e.g. a keypress or
