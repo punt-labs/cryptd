@@ -1,0 +1,6 @@
+{
+  "model": "phi3",
+  "created_at": "2024-01-01T00:00:00Z",
+  "response": "{\"action\":\"attack\",\"target\":\"goblin\"}",
+  "done": true
+}

@@ -29,9 +29,9 @@
 
 ```text
         ┌──────────────────────────────────────────────┐
-        │             CLI / Commands                    │  dungeon solo
-        │         (dungeon headless, dm, serve)         │  dungeon headless
-        └───────────────┬──────────────────────────────┘  dungeon serve
+        │             CLI / Commands                    │  crypt solo
+        │         (crypt headless, dm, serve)         │  crypt headless
+        └───────────────┬──────────────────────────────┘  crypt serve
                         │ wires together
         ┌───────────────▼──────────────────────────────┐
         │          Play Mode Composition                │
@@ -109,7 +109,7 @@ coverage. No engine logic, no command processing, no rendering.
   - Load and validate `minimal.yaml`
   - Typed errors for missing required fields, broken room references,
     unknown enemy templates, invalid dice notation
-  - `dungeon validate <file>` CLI command (first runnable command)
+  - `crypt validate <file>` CLI command (first runnable command)
 - `internal/save/` — JSON save/load:
   - `Save(state GameState, path string) error`
   - `Load(path string) (GameState, error)`
@@ -125,14 +125,14 @@ coverage. No engine logic, no command processing, no rendering.
 - Dice parser: all notation forms; boundary rolls; invalid → error
 
 **Done when:** `go test ./internal/...` passes with ≥ 90% coverage on all
-Milestone 1 packages. `dungeon validate testdata/scenarios/minimal.yaml`
+Milestone 1 packages. `crypt validate testdata/scenarios/minimal.yaml`
 prints "OK" and exits 0.
 
 ---
 
 ## Milestone 2 — Thin End-to-End Slice
 
-**Goal:** A player can type `dungeon headless` and move between two rooms.
+**Goal:** A player can type `crypt headless` and move between two rooms.
 The full pipeline — interpreter → engine → narrator → renderer — exists and
 is wired together, even though each layer is a thin stub. This is the most
 important milestone; it validates the architecture before any real logic is
@@ -154,9 +154,9 @@ built.
 - `internal/renderer/cli.go` — `CLIRenderer`:
   - Prints room name, exits list, narration text to stdout
   - Reads one line from stdin, returns it as `InputEvent`
-- `cmd/dungeon/` — `headless` subcommand:
-  - `dungeon headless --scenario <id>` starts a game loop
-  - `dungeon headless --script <file>` runs a script non-interactively
+- `cmd/crypt/` — `headless` subcommand:
+  - `crypt headless --scenario <id>` starts a game loop
+  - `crypt headless --script <file>` runs a script non-interactively
 - `testdata/scripts/minimal-run.yaml` — move north, move south, verify rooms
 
 **Tests written:**
@@ -167,10 +167,10 @@ built.
 - Unit: `TemplateNarrator` — each event type produces non-empty string
 - Integration (headless loop): `new_game → move(S) → look → move(N)`
   — wires all three interfaces; asserts `GameState` after each step
-- E2E: `dungeon headless --script minimal-run.yaml` exits 0 and prints
+- E2E: `crypt headless --script minimal-run.yaml` exits 0 and prints
   expected room names
 
-**Done when:** `dungeon headless --script testdata/scripts/minimal-run.yaml`
+**Done when:** `crypt headless --script testdata/scripts/minimal-run.yaml`
 passes. You can watch the full pipeline execute in one command. CI is green.
 
 ---
@@ -206,13 +206,13 @@ complete, playable mode. The acceptance test suite runs for the first time.
 - CI diffs generated vs. committed; any unintentional API change fails build
 
 **Done when:** All five acceptance scripts pass. Engine coverage ≥ 90%.
-A real human can play a complete game via `dungeon headless`.
+A real human can play a complete game via `crypt headless`.
 
 ---
 
 ## Milestone 4 — Lux Thin Slice
 
-**Goal:** `dungeon solo` starts, connects to Lux, and shows a minimal HUD.
+**Goal:** `crypt solo` starts, connects to Lux, and shows a minimal HUD.
 A player can move rooms and see the narration log update in Lux. No SLM yet —
 `solo` still uses `RulesInterpreter` as the interpreter in this milestone.
 
@@ -223,7 +223,7 @@ A player can move rooms and see the narration log update in Lux. No SLM yet —
     narration in a single Lux text panel
   - `update()` for log appends
   - `recv()` event loop for Lux button presses → `InputEvent`
-- `cmd/dungeon/solo.go` — `dungeon solo` subcommand:
+- `cmd/crypt/solo.go` — `crypt solo` subcommand:
   - Wires `RulesInterpreter` + `TemplateNarrator` + `LuxRenderer`
   - Falls back to `CLIRenderer` if Lux is not running
 
@@ -238,7 +238,7 @@ A player can move rooms and see the narration log update in Lux. No SLM yet —
 - Integration: `FakeLuxServer` injects a synthetic button press event;
   assert engine receives correct `InputEvent`
 
-**Done when:** `dungeon solo --scenario minimal` connects to a running Lux
+**Done when:** `crypt solo --scenario minimal` connects to a running Lux
 instance and displays room transitions. `FakeLuxServer` tests pass in CI
 without Lux installed.
 
@@ -267,7 +267,7 @@ press events from `FakeLuxServer` drive combat actions without any LLM.
 
 ## Milestone 6 — SLM Thin Slice
 
-**Goal:** `dungeon solo` uses a real SLM for command interpretation and
+**Goal:** `crypt solo` uses a real SLM for command interpretation and
 narration. The thin slice handles only movement commands; full verb coverage
 comes next.
 
@@ -291,7 +291,7 @@ comes next.
 - Non-200: fallback triggered, game continues
 - Narrator: prose from canned response passed through to renderer
 
-**Done when:** `dungeon solo` with a running ollama instance uses SLM for
+**Done when:** `crypt solo` with a running ollama instance uses SLM for
 movement narration. All SLM tests pass in CI without ollama installed.
 
 ---
@@ -305,30 +305,30 @@ mode is fully playable with SLM as a first-class experience.
 - Expand `SLMNarrator` templates to all event types: combat, items, leveling
 - Model eval harness: `cmd/eval-slm` runs the full verb table through a real
   ollama model and scores classification accuracy (not CI — run manually)
-- `dungeon solo` declared feature-complete
+- `crypt solo` declared feature-complete
 
 ---
 
 ## Milestone 8 — Daemon Thin Slice
 
-**Goal:** `dungeon serve` starts and handles a single MCP client connection.
+**Goal:** `crypt serve` starts and handles a single MCP client connection.
 The full daemon topology (Section 4.2 of architecture spec) is exercised for
 the first time, even though session routing is not yet implemented.
 
 **What gets built:**
 
-- `cmd/dungeon/serve.go` — `dungeon serve` subcommand:
+- `cmd/crypt/serve.go` — `crypt serve` subcommand:
   - Starts daemon, listens on Unix socket
   - Accepts one MCP client connection
   - Dispatches all MCP tools to embedded engine
   - Responds with same JSON as embedded mode
-- Auto-start: if socket is not present, `dungeon dm` starts the daemon
+- Auto-start: if socket is not present, `crypt dm` starts the daemon
 
 **Tests written:**
 
 - Integration (in-process): spawn daemon, connect one fake MCP client,
   call `new_game` + `move` + `save_game`, verify JSON responses
-- E2E: spawn `dungeon serve` subprocess, connect minimal MCP client over
+- E2E: spawn `crypt serve` subprocess, connect minimal MCP client over
   stdio, call each tool once, assert valid JSON, no stderr
 
 **Done when:** MCP wire smoke tests pass. Daemon can handle a complete game
@@ -338,7 +338,7 @@ session from a single client.
 
 ## Milestone 9 — DM Thin Slice
 
-**Goal:** `dungeon dm` works. A Claude Code session can connect via MCP,
+**Goal:** `crypt dm` works. A Claude Code session can connect via MCP,
 start a game, and receive narration from the LLM. The thin slice covers only
 movement and basic narration.
 
@@ -350,10 +350,10 @@ movement and basic narration.
 - `internal/narrator/llm.go` — `LLMNarrator` (thin):
   - Calls Claude with event result + adventure context
   - Returns narration string
-- `skills/dungeon/SKILL.md` — rewritten for DM role:
+- `skills/crypt/SKILL.md` — rewritten for DM role:
   - Narration instructions, not game rules
   - Handles room descriptions, item examine responses
-- `cmd/dungeon/dm.go` — `dungeon dm` subcommand
+- `cmd/crypt/dm.go` — `crypt dm` subcommand
 
 **Tests written (using `FakeLLMInterpreter` and `FakeLLMNarrator`):**
 
@@ -362,7 +362,7 @@ movement and basic narration.
 - The LLM is never called in tests; the fakes assert correct
   prompt structure is assembled
 
-**Done when:** `dungeon dm` invoked by `/dungeon` skill starts a playable
+**Done when:** `crypt dm` invoked by `/crypt` skill starts a playable
 game with Claude narrating room descriptions. E2E: daemon + one DM session +
 movement + narration all working together.
 
@@ -397,9 +397,9 @@ multi-player and is also required for production-quality DM mode.
 DM-generated scenario creation.
 
 - `LLMInterpreter` and `LLMNarrator` cover all game actions
-- `/dungeon:create` skill command: DM generates scenario YAML interactively
+- `/crypt:create` skill command: DM generates scenario YAML interactively
 - DM can generate encounter backstories and puzzle hints on demand
-- `dungeon dm` declared feature-complete
+- `crypt dm` declared feature-complete
 
 ---
 
@@ -435,12 +435,12 @@ M1  Data Contracts  Structs, YAML parser, save/load, testdata
 M2  Thin E2E Slice  Move pipeline: interpreter → engine → narrator → renderer
                     ← FIRST FULL ARCHITECTURE VALIDATION →
 M3  Full Headless   All engine mechanics; full headless mode; acceptance tests
-M4  Lux Thin Slice  LuxRenderer stub; dungeon solo shows minimal HUD
+M4  Lux Thin Slice  LuxRenderer stub; crypt solo shows minimal HUD
 M5  Full Lux HUD    Four-panel HUD; nav buttons; combat panel
 M6  SLM Thin Slice  SLMInterpreter + SLMNarrator for movement; fallback tested
 M7  Full SLM        All verbs; solo mode complete
-M8  Daemon Slice    dungeon serve; single-session; MCP wire tests
-M9  DM Thin Slice   LLM in the loop; dungeon dm; SKILL.md rewrite
+M8  Daemon Slice    crypt serve; single-session; MCP wire tests
+M9  DM Thin Slice   LLM in the loop; crypt dm; SKILL.md rewrite
                     ← FIRST FULL DM MODE VALIDATION →
 M10 Daemon Routing  Multi-session; privilege gating; push notifications
 M11 Full DM Mode    Rich narration; scenario creation

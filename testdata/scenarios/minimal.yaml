@@ -1,0 +1,32 @@
+schema_version: "1"
+id: minimal
+name: "Minimal Dungeon"
+
+rooms:
+  entrance:
+    name: "Entrance Hall"
+    description_seed: "A cold stone hall with torches flickering on the walls."
+    exits:
+      south: goblin_lair
+  goblin_lair:
+    name: "Goblin Lair"
+    description_seed: "Damp and foul-smelling. Bones crunch underfoot."
+    exits:
+      north: entrance
+    enemies: [goblin]
+    items: [rusty_key]
+
+start_room: entrance
+
+enemies:
+  goblin:
+    name: Goblin
+    hp: 8
+    attack: "1d4"
+    ai: aggressive
+
+items:
+  rusty_key:
+    name: "Rusty Key"
+    description: "An old iron key, pitted with rust."
+    weight: 0.1

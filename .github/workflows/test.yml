@@ -1,0 +1,72 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  unit:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Run unit tests
+        run: go test -race -count=1 ./...
+
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Run integration tests
+        run: go test -race -tags integration -count=1 ./...
+
+  coverage:
+    name: Engine Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Check engine coverage ≥ 90%
+        run: |
+          go test -cover -coverprofile=coverage.out ./internal/engine/... 2>/dev/null || true
+          if [ -f coverage.out ]; then
+            pct=$(go tool cover -func=coverage.out | awk '/total/{gsub(/%/,"",$3); print $3}')
+            echo "Engine coverage: ${pct}%"
+            awk "BEGIN{if(${pct:-100}<90){print \"Coverage ${pct}% < 90% required\"; exit 1}}"
+          else
+            echo "No engine packages yet — coverage gate passes trivially"
+          fi
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: go vet
+        run: go vet ./...
+      - name: staticcheck
+        run: |
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+          staticcheck ./...
+
+  markdownlint:
+    name: Markdownlint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run markdownlint
+        run: npx --yes markdownlint-cli2 "**/*.md" "#node_modules"

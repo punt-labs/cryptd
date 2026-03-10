@@ -14,8 +14,8 @@ This repo is at **design stage** — no Go source code exists yet. All content i
 architecture documentation. The intended first implementation step is Milestone 0
 in `docs/build-plan.md` (test infrastructure scaffold).
 
-The binary is named `cryptd` (repo name). The CLI subcommands are `dungeon dm`,
-`dungeon solo`, `dungeon headless`, and `dungeon serve`.
+The binary is named `cryptd` (repo name). The CLI subcommands are `crypt dm`,
+`crypt solo`, `crypt headless`, and `crypt serve`.
 
 ## Architecture
 
@@ -81,7 +81,7 @@ narrators. Narrators know nothing about renderers.
 ### Engine Deployment
 
 - **Embedded** (`solo`, `headless`): engine runs in-process, no socket.
-- **Daemon** (`dm`, future multi-player): `dungeon serve` on a Unix domain socket
+- **Daemon** (`dm`, future multi-player): `crypt serve` on a Unix domain socket
   (NDJSON, `net.Listen("unix", ...)`). Daemon scope is exactly two things: game
   logic resolution and session-aware push routing. No LLM calls, no orchestration.
 - `mcp-proxy` (design-stage, not yet built): per-session Go shim that bridges
@@ -123,7 +123,7 @@ go test -cover -coverprofile=coverage.out ./internal/engine/...
 go tool cover -func=coverage.out
 
 # E2E (requires built binary)
-go build -o dungeon ./cmd/dungeon
+go build -o cryptd ./cmd/crypt
 go test -tags e2e ./e2e/...
 
 # Acceptance (main and release branches only)
@@ -133,7 +133,7 @@ go test -tags acceptance -timeout 10m ./e2e/acceptance/...
 go run ./cmd/dump-mcp-schema > /tmp/schema.json && diff testdata/mcp-schema.json /tmp/schema.json
 
 # Scenario validation
-go run ./cmd/dungeon validate scenarios/minimal.yaml
+go run ./cmd/crypt validate scenarios/minimal.yaml
 
 # Lint
 go vet ./...
@@ -186,7 +186,7 @@ state corruption.
 `headless` uses `RulesInterpreter + TemplateNarrator + CLIRenderer` — zero external
 dependencies. It is the primary vehicle for integration and acceptance tests.
 Acceptance tests are YAML game scripts in `testdata/scripts/` and
-`e2e/acceptance/`, executed via `dungeon headless`.
+`e2e/acceptance/`, executed via `crypt headless`.
 
 ### Party-Ready from Day One
 

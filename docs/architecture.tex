@@ -139,9 +139,9 @@ named triple of interface implementations.
   & embedded \\
 \midrule
 \textbf{Invoked by}
-  & \cmd{/dungeon} skill
-  & \cmd{dungeon solo}
-  & \cmd{dungeon headless} \\
+  & \cmd{/crypt} skill
+  & \cmd{crypt solo}
+  & \cmd{crypt headless} \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -190,7 +190,7 @@ Game engine
   & Go interface
   & Presents game state to the player (Lux HUD or ANSI CLI). \\
 MCP server
-  & Go binary (\cmd{dungeon serve})
+  & Go binary (\cmd{crypt serve})
   & Exposes game engine as MCP tools; NDJSON over Unix socket in
     daemon mode; stdio in embedded mode. \\
 SKILL.md
@@ -222,7 +222,7 @@ identical in both topologies.
 \begin{lstlisting}[title={Embedded (solo / headless)}]
 player (stdin / Lux)
     |
-dungeon solo            <-- single process
+crypt solo            <-- single process
     |-- Go engine       embedded, no socket
     |-- CommandInterpreter (SLM or rules)
     |-- Narrator        (SLM or template)
@@ -235,7 +235,7 @@ Claude Code session (DM)
             |
             | NDJSON Unix socket
             v
-    dungeon serve   <-- shared daemon, one per adventure
+    crypt serve   <-- shared daemon, one per adventure
             |-- GameState (all sessions)
             |-- session identity routing
             `-- tools/list_changed push to DM on player action
@@ -440,7 +440,7 @@ type DungeonState struct {
     floor).  Rooms are nodes; corridors are edges.
   \item \textbf{Pre-generated}: the DM creates the room graph before
     play begins, either by writing scenario YAML directly or via the
-    \cmd{/dungeon:create} skill command.  Procedural generation is
+    \cmd{/crypt:create} skill command.  Procedural generation is
     explicitly not used --- it produces maps that are inconsistent on
     backtracking.
   \item \textbf{Fog of war}: unvisited rooms are opaque on the Lux
@@ -885,7 +885,7 @@ When Biff is added:
     all three interfaces + all implementations except
     \texttt{LLMInterpreter}/\texttt{LLMNarrator};
     \texttt{CLIRenderer} and \texttt{LuxRenderer};
-    \cmd{dungeon serve}, \cmd{dungeon solo}, \cmd{dungeon headless};
+    \cmd{crypt serve}, \cmd{crypt solo}, \cmd{crypt headless};
     scenario YAML schema;
     \texttt{classic-fantasy-dungeon.yaml} migration;
     save/load: \texttt{.dungeon/saves/<slot>.json}. \\
@@ -894,8 +894,8 @@ When Biff is added:
   & \texttt{LLMInterpreter} + \texttt{LLMNarrator} (MCP callbacks);
     SKILL.md rewritten for DM role;
     full Lux HUD (map canvas, HP/MP bars, nav buttons, narration log);
-    \cmd{dungeon dm} command;
-    \cmd{/dungeon:create} --- interactive scenario generation. \\
+    \cmd{crypt dm} command;
+    \cmd{/crypt:create} --- interactive scenario generation. \\
 \midrule
 \textbf{3 — Combat System}
   & Turn-based combat: initiative, weapon dice, AC, conditions;
@@ -985,8 +985,8 @@ Three principles follow from this:
 \midrule
 Unit           & Every commit & $<$5~s   & Pure engine functions, parsers, \texttt{RulesInterpreter}, \texttt{TemplateNarrator} \\
 Integration    & Every commit & $<$30~s  & Interface compositions, mock ollama, mock Lux, daemon routing \\
-End-to-End     & Every PR     & $<$2~min & Real \cmd{dungeon} subprocess; MCP wire smoke; save round-trips \\
-Acceptance     & Release      & $<$10~min & YAML game scripts through \cmd{dungeon headless}; full adventures \\
+End-to-End     & Every PR     & $<$2~min & Real \cmd{cryptd} subprocess; MCP wire smoke; save round-trips \\
+Acceptance     & Release      & $<$10~min & YAML game scripts through \cmd{crypt headless}; full adventures \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -1177,7 +1177,7 @@ Assign one the DM identity; the other a player identity.
 \textbf{Build tag:} \texttt{-tags e2e}
 
 \textbf{Style:} Black-box subprocess tests via \texttt{os/exec}.
-Requires \cmd{dungeon} binary pre-built.  Asserts observable
+Requires \cmd{cryptd} binary pre-built.  Asserts observable
 outputs: exit codes, JSON responses, save files on disk.
 
 \begin{center}
@@ -1186,22 +1186,22 @@ outputs: exit codes, JSON responses, save files on disk.
 \textbf{Test} & \textbf{Command} & \textbf{Assert} \\
 \midrule
 Help exits clean
-  & \cmd{dungeon --help}
+  & \cmd{crypt --help}
   & Exit~0; usage text present \\
 List scenarios
-  & \cmd{dungeon list-scenarios}
+  & \cmd{crypt list-scenarios}
   & JSON array; $\geq$1 entry \\
 Headless new game
-  & \cmd{dungeon headless --scenario minimal}
+  & \cmd{crypt headless --scenario minimal}
   & Exit~0; initial state JSON \\
 Scripted run
-  & \cmd{dungeon headless --script minimal-run.yaml}
+  & \cmd{crypt headless --script minimal-run.yaml}
   & All steps pass; final state matches \\
 Save round-trip
   & new\_game $\to$ save $\to$ kill $\to$ load
   & Save file created; state restored \\
 MCP wire smoke
-  & spawn \cmd{dungeon serve}; call each tool once
+  & spawn \cmd{crypt serve}; call each tool once
   & Valid JSON for all tools; no unexpected stderr \\
 Cross-mode save
   & headless save $\to$ \cmd{dungeon solo --dry-run}

@@ -216,8 +216,8 @@ client the DM session identity; the other a player identity. Assert:
 
 **Location:** `e2e/`
 
-**Tooling:** `go test -tags e2e ./e2e/...`; spawns real `dungeon` subprocess via
-`os/exec`. Requires the binary to be built first (`go build ./cmd/dungeon`).
+**Tooling:** `go test -tags e2e ./e2e/...`; spawns real `crypt` subprocess via
+`os/exec`. Requires the binary to be built first (`go build ./cmd/crypt`).
 
 **Style:** Black-box. Talks to the binary over stdin/stdout (headless mode) or
 over the MCP stdio protocol. Asserts observable outputs only — exit codes, JSON
@@ -227,15 +227,15 @@ responses, file side effects (save files created).
 
 | Test | Command | Assert |
 |---|---|---|
-| Help exits clean | `dungeon --help` | Exit 0, usage text present |
-| List scenarios | `dungeon list-scenarios` | JSON array, at least one entry |
-| Headless new game | `dungeon headless --scenario minimal` | Exit 0, initial state JSON |
-| Headless scripted run | `dungeon headless --script testdata/scripts/minimal-run.yaml` | All steps pass, final state matches expected |
+| Help exits clean | `crypt --help` | Exit 0, usage text present |
+| List scenarios | `crypt list-scenarios` | JSON array, at least one entry |
+| Headless new game | `crypt headless --scenario minimal` | Exit 0, initial state JSON |
+| Headless scripted run | `crypt headless --script testdata/scripts/minimal-run.yaml` | All steps pass, final state matches expected |
 | Save round-trip | new_game → save → kill → load → assert state | Save file created, state restored |
 
 ### MCP Wire Smoke
 
-Spawn `dungeon serve` as a subprocess. Connect a minimal MCP client over stdio.
+Spawn `crypt serve` as a subprocess. Connect a minimal MCP client over stdio.
 Call each tool once with valid arguments. Assert valid JSON responses and no
 unexpected stderr output. This is the "does the binary actually work" check that
 integration tests (in-process) cannot catch.
@@ -243,9 +243,9 @@ integration tests (in-process) cannot catch.
 ### Cross-Mode Save Compatibility
 
 ```text
-1. Run dungeon headless to a known save point.
+1. Run crypt headless to a known save point.
 2. Verify save file exists.
-3. Load the save with dungeon solo --dry-run (no ollama needed).
+3. Load the save with crypt solo --dry-run (no ollama needed).
 4. Assert GameState matches expected values.
 ```
 
@@ -256,7 +256,7 @@ integration tests (in-process) cannot catch.
 **Location:** `e2e/acceptance/`
 
 **Format:** YAML game scripts that describe a complete adventure session as a
-sequence of steps. The runner executes each step via `dungeon headless`, asserts
+sequence of steps. The runner executes each step via `crypt headless`, asserts
 the expected state, and fails on any deviation.
 
 **Why headless?** Acceptance tests must be deterministic. `headless` uses
@@ -371,14 +371,14 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     steps:
-      - go build -o dungeon ./cmd/dungeon
+      - go build -o cryptd ./cmd/crypt
       - go test -tags e2e ./e2e/...
 
   acceptance:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/')
     steps:
-      - go build -o dungeon ./cmd/dungeon
+      - go build -o cryptd ./cmd/crypt
       - go test -tags acceptance -timeout 10m ./e2e/acceptance/...
 ```
 
@@ -392,7 +392,7 @@ keep PR feedback fast.
 
 ### Scenario Validation
 
-A `dungeon validate <file.yaml>` command (not a test) validates a scenario YAML
+A `crypt validate <file.yaml>` command (not a test) validates a scenario YAML
 against the engine's schema before committing it. This is the safeguard for DM-authored
 content — catch broken room references, unknown enemy templates, and invalid dice
 notation before a player encounters them at runtime.
