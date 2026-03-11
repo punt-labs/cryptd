@@ -27,7 +27,7 @@ rooms:
         type: open
       south:
         room: etc_shadow
-        type: locked
+        type: open
     items: [alias_shield]
 
   tmp_wasteland:
@@ -61,7 +61,7 @@ rooms:
         type: open
       south:
         room: root_chamber
-        type: locked
+        type: open
       west:
         room: dev_null
         type: open
@@ -94,7 +94,7 @@ rooms:
       north:
         room: root_chamber
         type: open
-    items: [root_shell_artifact]
+    items: [root_shell]
 
   etc_shadow:
     name: "/etc/shadow"
@@ -140,7 +140,7 @@ spells:
 
 items:
   man_page:
-    name: "Crumpled Man Page"
+    name: "Man Page"
     description: "man survival(7) — In the UNIX Catacombs, every process has a PID and a purpose. Find the Root Shell before the OOM Killer finds you. Pipes connect all things. stderr is your friend."
     type: misc
     weight: 0.1
@@ -168,14 +168,14 @@ items:
     value: 20
 
   kill_nine:
-    name: "kill -9"
-    description: "The ultimate signal. SIGKILL. No process can catch it, no process can ignore it. Unceremonious but effective."
+    name: "Kill Nine"
+    description: "The ultimate signal — the infamous 'kill -9'. SIGKILL. No process can catch it, no process can ignore it. Unceremonious but effective."
     type: weapon
     damage: "1d8+1"
     weight: 1.0
     value: 25
 
-  root_shell_artifact:
+  root_shell:
     name: "Root Shell"
     description: "A glowing terminal prompt pulsing with # instead of $. You are root. The system is yours."
     type: amulet

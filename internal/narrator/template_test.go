@@ -50,6 +50,54 @@ func TestTemplateNarrator_LookedWithRoomName(t *testing.T) {
 	assert.Contains(t, text, "entrance")
 }
 
+func TestTemplateNarrator_MovedWithDescriptionExitsItems(t *testing.T) {
+	n := narrator.NewTemplate()
+	text, err := n.Narrate(context.Background(), model.EngineEvent{
+		Type: "moved",
+		Room: "The Cave",
+		Details: map[string]any{
+			"description": "A dark cave with dripping water.",
+			"exits":       []string{"north", "south"},
+			"items":       []string{"Rusty Sword", "Old Shield"},
+		},
+	}, model.GameState{})
+	require.NoError(t, err)
+	assert.Contains(t, text, "The Cave")
+	assert.Contains(t, text, "A dark cave with dripping water.")
+	assert.Contains(t, text, "Exits: north, south.")
+	assert.Contains(t, text, "You see: Rusty Sword, Old Shield.")
+}
+
+func TestTemplateNarrator_LookedWithDescriptionExitsItems(t *testing.T) {
+	n := narrator.NewTemplate()
+	text, err := n.Narrate(context.Background(), model.EngineEvent{
+		Type: "looked",
+		Room: "Entrance Hall",
+		Details: map[string]any{
+			"description": "A grand entrance with marble columns.",
+			"exits":       []string{"east"},
+			"items":       []string{"Torch"},
+		},
+	}, model.GameState{})
+	require.NoError(t, err)
+	assert.Contains(t, text, "Entrance Hall")
+	assert.Contains(t, text, "A grand entrance with marble columns.")
+	assert.Contains(t, text, "Exits: east.")
+	assert.Contains(t, text, "You see: Torch.")
+}
+
+func TestTemplateNarrator_MovedWithoutDetails(t *testing.T) {
+	n := narrator.NewTemplate()
+	text, err := n.Narrate(context.Background(), model.EngineEvent{
+		Type: "moved",
+		Room: "Empty Room",
+	}, model.GameState{})
+	require.NoError(t, err)
+	assert.Contains(t, text, "Empty Room")
+	assert.NotContains(t, text, "Exits:")
+	assert.NotContains(t, text, "You see:")
+}
+
 func TestTemplateNarrator_UnknownEventFallback(t *testing.T) {
 	n := narrator.NewTemplate()
 	text, err := n.Narrate(context.Background(), model.EngineEvent{Type: "some_future_event"}, model.GameState{})

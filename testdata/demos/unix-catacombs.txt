@@ -13,13 +13,13 @@ equip kill nine
 west
 west
 look
+attack
+attack
+attack
+attack
+attack
+attack
 take pipe connector
-attack
-attack
-attack
-attack
-attack
-attack
 south
 look
 south
