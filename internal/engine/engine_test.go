@@ -2,6 +2,7 @@ package engine_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/punt-labs/cryptd/internal/engine"
 	"github.com/punt-labs/cryptd/internal/model"
@@ -133,6 +134,17 @@ func TestMove_HiddenIsNoExit(t *testing.T) {
 	var noExit *engine.NoExitError
 	require.ErrorAs(t, err, &noExit)
 	assert.Equal(t, "north", noExit.Direction)
+}
+
+func TestMove_UsesInjectedClock(t *testing.T) {
+	e, state := newGame(t)
+	fixed := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	e.Now = func() time.Time { return fixed }
+
+	_, err := e.Move(&state, "south")
+	require.NoError(t, err)
+	require.NotEmpty(t, state.AdventureLog)
+	assert.Equal(t, "2025-01-01T00:00:00Z", state.AdventureLog[len(state.AdventureLog)-1].Timestamp)
 }
 
 func TestMove_UnknownConnectionType(t *testing.T) {

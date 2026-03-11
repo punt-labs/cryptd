@@ -50,19 +50,20 @@ func (e *LockedError) Error() string {
 // Engine is the deterministic rules machine. All game state transitions go
 // through Engine methods. The Engine holds the scenario but never mutates it.
 type Engine struct {
-	s *scenario.Scenario
+	s   *scenario.Scenario
+	Now func() time.Time // injectable clock; defaults to time.Now
 }
 
 // New creates an Engine for the given scenario.
 func New(s *scenario.Scenario) *Engine {
-	return &Engine{s: s}
+	return &Engine{s: s, Now: time.Now}
 }
 
 // NewGame initialises a fresh GameState for the scenario and character.
+// PlayMode is left empty; the composition layer (cmd or game.Loop) sets it.
 func (e *Engine) NewGame(char model.Character) (model.GameState, error) {
 	state := model.GameState{
 		Scenario: e.s.ID,
-		PlayMode: "headless",
 		Dungeon: model.DungeonState{
 			CurrentRoom:  e.s.StartingRoom,
 			VisitedRooms: []string{e.s.StartingRoom},
@@ -110,7 +111,7 @@ func (e *Engine) Move(state *model.GameState, direction string) (MoveResult, err
 
 	state.AdventureLog = append(state.AdventureLog, model.LogEntry{
 		Text:      fmt.Sprintf("You move %s and enter %s.", direction, conn.Room),
-		Timestamp: time.Now().UTC().Format(time.RFC3339),
+		Timestamp: e.Now().UTC().Format(time.RFC3339),
 	})
 
 	return MoveResult{

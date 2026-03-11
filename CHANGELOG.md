@@ -14,7 +14,7 @@ All notable changes to this project will be documented in this file.
 - `internal/game` — `Loop`: wires engine + interpreter + narrator + renderer; drives full game until quit or context cancel
 - `e2e/headless_test.go` — E2E test (build tag `e2e`) that compiles the binary and runs a scripted headless session
 - `testdata/scripts/minimal-run.yaml` — M2 acceptance script: move south → look → move north → quit
-- `crypt validate <file>` — validates a scenario YAML file; prints `OK` exits 0 on success, error message exits 1 on failure
+- `cryptd validate <scenario-file>` — validates a scenario YAML file; prints `OK` exits 0 on success, error message exits 1 on failure
 - `internal/model` — full data model structs: `GameState`, `Character`, `Stats`, `Equipment`, `Condition`, `Item`, `DungeonState`, `RoomState`, `LogEntry`
 - `internal/dice` — dice notation parser supporting `NdS`, `NdS+M`, `NdS-M` forms with `Roll()`, `Min()`, `Max()`
 - `internal/scenario` — YAML scenario parser and validator with typed errors for missing fields, broken room references, unknown enemy templates, and invalid dice notation

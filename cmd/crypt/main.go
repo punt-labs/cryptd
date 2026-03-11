@@ -66,6 +66,7 @@ func runHeadless(args []string) {
 		fmt.Fprintf(os.Stderr, "error starting game: %v\n", err)
 		os.Exit(1)
 	}
+	state.PlayMode = "headless"
 
 	loop := game.NewLoop(eng, interpreter.NewRules(), narrator.NewTemplate(), renderer.NewCLI(os.Stdout, os.Stdin))
 	if err := loop.Run(context.Background(), &state); err != nil {
