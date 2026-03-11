@@ -265,46 +265,76 @@ press events from `FakeLuxServer` drive combat actions without any LLM.
 
 ---
 
-## Milestone 6 — SLM Thin Slice
+## Milestone 6 — Small Tier Thin Slice (DES-023)
 
-**Goal:** `crypt solo` uses a real SLM for command interpretation and
-narration. The thin slice handles only movement commands; full verb coverage
-comes next.
+**Goal:** `crypt solo` uses a real small language model for command
+interpretation and narration. The thin slice handles only movement commands;
+full verb coverage comes in M7. This milestone introduces the **small tier**
+of the four-tier inference architecture (DES-023): a llama.cpp sidecar process
+running SmolLM2-135M, communicating via OpenAI-compatible HTTP API.
 
 **What gets built:**
 
+- `internal/inference/` — OpenAI-compatible HTTP client:
+  - Calls `/v1/chat/completions` (works with both llama.cpp and ollama)
+  - Configurable base URL, model name, timeout
+  - Structured JSON response parsing with retry on malformed output
 - `internal/interpreter/slm.go` — `SLMInterpreter` (thin):
-  - Calls ollama `/api/generate` with compact system prompt
+  - Uses `inference` client with compact system prompt
   - Parses JSON action response
-  - Timeout → fallback to `RulesInterpreter`
-  - Non-200 or malformed JSON → fallback
+  - Timeout or malformed JSON → fallback to `RulesInterpreter` (one-time
+    warning logged)
 - `internal/narrator/slm.go` — `SLMNarrator` (thin):
-  - Calls ollama with room seed + moved event
+  - Uses `inference` client with room seed + moved event
   - Returns model prose verbatim
-- `testdata/fixtures/ollama-*.json` — canned responses for all test cases
+  - Timeout → fallback to `TemplateNarrator`
+- Runtime auto-detection: probe ollama `/api/tags` → llama.cpp
+  `/v1/models` → fall back to tiny tier (regex+templates)
+- `testdata/fixtures/openai-*.json` — canned `/v1/chat/completions`
+  responses for all test cases
 
-**Tests written (all using `FakeSLMServer`, never real ollama):**
+**Four-tier failover tested:**
 
-- Happy path: JSON action parsed correctly
-- Timeout: fallback triggered, game continues
+The failover chain (large → medium → small → tiny) is exercised in
+integration tests. Each tier fails open to the next with a one-time warning.
+The game is always playable even with zero inference backends running.
+
+**Tests written (all using `FakeSLMServer` with OpenAI-compatible API,
+never real llama.cpp or ollama):**
+
+- Happy path: JSON action parsed correctly from `/v1/chat/completions`
+- Timeout: fallback to `RulesInterpreter`, game continues
 - Malformed JSON: fallback triggered, game continues
 - Non-200: fallback triggered, game continues
 - Narrator: prose from canned response passed through to renderer
+- Runtime detection: probe sequence tested with fake endpoints
+- Full failover chain: all tiers unavailable → tiny tier plays the game
 
-**Done when:** `crypt solo` with a running ollama instance uses SLM for
-movement narration. All SLM tests pass in CI without ollama installed.
+**Done when:** `crypt solo` with a running llama.cpp or ollama instance uses
+the small model for movement narration. All tests pass in CI without any
+inference backend installed.
 
 ---
 
-## Milestone 7 — Full SLM (Solo Mode Complete)
+## Milestone 7 — Full SLM + Medium Tier (Solo Mode Complete)
 
-**Goal:** `SLMInterpreter` and `SLMNarrator` cover all game actions. `solo`
-mode is fully playable with SLM as a first-class experience.
+**Goal:** `SLMInterpreter` and `SLMNarrator` cover all game actions across
+both small and medium tiers. `solo` mode is fully playable. The `--model`
+flag allows explicit model selection.
+
+**What gets built:**
 
 - Expand `SLMInterpreter` system prompt and action schema to all verbs
 - Expand `SLMNarrator` templates to all event types: combat, items, leveling
-- Model eval harness: `cmd/eval-slm` runs the full verb table through a real
-  ollama model and scores classification accuracy (not CI — run manually)
+- **Medium tier defaults:** ollama with Gemma 3 1B (primary) or Llama 3.2 3B
+  (fallback) — richer narration than the 135M small tier
+- **`--model` flag:** `crypt solo --model smollm2:135m` or
+  `crypt solo --model gemma3:1b` — user picks the model explicitly;
+  runtime (llama.cpp vs ollama) auto-detected from what's available
+- Model eval harness: `cmd/eval-slm` runs the full verb table through each
+  tier's default model and scores classification accuracy (not CI — manual)
+- Eval covers: SmolLM2-135M (small), Gemma 3 1B (medium), Llama 3.2 3B
+  (medium alt) — measures verb classification accuracy and narration quality
 - `crypt solo` declared feature-complete
 
 ---
@@ -430,15 +460,16 @@ DM-generated scenario creation.
 ## Build Order Summary
 
 ```text
-M0  Foundation      Test infra, CI, fakes, no game code
-M1  Data Contracts  Structs, YAML parser, save/load, testdata
-M2  Thin E2E Slice  Move pipeline: interpreter → engine → narrator → renderer
+M0  Foundation      Test infra, CI, fakes, no game code                         ✓ DONE
+M1  Data Contracts  Structs, YAML parser, save/load, testdata                   ✓ DONE
+M2  Thin E2E Slice  Move pipeline: interpreter → engine → narrator → renderer   ✓ DONE
                     ← FIRST FULL ARCHITECTURE VALIDATION →
-M3  Full Headless   All engine mechanics; full headless mode; acceptance tests
+M3  Full Headless   All engine mechanics; full headless mode; acceptance tests   ✓ DONE
 M4  Lux Thin Slice  LuxRenderer stub; crypt solo shows minimal HUD
 M5  Full Lux HUD    Four-panel HUD; nav buttons; combat panel
-M6  SLM Thin Slice  SLMInterpreter + SLMNarrator for movement; fallback tested
-M7  Full SLM        All verbs; solo mode complete
+M6  SLM Thin Slice  SLMInterpreter + SLMNarrator (llama.cpp sidecar + SmolLM2-135M);
+                    movement only; four-tier failover tested (DES-023)
+M7  Full SLM        All verbs; solo mode complete; ollama medium tier; --model flag
 M8  Daemon Slice    crypt serve; single-session; MCP wire tests
 M9  DM Thin Slice   LLM in the loop; crypt dm; SKILL.md rewrite
                     ← FIRST FULL DM MODE VALIDATION →
@@ -462,7 +493,7 @@ Some work can proceed in parallel once its dependencies are met:
 | Can run in parallel | After |
 |---|---|
 | `FakeLuxServer` + `LuxRenderer` | M2 (interfaces defined) |
-| `FakeSLMServer` + SLM interpreters | M2 (interfaces defined) |
+| `FakeSLMServer` (OpenAI-compat) + SLM interpreters + llama.cpp sidecar | M2 (interfaces defined) |
 | Additional scenario YAML files | M1 (parser exists) |
 | Additional acceptance scripts | M3 (engine complete) |
 | SKILL.md DM role draft | M3 (game mechanics stable) |
@@ -481,7 +512,7 @@ These constraints must hold throughout development:
   be. The LLM prompt grows only with narrative and creative guidance.
 - **No network in unit tests.** Any test that dials a real socket is an
   integration test and must be tagged accordingly.
-- **No real ollama or Lux in CI.** Every external dependency has a fake. If a
-  test requires the real thing, it is a manual playtest, not CI.
+- **No real ollama, llama.cpp, or Lux in CI.** Every external dependency has
+  a fake. If a test requires the real thing, it is a manual playtest, not CI.
 - **Save files are always loadable by the current binary.** Migration tests
   run on every format change. Old saves never silently corrupt.

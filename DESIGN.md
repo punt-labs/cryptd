@@ -777,7 +777,7 @@ Rejected because:
 ## DES-015: SLM Integration — ollama over localhost HTTP
 
 **Date:** 2026-03-10
-**Status:** SETTLED
+**Status:** SETTLED (partially superseded by DES-023 — ollama is now the medium tier; small tier uses llama.cpp sidecar)
 **Topic:** How the solo mode SLM is invoked
 
 ### Design
@@ -1121,3 +1121,98 @@ The game takes mechanical inspiration from two 1981 classics:
 Both games define what a dungeon crawl IS for players of a certain era. Choosing them
 as reference points gives the design team a shared vocabulary ("this room should feel
 Zork-ish") and a known quality bar. Neither is being reproduced — they are taste references.
+
+---
+
+## DES-023: Four-Tier Inference Architecture
+
+**Date:** 2026-03-11
+**Status:** SETTLED
+**Topic:** How the game maps inference capabilities to play modes
+**Supersedes:** DES-015 (partially — ollama is no longer the only SLM runtime)
+
+### Design
+
+The game has four inference tiers. Each tier fails open to the one below it, so the
+game is always playable regardless of what's installed.
+
+```
+Large  →  Medium  →  Small  →  Tiny
+Claude    ollama     llama.cpp  regex+templates
+  ↓ fail    ↓ fail     ↓ fail     ↓ always works
+```
+
+| Tier | Interpreter | Narrator | Runtime | Default Model | Distribution |
+|------|-------------|----------|---------|---------------|-------------|
+| Tiny | RulesInterpreter (regex) | TemplateNarrator | None | None | `brew install cryptd` |
+| Small | SLMInterpreter | SLMNarrator | llama.cpp (sidecar) | SmolLM2-135M | Bundled in brew bottle |
+| Medium | SLMInterpreter | SLMNarrator | ollama | User's choice | `brew install ollama` + model pull |
+| Large | LLMInterpreter | LLMNarrator | Claude API | Claude | API key |
+
+The three play modes map to tiers with automatic detection:
+
+| Mode | Preferred Tier | Failover Chain |
+|------|---------------|----------------|
+| `headless` | Tiny | Always tiny (no model) |
+| `solo` | Small or Medium | ollama → llama.cpp → tiny |
+| `dm` | Large | Claude → ollama → llama.cpp → tiny |
+
+The `--model` flag lets the user override the default model for solo or dm mode.
+cryptd probes available runtimes in order (ollama running? → llama.cpp installed? →
+regex fallback) and uses the best match.
+
+```
+cryptd headless                    # tiny (always regex+templates)
+cryptd solo                        # auto: best available
+cryptd solo --model smollm2:135m   # explicit model
+cryptd solo --model gemma3:1b      # explicit model (needs ollama or llama.cpp)
+cryptd dm                          # Claude, falls back through chain
+```
+
+### Model Selection (No Chinese-Origin Models)
+
+Default and recommended models are from Western labs only:
+
+| Tier | Default | Recommended Upgrade | Origin |
+|------|---------|-------------------|--------|
+| Small | SmolLM2-135M | SmolLM2-360M | Hugging Face (France) |
+| Medium | Gemma 3 1B | Llama 3.2 3B | Google (US) / Meta (US) |
+| Large | Claude | Claude | Anthropic (US) |
+
+### Small Tier: llama.cpp Sidecar
+
+The small tier ships SmolLM2-135M (~100MB quantized GGUF) in the Homebrew bottle and
+uses llama.cpp as a sidecar process. The Homebrew formula declares `llama.cpp` as a
+dependency. cryptd spawns `llama-server` as a subprocess and communicates via the same
+HTTP API as ollama (OpenAI-compatible `/v1/chat/completions`).
+
+This avoids CGo in the cryptd binary while providing zero-setup model inference. The
+user runs `brew install cryptd` and solo mode works immediately.
+
+### Why Not Embed (Revisiting DES-015)
+
+DES-015's rejection of embedded llama.cpp (CGo complexity, binary bloat) still holds
+for the cryptd binary itself. The sidecar approach gets the benefits of bundled inference
+without the build system costs:
+
+- cryptd binary remains pure Go
+- llama.cpp is a separate, well-maintained binary managed by Homebrew
+- SmolLM2-135M GGUF is a data file, not compiled into anything
+- Cross-compilation is unaffected
+
+### Why Not ollama for Everything
+
+ollama is excellent for the medium tier (model management, GPU optimization, multiple
+models). But requiring `brew install ollama` + a model pull for the small tier defeats
+the purpose of "just works." The small tier must have zero post-install friction.
+
+### Graceful Degradation
+
+Each tier degrades silently with a one-time warning:
+
+- ollama unavailable → try llama.cpp sidecar
+- llama.cpp unavailable → regex + templates
+- Claude API unavailable → try ollama → try llama.cpp → regex + templates
+
+The engine receives the same `EngineAction` structs regardless of which interpreter
+produced them. The game is always playable.

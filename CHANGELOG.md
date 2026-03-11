@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- DES-023: Four-tier inference architecture (tiny/small/medium/large) with graceful failover chain
+- Room descriptions: `description_seed` wired through event system, displayed on move/look with exits and visible items
+- `unix-catacombs.yaml` scenario: 9-room UNIX-themed dungeon with 3 enemies, 7 items
+- CLIRenderer readline support: line editing and command history when stdin is a terminal (ergochat/readline)
+- Look resolves item IDs to human-readable names via scenario data
+
 - 5 acceptance scripts: `full-run`, `combat-walkthrough`, `pick-up-item`, `combat`, `save-and-reload` — all passing via `cryptd autoplay --json`
 - E2E acceptance test suite (`e2e/acceptance_test.go`) with structured JSON transcript assertions
 - MCP schema contract: `cmd/dump-mcp-schema` generates `testdata/mcp-schema.json`; CI diffs generated vs committed to catch unintentional API changes
