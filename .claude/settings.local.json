@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(bd list:*)",
-      "Bash(go test:*)"
-    ]
-  }
-}

@@ -31,6 +31,8 @@ func (t *Template) Narrate(_ context.Context, event model.EngineEvent, _ model.G
 		return "You can't go that way.", nil
 	case "quit":
 		return "Farewell, adventurer.", nil
+	case "unknown_action":
+		return "I don't understand that command.", nil
 	default:
 		return fmt.Sprintf("Something happens: %s.", event.Type), nil
 	}

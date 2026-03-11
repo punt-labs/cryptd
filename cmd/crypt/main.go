@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/punt-labs/cryptd/internal/engine"
 	"github.com/punt-labs/cryptd/internal/game"
@@ -41,6 +42,10 @@ func runHeadless(args []string) {
 
 	if *scenarioID == "" {
 		fmt.Fprintln(os.Stderr, "usage: cryptd headless --scenario <id>")
+		os.Exit(1)
+	}
+	if strings.ContainsAny(*scenarioID, `/\`) || strings.Contains(*scenarioID, "..") {
+		fmt.Fprintln(os.Stderr, "error: invalid scenario ID")
 		os.Exit(1)
 	}
 

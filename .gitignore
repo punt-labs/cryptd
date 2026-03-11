@@ -27,3 +27,6 @@ prfaq.bbl
 prfaq.bcf
 .idea/
 copilot-session-*.md
+
+# Local Claude tool settings
+.claude/settings.local.json

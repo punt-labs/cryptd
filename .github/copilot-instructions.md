@@ -323,4 +323,5 @@ Org-wide issues (touching 2+ repos or changing a punt-kit standard) go in
 | `docs/plan.md` | Architecture evolution plan: interfaces, engine design, MCP tool surface |
 | `docs/testing.md` | Full test architecture: pyramid, fixture layout, fakes reference, CI config |
 | `docs/architecture.tex` / `.pdf` | Technical architecture specification (LaTeX) |
+| `docs/distribution.md` | Binary distribution: GitHub Releases, GoReleaser, Homebrew tap, trust tiers |
 | `docs/review.md` | Compliance review of the predecessor project; gap list still relevant |
