@@ -145,8 +145,9 @@ func (e *SlotEmptyError) Error() string {
 // Engine is the deterministic rules machine. All game state transitions go
 // through Engine methods. The Engine holds the scenario but never mutates it.
 type Engine struct {
-	s   *scenario.Scenario
-	Now func() time.Time // injectable clock; defaults to time.Now
+	s       *scenario.Scenario
+	Now     func() time.Time // injectable clock; defaults to time.Now
+	SaveDir string           // injectable save directory; defaults to ".dungeon/saves"
 }
 
 // New creates an Engine for the given scenario.
