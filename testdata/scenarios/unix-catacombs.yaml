@@ -1,0 +1,190 @@
+title: "The UNIX Catacombs"
+starting_room: login_terminal
+death: respawn
+
+rooms:
+  login_terminal:
+    name: "Login Prompt"
+    description_seed: "A green phosphor terminal flickers in the darkness. The cursor blinks steadily. UNIX System V — Catacomb Edition. You are a process, newly spawned, standing before the system's login gate. A crumpled man page lies on the floor. The filesystem stretches south."
+    connections:
+      south:
+        room: home_dir
+        type: open
+    items: [man_page]
+
+  home_dir:
+    name: "/home/guest"
+    description_seed: "A sparse home directory. A .bashrc file glows faintly on the floor. Three paths branch out: a well-worn path west to /tmp, a narrow corridor east to /var/log, and a passage south with /etc/shadow stenciled above it."
+    connections:
+      north:
+        room: login_terminal
+        type: open
+      west:
+        room: tmp_wasteland
+        type: open
+      east:
+        room: var_log
+        type: open
+      south:
+        room: etc_shadow
+        type: open
+    items: [alias_shield]
+
+  tmp_wasteland:
+    name: "/tmp Wasteland"
+    description_seed: "A chaotic landscape of abandoned temp files. Half-finished downloads, orphaned sockets, and stale lock files litter the ground. A Segfault Daemon shambles between the debris, corrupting everything it touches. A pipe juts from the ground nearby."
+    connections:
+      east:
+        room: home_dir
+        type: open
+      south:
+        room: pipe_maze
+        type: open
+    enemies: [segfault_daemon]
+    items: [pipe_connector]
+
+  var_log:
+    name: "/var/log"
+    description_seed: "Walls of scrolling text surround you — system logs, auth logs, error messages cascading forever. Most are noise, but patterns emerge if you look carefully. A grep tool hangs on the wall in a glass case labeled 'Break in case of emergency.' One line stands out: WARN — OOM Killer activated."
+    connections:
+      west:
+        room: home_dir
+        type: open
+    items: [grep_tool, kill_nine]
+
+  pipe_maze:
+    name: "The Pipe Maze"
+    description_seed: "You are inside a network of UNIX pipes connecting processes. Data streams flow in every direction. Pipes branch in all directions — some loop back on themselves, one leads to the void of /dev/null. A faint light glows from the south where an open gate leads onward."
+    connections:
+      north:
+        room: tmp_wasteland
+        type: open
+      south:
+        room: root_chamber
+        type: open
+      west:
+        room: dev_null
+        type: open
+
+  dev_null:
+    name: "/dev/null"
+    description_seed: "Void. Absolute nothing. Data enters and is destroyed. You feel yourself dissolving at the edges. A faint echo of a path leads east, back to the pipe junction."
+    connections:
+      east:
+        room: pipe_maze
+        type: open
+    enemies: [null_byte]
+
+  root_chamber:
+    name: "The Root Chamber"
+    description_seed: "A vast chamber carved from pure silicon. On a pedestal of stacked man pages rests the Root Shell — a glowing terminal prompt pulsing with # instead of $. The air hums with privilege escalation. The OOM Killer stands guard — a towering process reaper with kill -9 crackling in its hands."
+    connections:
+      north:
+        room: pipe_maze
+        type: open
+      south:
+        room: root_shell
+        type: open
+    enemies: [oom_killer]
+
+  root_shell:
+    name: "The Root Shell"
+    description_seed: "The OOM Killer is gone. The Root Shell glows before you — root@catacombs:~# — Welcome, superuser. You now have root access. The system is yours. chmod 777 everything."
+    connections:
+      north:
+        room: root_chamber
+        type: open
+    items: [root_shell]
+
+  etc_shadow:
+    name: "/etc/shadow"
+    description_seed: "The secrets of the system lie bare before you. Password hashes line the walls like ancient runes. This vault was worth the trouble."
+    connections:
+      north:
+        room: home_dir
+        type: open
+    items: [shadow_file]
+
+enemies:
+  segfault_daemon:
+    name: "Segfault Daemon"
+    hp: 15
+    attack: "1d6"
+    ai: aggressive
+
+  oom_killer:
+    name: "OOM Killer"
+    hp: 25
+    attack: "1d8+2"
+    ai: aggressive
+
+  null_byte:
+    name: "Null Byte"
+    hp: 5
+    attack: "1d4"
+    ai: cautious
+
+spells:
+  fireball:
+    name: Fireball
+    mp: 3
+    effect: damage
+    power: "2d6"
+    classes: [mage, priest]
+  heal:
+    name: Heal
+    mp: 2
+    effect: heal
+    power: "1d6+2"
+    classes: [priest, mage]
+
+items:
+  man_page:
+    name: "Man Page"
+    description: "man survival(7) — In the UNIX Catacombs, every process has a PID and a purpose. Find the Root Shell before the OOM Killer finds you. Pipes connect all things. stderr is your friend."
+    type: misc
+    weight: 0.1
+    value: 0
+
+  alias_shield:
+    name: "Alias Shield"
+    description: "Sourced from .bashrc. The alias 'shield=deflect -a' wraps around you like armor, deflecting the worst of incoming signals."
+    type: armor
+    weight: 2.0
+    value: 15
+
+  pipe_connector:
+    name: "Pipe Connector"
+    description: "Wrenched from the ground in /tmp. A mystery.pipe that could connect to anything — or unlock sealed gates."
+    type: key
+    weight: 0.5
+    value: 5
+
+  grep_tool:
+    name: "Grep Tool"
+    description: "A powerful pattern-matching tool from /var/log. With this, you can search for weaknesses in any process."
+    type: amulet
+    weight: 0.3
+    value: 20
+
+  kill_nine:
+    name: "Kill Nine"
+    description: "The ultimate signal — the infamous 'kill -9'. SIGKILL. No process can catch it, no process can ignore it. Unceremonious but effective."
+    type: weapon
+    damage: "1d8+1"
+    weight: 1.0
+    value: 25
+
+  root_shell:
+    name: "Root Shell"
+    description: "A glowing terminal prompt pulsing with # instead of $. You are root. The system is yours."
+    type: amulet
+    weight: 0.0
+    value: 100
+
+  shadow_file:
+    name: "Shadow File"
+    description: "A copy of /etc/shadow. Password hashes for every user on the system. Knowledge is power."
+    type: misc
+    weight: 0.1
+    value: 50

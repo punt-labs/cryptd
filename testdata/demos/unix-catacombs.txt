@@ -1,0 +1,38 @@
+# unix-catacombs — explore, gear up, fight through to the Root Shell
+look
+take man page
+south
+look
+take alias shield
+equip alias shield
+east
+look
+take grep tool
+take kill nine
+equip kill nine
+west
+west
+look
+attack
+attack
+attack
+attack
+attack
+attack
+take pipe connector
+south
+look
+south
+attack
+attack
+attack
+attack
+attack
+attack
+attack
+attack
+attack
+south
+look
+take root shell
+quit

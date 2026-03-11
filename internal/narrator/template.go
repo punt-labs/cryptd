@@ -4,6 +4,7 @@ package narrator
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/punt-labs/cryptd/internal/model"
 )
@@ -19,12 +20,13 @@ func NewTemplate() *Template { return &Template{} }
 func (t *Template) Narrate(_ context.Context, event model.EngineEvent, _ model.GameState) (string, error) {
 	switch event.Type {
 	case "moved":
-		return fmt.Sprintf("You enter %s.", event.Room), nil
+		return roomNarration(fmt.Sprintf("You enter %s.", event.Room), event.Details), nil
 	case "looked":
+		header := "You look around."
 		if event.Room != "" {
-			return fmt.Sprintf("You look around %s.", event.Room), nil
+			header = fmt.Sprintf("You look around %s.", event.Room)
 		}
-		return "You look around.", nil
+		return roomNarration(header, event.Details), nil
 	case "locked_door":
 		return "That way is locked.", nil
 	case "no_exit":
@@ -154,4 +156,25 @@ func (t *Template) Narrate(_ context.Context, event model.EngineEvent, _ model.G
 	default:
 		return fmt.Sprintf("Something happens: %s.", event.Type), nil
 	}
+}
+
+// roomNarration appends description, exits, and items from event details to a
+// header line (e.g. "You enter X." or "You look around X.").
+func roomNarration(header string, details map[string]any) string {
+	var parts []string
+	parts = append(parts, header)
+
+	if desc, ok := details["description"].(string); ok && desc != "" {
+		parts = append(parts, desc)
+	}
+
+	if exits, ok := details["exits"].([]string); ok && len(exits) > 0 {
+		parts = append(parts, fmt.Sprintf("Exits: %s.", strings.Join(exits, ", ")))
+	}
+
+	if items, ok := details["items"].([]string); ok && len(items) > 0 {
+		parts = append(parts, fmt.Sprintf("You see: %s.", strings.Join(items, ", ")))
+	}
+
+	return strings.Join(parts, " ")
 }
