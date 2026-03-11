@@ -230,6 +230,15 @@ func TestRulesInterpreter_Load(t *testing.T) {
 	assert.Equal(t, "slot1", a.Target)
 }
 
+func TestRulesInterpreter_Help(t *testing.T) {
+	for _, input := range []string{"help", "?"} {
+		t.Run(input, func(t *testing.T) {
+			a := interpret(t, input)
+			assert.Equal(t, "help", a.Type)
+		})
+	}
+}
+
 func TestRulesInterpreter_CaseInsensitive(t *testing.T) {
 	a := interpret(t, "GO NORTH")
 	assert.Equal(t, "move", a.Type)

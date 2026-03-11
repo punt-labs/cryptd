@@ -19,6 +19,7 @@ func TestTemplateNarrator_AllEventTypes(t *testing.T) {
 		"picked_up", "dropped", "equipped", "unequipped", "examined",
 		"inventory_listed", "item_not_found", "not_in_inventory",
 		"too_heavy", "slot_occupied", "slot_empty", "not_equippable",
+		"help",
 	}
 	for _, evType := range events {
 		t.Run(evType, func(t *testing.T) {
