@@ -11,6 +11,37 @@ import (
 	"github.com/punt-labs/cryptd/internal/model"
 )
 
+// inventoryErrorEvent converts a typed inventory error into a narration-friendly
+// EngineEvent. Internal (unexpected) errors are not converted — they propagate
+// as-is from the dispatch caller.
+func inventoryErrorEvent(err error) model.EngineEvent {
+	var notInRoom *engine.ItemNotInRoomError
+	var notInInv *engine.ItemNotInInventoryError
+	var tooHeavy *engine.TooHeavyError
+	var notEquippable *engine.NotEquippableError
+	var occupied *engine.SlotOccupiedError
+	var slotEmpty *engine.SlotEmptyError
+
+	switch {
+	case errors.As(err, &notInRoom):
+		return model.EngineEvent{Type: "item_not_found"}
+	case errors.As(err, &notInInv):
+		return model.EngineEvent{Type: "not_in_inventory"}
+	case errors.As(err, &tooHeavy):
+		return model.EngineEvent{Type: "too_heavy"}
+	case errors.As(err, &notEquippable):
+		return model.EngineEvent{Type: "not_equippable"}
+	case errors.As(err, &occupied):
+		return model.EngineEvent{Type: "slot_occupied"}
+	case errors.As(err, &slotEmpty):
+		return model.EngineEvent{Type: "slot_empty"}
+	default:
+		// Unknown error — this shouldn't happen for inventory operations.
+		// Return a generic event; caller can inspect further if needed.
+		return model.EngineEvent{Type: "unknown_action"}
+	}
+}
+
 // Loop runs the game by pulling input from the renderer, routing it through
 // the interpreter and engine, and pushing narrated output back to the renderer.
 type Loop struct {
@@ -103,6 +134,59 @@ func (l *Loop) dispatch(ctx context.Context, state *model.GameState, action mode
 	case "look":
 		look := l.eng.Look(state)
 		event = model.EngineEvent{Type: "looked", Room: look.Room}
+
+	case "take":
+		result, err := l.eng.PickUp(state, action.ItemID)
+		if err != nil {
+			event = inventoryErrorEvent(err)
+		} else {
+			event = model.EngineEvent{Type: "picked_up", Details: map[string]any{
+				"item_name": result.Item.Name, "item_id": result.Item.ID,
+			}}
+		}
+
+	case "drop":
+		result, err := l.eng.Drop(state, action.ItemID)
+		if err != nil {
+			event = inventoryErrorEvent(err)
+		} else {
+			event = model.EngineEvent{Type: "dropped", Details: map[string]any{
+				"item_name": result.Item.Name, "item_id": result.Item.ID,
+			}}
+		}
+
+	case "equip":
+		result, err := l.eng.Equip(state, action.ItemID)
+		if err != nil {
+			event = inventoryErrorEvent(err)
+		} else {
+			event = model.EngineEvent{Type: "equipped", Details: map[string]any{
+				"item_name": result.Item.Name, "slot": result.Slot,
+			}}
+		}
+
+	case "unequip":
+		result, err := l.eng.Unequip(state, action.Target)
+		if err != nil {
+			event = inventoryErrorEvent(err)
+		} else {
+			event = model.EngineEvent{Type: "unequipped", Details: map[string]any{
+				"item_name": result.Item.Name, "slot": result.Slot,
+			}}
+		}
+
+	case "examine":
+		result, err := l.eng.Examine(state, action.ItemID)
+		if err != nil {
+			event = inventoryErrorEvent(err)
+		} else {
+			event = model.EngineEvent{Type: "examined", Details: map[string]any{
+				"item_name": result.Item.Name, "description": result.Item.Description,
+			}}
+		}
+
+	case "inventory":
+		event = model.EngineEvent{Type: "inventory_listed"}
 
 	case "quit":
 		event = model.EngineEvent{Type: "quit"}

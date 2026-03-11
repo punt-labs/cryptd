@@ -48,6 +48,100 @@ func (e *LockedError) Error() string {
 	return fmt.Sprintf("the way %s to %s is locked", e.Direction, e.Room)
 }
 
+// PickUpResult holds the outcome of a successful pick-up action.
+type PickUpResult struct {
+	Item model.Item
+}
+
+// DropResult holds the outcome of a successful drop action.
+type DropResult struct {
+	Item model.Item
+}
+
+// EquipResult holds the outcome of a successful equip action.
+type EquipResult struct {
+	Item model.Item
+	Slot string
+}
+
+// UnequipResult holds the outcome of a successful unequip action.
+type UnequipResult struct {
+	Item model.Item
+	Slot string
+}
+
+// ExamineResult holds item details returned by Examine.
+type ExamineResult struct {
+	Item model.Item
+}
+
+// InventoryResult holds the character's current inventory and equipment.
+type InventoryResult struct {
+	Items    []model.Item
+	Equipped model.Equipment
+	Weight   float64
+	Capacity float64
+}
+
+// ItemNotInRoomError is returned when the player tries to pick up an item not in the room.
+type ItemNotInRoomError struct {
+	ItemID string
+}
+
+func (e *ItemNotInRoomError) Error() string {
+	return fmt.Sprintf("no item %q here", e.ItemID)
+}
+
+// ItemNotInInventoryError is returned when referencing an item not in inventory.
+type ItemNotInInventoryError struct {
+	ItemID string
+}
+
+func (e *ItemNotInInventoryError) Error() string {
+	return fmt.Sprintf("you don't have %q", e.ItemID)
+}
+
+// TooHeavyError is returned when picking up an item would exceed carry weight.
+type TooHeavyError struct {
+	ItemID   string
+	Weight   float64
+	Capacity float64
+	Current  float64
+}
+
+func (e *TooHeavyError) Error() string {
+	return fmt.Sprintf("picking up %q (%.1f) would exceed carry limit (%.1f/%.1f)", e.ItemID, e.Weight, e.Current, e.Capacity)
+}
+
+// NotEquippableError is returned when trying to equip a non-equippable item.
+type NotEquippableError struct {
+	ItemID   string
+	ItemType string
+}
+
+func (e *NotEquippableError) Error() string {
+	return fmt.Sprintf("cannot equip %q (type %s)", e.ItemID, e.ItemType)
+}
+
+// SlotOccupiedError is returned when the equipment slot already holds an item.
+type SlotOccupiedError struct {
+	Slot       string
+	OccupiedBy string
+}
+
+func (e *SlotOccupiedError) Error() string {
+	return fmt.Sprintf("slot %s already occupied by %q", e.Slot, e.OccupiedBy)
+}
+
+// SlotEmptyError is returned when trying to unequip from an empty slot.
+type SlotEmptyError struct {
+	Slot string
+}
+
+func (e *SlotEmptyError) Error() string {
+	return fmt.Sprintf("nothing equipped in %s slot", e.Slot)
+}
+
 // Engine is the deterministic rules machine. All game state transitions go
 // through Engine methods. The Engine holds the scenario but never mutates it.
 type Engine struct {
@@ -62,13 +156,23 @@ func New(s *scenario.Scenario) *Engine {
 
 // NewGame initialises a fresh GameState for the scenario and character.
 // PlayMode is left empty; the composition layer (cmd or game.Loop) sets it.
+// Room items are seeded from the scenario into mutable RoomState.
 func (e *Engine) NewGame(char model.Character) (model.GameState, error) {
+	roomState := make(map[string]model.RoomState, len(e.s.Rooms))
+	for id, room := range e.s.Rooms {
+		rs := model.RoomState{}
+		if len(room.Items) > 0 {
+			rs.Items = make([]string, len(room.Items))
+			copy(rs.Items, room.Items)
+		}
+		roomState[id] = rs
+	}
 	state := model.GameState{
 		Scenario: e.s.ID,
 		Dungeon: model.DungeonState{
 			CurrentRoom:  e.s.StartingRoom,
 			VisitedRooms: []string{e.s.StartingRoom},
-			RoomState:    make(map[string]model.RoomState),
+			RoomState:    roomState,
 		},
 		Party: []model.Character{char},
 	}
@@ -118,7 +222,7 @@ func (e *Engine) Move(state *model.GameState, direction string) (MoveResult, err
 	return MoveResult{
 		NewRoom: conn.Room,
 		Exits:   exitList(dest),
-		Items:   dest.Items,
+		Items:   state.Dungeon.RoomState[conn.Room].Items,
 		Enemies: dest.Enemies,
 	}, nil
 }
@@ -134,7 +238,7 @@ func (e *Engine) Look(state *model.GameState) LookResult {
 		Name:        room.Name,
 		Description: room.DescriptionSeed,
 		Exits:       exitList(room),
-		Items:       room.Items,
+		Items:       state.Dungeon.RoomState[state.Dungeon.CurrentRoom].Items,
 		Enemies:     room.Enemies,
 	}
 }
@@ -159,4 +263,241 @@ func appendUnique(slice []string, s string) []string {
 		}
 	}
 	return append(slice, s)
+}
+
+// hero returns a pointer to the first party member (single-player, DES-021).
+func hero(state *model.GameState) *model.Character {
+	return &state.Party[0]
+}
+
+// inventoryWeight returns the total weight of items in the character's inventory.
+func inventoryWeight(char *model.Character, s *scenario.Scenario) float64 {
+	var w float64
+	for _, item := range char.Inventory {
+		w += item.Weight
+	}
+	return w
+}
+
+// scenarioItem converts a scenario item definition to a model.Item.
+func scenarioItem(id string, si *scenario.ScenarioItem) model.Item {
+	return model.Item{
+		ID:          id,
+		Name:        si.Name,
+		Type:        si.Type,
+		Damage:      si.Damage,
+		Weight:      si.Weight,
+		Value:       si.Value,
+		Description: si.Description,
+	}
+}
+
+// removeItem removes the first occurrence of itemID from a string slice,
+// returning the modified slice and whether the item was found.
+func removeItem(items []string, itemID string) ([]string, bool) {
+	for i, id := range items {
+		if id == itemID {
+			return append(items[:i], items[i+1:]...), true
+		}
+	}
+	return items, false
+}
+
+// PickUp removes an item from the current room and adds it to the character's inventory.
+func (e *Engine) PickUp(state *model.GameState, itemID string) (PickUpResult, error) {
+	rs := state.Dungeon.RoomState[state.Dungeon.CurrentRoom]
+	newItems, found := removeItem(rs.Items, itemID)
+	if !found {
+		return PickUpResult{}, &ItemNotInRoomError{ItemID: itemID}
+	}
+
+	si, ok := e.s.Items[itemID]
+	if !ok {
+		return PickUpResult{}, fmt.Errorf("item %q not defined in scenario", itemID)
+	}
+
+	char := hero(state)
+	current := inventoryWeight(char, e.s)
+	if current+si.Weight > model.MaxCarryWeight {
+		return PickUpResult{}, &TooHeavyError{
+			ItemID: itemID, Weight: si.Weight,
+			Capacity: model.MaxCarryWeight, Current: current,
+		}
+	}
+
+	rs.Items = newItems
+	state.Dungeon.RoomState[state.Dungeon.CurrentRoom] = rs
+
+	item := scenarioItem(itemID, si)
+	char.Inventory = append(char.Inventory, item)
+
+	state.AdventureLog = append(state.AdventureLog, model.LogEntry{
+		Text:      fmt.Sprintf("You pick up %s.", si.Name),
+		Timestamp: e.Now().UTC().Format(time.RFC3339),
+	})
+
+	return PickUpResult{Item: item}, nil
+}
+
+// Drop removes an item from inventory and places it in the current room.
+func (e *Engine) Drop(state *model.GameState, itemID string) (DropResult, error) {
+	char := hero(state)
+	idx := -1
+	for i, item := range char.Inventory {
+		if item.ID == itemID {
+			idx = i
+			break
+		}
+	}
+	if idx == -1 {
+		return DropResult{}, &ItemNotInInventoryError{ItemID: itemID}
+	}
+
+	item := char.Inventory[idx]
+	char.Inventory = append(char.Inventory[:idx], char.Inventory[idx+1:]...)
+
+	rs := state.Dungeon.RoomState[state.Dungeon.CurrentRoom]
+	rs.Items = append(rs.Items, itemID)
+	state.Dungeon.RoomState[state.Dungeon.CurrentRoom] = rs
+
+	state.AdventureLog = append(state.AdventureLog, model.LogEntry{
+		Text:      fmt.Sprintf("You drop %s.", item.Name),
+		Timestamp: e.Now().UTC().Format(time.RFC3339),
+	})
+
+	return DropResult{Item: item}, nil
+}
+
+// slotForType maps item types to equipment slot names.
+var slotForType = map[string]string{
+	"weapon": "weapon",
+	"armor":  "armor",
+	"ring":   "ring",
+	"amulet": "amulet",
+}
+
+// getSlot reads the equipment slot value for the given slot name.
+func getSlot(eq *model.Equipment, slot string) string {
+	switch slot {
+	case "weapon":
+		return eq.Weapon
+	case "armor":
+		return eq.Armor
+	case "ring":
+		return eq.Ring
+	case "amulet":
+		return eq.Amulet
+	default:
+		return ""
+	}
+}
+
+// setSlot writes an item ID to the named equipment slot.
+func setSlot(eq *model.Equipment, slot, itemID string) {
+	switch slot {
+	case "weapon":
+		eq.Weapon = itemID
+	case "armor":
+		eq.Armor = itemID
+	case "ring":
+		eq.Ring = itemID
+	case "amulet":
+		eq.Amulet = itemID
+	}
+}
+
+// Equip moves an item from inventory to the appropriate equipment slot.
+func (e *Engine) Equip(state *model.GameState, itemID string) (EquipResult, error) {
+	char := hero(state)
+	idx := -1
+	for i, item := range char.Inventory {
+		if item.ID == itemID {
+			idx = i
+			break
+		}
+	}
+	if idx == -1 {
+		return EquipResult{}, &ItemNotInInventoryError{ItemID: itemID}
+	}
+
+	item := char.Inventory[idx]
+	slot, ok := slotForType[item.Type]
+	if !ok {
+		return EquipResult{}, &NotEquippableError{ItemID: itemID, ItemType: item.Type}
+	}
+
+	if existing := getSlot(&char.Equipped, slot); existing != "" {
+		return EquipResult{}, &SlotOccupiedError{Slot: slot, OccupiedBy: existing}
+	}
+
+	char.Inventory = append(char.Inventory[:idx], char.Inventory[idx+1:]...)
+	setSlot(&char.Equipped, slot, itemID)
+
+	state.AdventureLog = append(state.AdventureLog, model.LogEntry{
+		Text:      fmt.Sprintf("You equip %s.", item.Name),
+		Timestamp: e.Now().UTC().Format(time.RFC3339),
+	})
+
+	return EquipResult{Item: item, Slot: slot}, nil
+}
+
+// Unequip moves an item from an equipment slot back to inventory.
+func (e *Engine) Unequip(state *model.GameState, slot string) (UnequipResult, error) {
+	char := hero(state)
+	itemID := getSlot(&char.Equipped, slot)
+	if itemID == "" {
+		return UnequipResult{}, &SlotEmptyError{Slot: slot}
+	}
+
+	si, ok := e.s.Items[itemID]
+	if !ok {
+		return UnequipResult{}, fmt.Errorf("equipped item %q not defined in scenario", itemID)
+	}
+
+	item := scenarioItem(itemID, si)
+	setSlot(&char.Equipped, slot, "")
+	char.Inventory = append(char.Inventory, item)
+
+	state.AdventureLog = append(state.AdventureLog, model.LogEntry{
+		Text:      fmt.Sprintf("You unequip %s.", item.Name),
+		Timestamp: e.Now().UTC().Format(time.RFC3339),
+	})
+
+	return UnequipResult{Item: item, Slot: slot}, nil
+}
+
+// Examine returns details about an item in inventory or the current room.
+func (e *Engine) Examine(state *model.GameState, itemID string) (ExamineResult, error) {
+	// Check inventory first.
+	char := hero(state)
+	for _, item := range char.Inventory {
+		if item.ID == itemID {
+			return ExamineResult{Item: item}, nil
+		}
+	}
+
+	// Check room.
+	rs := state.Dungeon.RoomState[state.Dungeon.CurrentRoom]
+	for _, id := range rs.Items {
+		if id == itemID {
+			si, ok := e.s.Items[id]
+			if !ok {
+				return ExamineResult{}, fmt.Errorf("item %q not defined in scenario", id)
+			}
+			return ExamineResult{Item: scenarioItem(id, si)}, nil
+		}
+	}
+
+	return ExamineResult{}, &ItemNotInRoomError{ItemID: itemID}
+}
+
+// Inventory returns the hero's current inventory and equipment.
+func (e *Engine) Inventory(state *model.GameState) InventoryResult {
+	char := hero(state)
+	return InventoryResult{
+		Items:    char.Inventory,
+		Equipped: char.Equipped,
+		Weight:   inventoryWeight(char, e.s),
+		Capacity: model.MaxCarryWeight,
+	}
 }

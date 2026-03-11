@@ -68,12 +68,87 @@ func TestRulesInterpreter_Quit(t *testing.T) {
 }
 
 func TestRulesInterpreter_Unknown(t *testing.T) {
-	for _, input := range []string{"frobnicate", "attack goblin", "", "   "} {
+	for _, input := range []string{"frobnicate", "", "   "} {
 		t.Run(input, func(t *testing.T) {
 			a := interpret(t, input)
 			assert.Equal(t, "unknown", a.Type)
 		})
 	}
+}
+
+var takeTests = []struct {
+	input  string
+	itemID string
+}{
+	{"take rusty_key", "rusty_key"},
+	{"get rusty_key", "rusty_key"},
+	{"grab rusty_key", "rusty_key"},
+	{"pick up rusty_key", "rusty_key"},
+	{"TAKE Rusty_Key", "rusty_key"},
+}
+
+func TestRulesInterpreter_TakeVerbs(t *testing.T) {
+	for _, tt := range takeTests {
+		t.Run(tt.input, func(t *testing.T) {
+			a := interpret(t, tt.input)
+			assert.Equal(t, "take", a.Type)
+			assert.Equal(t, tt.itemID, a.ItemID)
+		})
+	}
+}
+
+func TestRulesInterpreter_Drop(t *testing.T) {
+	a := interpret(t, "drop rusty_key")
+	assert.Equal(t, "drop", a.Type)
+	assert.Equal(t, "rusty_key", a.ItemID)
+}
+
+func TestRulesInterpreter_Equip(t *testing.T) {
+	for _, input := range []string{"equip short_sword", "wear short_sword", "wield short_sword"} {
+		t.Run(input, func(t *testing.T) {
+			a := interpret(t, input)
+			assert.Equal(t, "equip", a.Type)
+			assert.Equal(t, "short_sword", a.ItemID)
+		})
+	}
+}
+
+func TestRulesInterpreter_Unequip(t *testing.T) {
+	for _, input := range []string{"unequip weapon", "remove weapon"} {
+		t.Run(input, func(t *testing.T) {
+			a := interpret(t, input)
+			assert.Equal(t, "unequip", a.Type)
+			assert.Equal(t, "weapon", a.Target)
+		})
+	}
+}
+
+func TestRulesInterpreter_Inventory(t *testing.T) {
+	for _, input := range []string{"inventory", "i"} {
+		t.Run(input, func(t *testing.T) {
+			a := interpret(t, input)
+			assert.Equal(t, "inventory", a.Type)
+		})
+	}
+}
+
+func TestRulesInterpreter_Examine(t *testing.T) {
+	a := interpret(t, "examine short_sword")
+	assert.Equal(t, "examine", a.Type)
+	assert.Equal(t, "short_sword", a.ItemID)
+
+	// "examine room" is still a look
+	a = interpret(t, "examine room")
+	assert.Equal(t, "look", a.Type)
+
+	// "x" alone is a look
+	a = interpret(t, "x")
+	assert.Equal(t, "look", a.Type)
+
+	// "x short_sword" is examine
+	a = interpret(t, "x short_sword")
+	assert.Equal(t, "examine", a.Type)
+	assert.Equal(t, "short_sword", a.ItemID)
 }
 
 func TestRulesInterpreter_CaseInsensitive(t *testing.T) {
