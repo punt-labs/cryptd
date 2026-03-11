@@ -151,6 +151,45 @@ func TestRulesInterpreter_Examine(t *testing.T) {
 	assert.Equal(t, "short_sword", a.ItemID)
 }
 
+func TestRulesInterpreter_Attack(t *testing.T) {
+	for _, tt := range []struct {
+		input  string
+		target string
+	}{
+		{"attack goblin_0", "goblin_0"},
+		{"a goblin_0", "goblin_0"},
+		{"hit goblin_0", "goblin_0"},
+		{"strike goblin_0", "goblin_0"},
+		{"kill goblin_0", "goblin_0"},
+		{"attack", ""},     // no target — default to first alive
+		{"a", ""},           // shorthand, no target
+	} {
+		t.Run(tt.input, func(t *testing.T) {
+			a := interpret(t, tt.input)
+			assert.Equal(t, "attack", a.Type)
+			assert.Equal(t, tt.target, a.Target)
+		})
+	}
+}
+
+func TestRulesInterpreter_Defend(t *testing.T) {
+	for _, input := range []string{"defend", "block", "guard"} {
+		t.Run(input, func(t *testing.T) {
+			a := interpret(t, input)
+			assert.Equal(t, "defend", a.Type)
+		})
+	}
+}
+
+func TestRulesInterpreter_Flee(t *testing.T) {
+	for _, input := range []string{"flee", "run", "escape"} {
+		t.Run(input, func(t *testing.T) {
+			a := interpret(t, input)
+			assert.Equal(t, "flee", a.Type)
+		})
+	}
+}
+
 func TestRulesInterpreter_CaseInsensitive(t *testing.T) {
 	a := interpret(t, "GO NORTH")
 	assert.Equal(t, "move", a.Type)

@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/punt-labs/cryptd/internal/engine"
 	"github.com/punt-labs/cryptd/internal/model"
@@ -38,6 +39,12 @@ func inventoryErrorEvent(err error) (model.EngineEvent, error) {
 	default:
 		return model.EngineEvent{}, err
 	}
+}
+
+// combatBlockedActions are action types that cannot be performed during combat.
+var combatBlockedActions = map[string]bool{
+	"move": true, "take": true, "drop": true,
+	"equip": true, "unequip": true, "examine": true,
 }
 
 // Loop runs the game by pulling input from the renderer, routing it through
@@ -92,7 +99,7 @@ func (l *Loop) Run(ctx context.Context, state *model.GameState) error {
 				}
 			}
 
-			event, narration, err := l.dispatch(ctx, state, action)
+			events, narration, err := l.dispatch(ctx, state, action)
 			if err != nil {
 				return err
 			}
@@ -101,14 +108,29 @@ func (l *Loop) Run(ctx context.Context, state *model.GameState) error {
 				return err
 			}
 
-			if event.Type == "quit" {
-				return nil
+			for _, event := range events {
+				if event.Type == "quit" {
+					return nil
+				}
+				if event.Type == "hero_died" {
+					return nil
+				}
 			}
 		}
 	}
 }
 
-func (l *Loop) dispatch(ctx context.Context, state *model.GameState, action model.EngineAction) (model.EngineEvent, string, error) {
+func (l *Loop) dispatch(ctx context.Context, state *model.GameState, action model.EngineAction) ([]model.EngineEvent, string, error) {
+	// Block non-combat actions during combat.
+	if state.Dungeon.Combat.Active && combatBlockedActions[action.Type] {
+		event := model.EngineEvent{Type: "in_combat"}
+		narration, err := l.narr.Narrate(ctx, event, *state)
+		if err != nil {
+			return nil, "", err
+		}
+		return []model.EngineEvent{event}, narration, nil
+	}
+
 	var event model.EngineEvent
 
 	switch action.Type {
@@ -123,10 +145,23 @@ func (l *Loop) dispatch(ctx context.Context, state *model.GameState, action mode
 			case errors.As(err, &noExit):
 				event = model.EngineEvent{Type: "no_exit"}
 			default:
-				return model.EngineEvent{}, "", err
+				return nil, "", err
 			}
 		} else {
 			event = model.EngineEvent{Type: "moved", Room: result.NewRoom}
+
+			// Auto-start combat if room has enemies and is not cleared.
+			narration, err := l.narr.Narrate(ctx, event, *state)
+			if err != nil {
+				return nil, "", err
+			}
+			combatResult, combatErr := l.eng.StartCombat(state)
+			if combatErr == nil {
+				// Combat started — append combat narration.
+				return l.narrateCombatStart(ctx, state, event, narration, combatResult)
+			}
+			// No combat to start — return just the move event.
+			return []model.EngineEvent{event}, narration, nil
 		}
 
 	case "look":
@@ -138,7 +173,7 @@ func (l *Loop) dispatch(ctx context.Context, state *model.GameState, action mode
 		if err != nil {
 			event, err = inventoryErrorEvent(err)
 			if err != nil {
-				return model.EngineEvent{}, "", err
+				return nil, "", err
 			}
 		} else {
 			event = model.EngineEvent{Type: "picked_up", Details: map[string]any{
@@ -151,7 +186,7 @@ func (l *Loop) dispatch(ctx context.Context, state *model.GameState, action mode
 		if err != nil {
 			event, err = inventoryErrorEvent(err)
 			if err != nil {
-				return model.EngineEvent{}, "", err
+				return nil, "", err
 			}
 		} else {
 			event = model.EngineEvent{Type: "dropped", Details: map[string]any{
@@ -164,7 +199,7 @@ func (l *Loop) dispatch(ctx context.Context, state *model.GameState, action mode
 		if err != nil {
 			event, err = inventoryErrorEvent(err)
 			if err != nil {
-				return model.EngineEvent{}, "", err
+				return nil, "", err
 			}
 		} else {
 			event = model.EngineEvent{Type: "equipped", Details: map[string]any{
@@ -177,7 +212,7 @@ func (l *Loop) dispatch(ctx context.Context, state *model.GameState, action mode
 		if err != nil {
 			event, err = inventoryErrorEvent(err)
 			if err != nil {
-				return model.EngineEvent{}, "", err
+				return nil, "", err
 			}
 		} else {
 			event = model.EngineEvent{Type: "unequipped", Details: map[string]any{
@@ -190,7 +225,7 @@ func (l *Loop) dispatch(ctx context.Context, state *model.GameState, action mode
 		if err != nil {
 			event, err = inventoryErrorEvent(err)
 			if err != nil {
-				return model.EngineEvent{}, "", err
+				return nil, "", err
 			}
 		} else {
 			event = model.EngineEvent{Type: "examined", Details: map[string]any{
@@ -207,6 +242,15 @@ func (l *Loop) dispatch(ctx context.Context, state *model.GameState, action mode
 			"capacity": result.Capacity,
 		}}
 
+	case "attack":
+		return l.dispatchAttack(ctx, state, action)
+
+	case "defend":
+		return l.dispatchDefend(ctx, state)
+
+	case "flee":
+		return l.dispatchFlee(ctx, state)
+
 	case "quit":
 		event = model.EngineEvent{Type: "quit"}
 
@@ -216,7 +260,294 @@ func (l *Loop) dispatch(ctx context.Context, state *model.GameState, action mode
 
 	narration, err := l.narr.Narrate(ctx, event, *state)
 	if err != nil {
-		return event, "", err
+		return nil, "", err
 	}
-	return event, narration, nil
+	return []model.EngineEvent{event}, narration, nil
+}
+
+func (l *Loop) dispatchAttack(ctx context.Context, state *model.GameState, action model.EngineAction) ([]model.EngineEvent, string, error) {
+	if !state.Dungeon.Combat.Active {
+		event := model.EngineEvent{Type: "not_in_combat"}
+		narration, err := l.narr.Narrate(ctx, event, *state)
+		if err != nil {
+			return nil, "", err
+		}
+		return []model.EngineEvent{event}, narration, nil
+	}
+
+	targetID := action.Target
+	if targetID == "" {
+		targetID = l.eng.FirstAliveEnemy(state)
+	}
+
+	// Capture enemy name before Attack() — endCombat zeroes the slice on kill.
+	enemyName := targetID
+	for _, e := range state.Dungeon.Combat.Enemies {
+		if e.ID == targetID {
+			enemyName = e.Name
+			break
+		}
+	}
+
+	result, err := l.eng.Attack(state, targetID)
+	if err != nil {
+		return l.narrateCombatError(ctx, state, err)
+	}
+
+	var events []model.EngineEvent
+	var parts []string
+
+	if result.Killed {
+		event := model.EngineEvent{Type: "attack_kill", Details: map[string]any{
+			"target": enemyName, "xp": result.XPAwarded,
+		}}
+		events = append(events, event)
+		narr, err := l.narr.Narrate(ctx, event, *state)
+		if err != nil {
+			return nil, "", err
+		}
+		parts = append(parts, narr)
+	} else {
+		event := model.EngineEvent{Type: "attack_hit", Details: map[string]any{
+			"target": enemyName, "damage": result.Damage,
+		}}
+		events = append(events, event)
+		narr, err := l.narr.Narrate(ctx, event, *state)
+		if err != nil {
+			return nil, "", err
+		}
+		parts = append(parts, narr)
+	}
+
+	if result.CombatOver {
+		event := model.EngineEvent{Type: "combat_won"}
+		events = append(events, event)
+		narr, err := l.narr.Narrate(ctx, event, *state)
+		if err != nil {
+			return nil, "", err
+		}
+		parts = append(parts, narr)
+		return events, strings.Join(parts, " "), nil
+	}
+
+	// Process enemy turns.
+	enemyEvents, enemyNarr, err := l.processEnemyTurns(ctx, state)
+	if err != nil {
+		return nil, "", err
+	}
+	events = append(events, enemyEvents...)
+	if enemyNarr != "" {
+		parts = append(parts, enemyNarr)
+	}
+
+	return events, strings.Join(parts, " "), nil
+}
+
+func (l *Loop) dispatchDefend(ctx context.Context, state *model.GameState) ([]model.EngineEvent, string, error) {
+	if !state.Dungeon.Combat.Active {
+		event := model.EngineEvent{Type: "not_in_combat"}
+		narration, err := l.narr.Narrate(ctx, event, *state)
+		if err != nil {
+			return nil, "", err
+		}
+		return []model.EngineEvent{event}, narration, nil
+	}
+
+	_, err := l.eng.Defend(state)
+	if err != nil {
+		return l.narrateCombatError(ctx, state, err)
+	}
+
+	event := model.EngineEvent{Type: "defend"}
+	var events []model.EngineEvent
+	var parts []string
+
+	events = append(events, event)
+	narr, err := l.narr.Narrate(ctx, event, *state)
+	if err != nil {
+		return nil, "", err
+	}
+	parts = append(parts, narr)
+
+	// Process enemy turns.
+	enemyEvents, enemyNarr, err := l.processEnemyTurns(ctx, state)
+	if err != nil {
+		return nil, "", err
+	}
+	events = append(events, enemyEvents...)
+	if enemyNarr != "" {
+		parts = append(parts, enemyNarr)
+	}
+
+	return events, strings.Join(parts, " "), nil
+}
+
+func (l *Loop) dispatchFlee(ctx context.Context, state *model.GameState) ([]model.EngineEvent, string, error) {
+	if !state.Dungeon.Combat.Active {
+		event := model.EngineEvent{Type: "not_in_combat"}
+		narration, err := l.narr.Narrate(ctx, event, *state)
+		if err != nil {
+			return nil, "", err
+		}
+		return []model.EngineEvent{event}, narration, nil
+	}
+
+	result, err := l.eng.Flee(state)
+	if err != nil {
+		return l.narrateCombatError(ctx, state, err)
+	}
+
+	var events []model.EngineEvent
+	var parts []string
+
+	if result.Success {
+		event := model.EngineEvent{Type: "flee_success"}
+		events = append(events, event)
+		narr, err := l.narr.Narrate(ctx, event, *state)
+		if err != nil {
+			return nil, "", err
+		}
+		parts = append(parts, narr)
+	} else {
+		event := model.EngineEvent{Type: "flee_fail"}
+		events = append(events, event)
+		narr, err := l.narr.Narrate(ctx, event, *state)
+		if err != nil {
+			return nil, "", err
+		}
+		parts = append(parts, narr)
+
+		// Process enemy turns after failed flee.
+		enemyEvents, enemyNarr, err := l.processEnemyTurns(ctx, state)
+		if err != nil {
+			return nil, "", err
+		}
+		events = append(events, enemyEvents...)
+		if enemyNarr != "" {
+			parts = append(parts, enemyNarr)
+		}
+	}
+
+	return events, strings.Join(parts, " "), nil
+}
+
+// processEnemyTurns processes all enemy turns until it's the hero's turn again.
+// Returns the accumulated events and narration text.
+func (l *Loop) processEnemyTurns(ctx context.Context, state *model.GameState) ([]model.EngineEvent, string, error) {
+	var events []model.EngineEvent
+	var parts []string
+
+	for i := 0; i < 20 && state.Dungeon.Combat.Active && !l.eng.IsHeroTurn(state); i++ {
+		result, err := l.eng.ProcessEnemyTurn(state)
+		if err != nil {
+			return nil, "", err
+		}
+
+		switch result.Action {
+		case "attack":
+			event := model.EngineEvent{Type: "enemy_attacks", Details: map[string]any{
+				"enemy": result.EnemyName, "damage": result.Damage,
+			}}
+			events = append(events, event)
+			narr, err := l.narr.Narrate(ctx, event, *state)
+			if err != nil {
+				return nil, "", err
+			}
+			parts = append(parts, narr)
+
+			if result.HeroDead {
+				event := model.EngineEvent{Type: "hero_died"}
+				events = append(events, event)
+				narr, err := l.narr.Narrate(ctx, event, *state)
+				if err != nil {
+					return nil, "", err
+				}
+				parts = append(parts, narr)
+				return events, strings.Join(parts, " "), nil
+			}
+		case "flee":
+			event := model.EngineEvent{Type: "enemy_flees", Details: map[string]any{
+				"enemy": result.EnemyName,
+			}}
+			events = append(events, event)
+			narr, err := l.narr.Narrate(ctx, event, *state)
+			if err != nil {
+				return nil, "", err
+			}
+			parts = append(parts, narr)
+
+			// If all enemies fled/dead, combat may have ended.
+			if !state.Dungeon.Combat.Active {
+				wonEvent := model.EngineEvent{Type: "combat_won"}
+				events = append(events, wonEvent)
+				narr, err := l.narr.Narrate(ctx, wonEvent, *state)
+				if err != nil {
+					return nil, "", err
+				}
+				parts = append(parts, narr)
+			}
+		case "skip":
+			// Dead enemy — no narration needed.
+		}
+	}
+
+	return events, strings.Join(parts, " "), nil
+}
+
+func (l *Loop) narrateCombatStart(ctx context.Context, state *model.GameState, moveEvent model.EngineEvent, moveNarr string, result engine.CombatStartResult) ([]model.EngineEvent, string, error) {
+	var names []string
+	for _, e := range result.Enemies {
+		names = append(names, e.Name)
+	}
+	combatEvent := model.EngineEvent{Type: "combat_started", Details: map[string]any{
+		"enemy_names": strings.Join(names, ", "),
+	}}
+	combatNarr, err := l.narr.Narrate(ctx, combatEvent, *state)
+	if err != nil {
+		return nil, "", err
+	}
+
+	events := []model.EngineEvent{moveEvent, combatEvent}
+	narration := moveNarr + " " + combatNarr
+
+	// If enemies go first, process their turns.
+	if state.Dungeon.Combat.Active && !l.eng.IsHeroTurn(state) {
+		enemyEvents, enemyNarr, err := l.processEnemyTurns(ctx, state)
+		if err != nil {
+			return nil, "", err
+		}
+		events = append(events, enemyEvents...)
+		if enemyNarr != "" {
+			narration += " " + enemyNarr
+		}
+	}
+
+	return events, narration, nil
+}
+
+func (l *Loop) narrateCombatError(ctx context.Context, state *model.GameState, err error) ([]model.EngineEvent, string, error) {
+	var notInCombat *engine.NotInCombatError
+	var notHeroTurn *engine.NotHeroTurnError
+	var invalidTarget *engine.InvalidTargetError
+	var heroDead *engine.HeroDeadError
+
+	var event model.EngineEvent
+	switch {
+	case errors.As(err, &notInCombat):
+		event = model.EngineEvent{Type: "not_in_combat"}
+	case errors.As(err, &notHeroTurn):
+		event = model.EngineEvent{Type: "unknown_action"}
+	case errors.As(err, &invalidTarget):
+		event = model.EngineEvent{Type: "unknown_action"}
+	case errors.As(err, &heroDead):
+		event = model.EngineEvent{Type: "hero_died"}
+	default:
+		return nil, "", err
+	}
+
+	narration, err := l.narr.Narrate(ctx, event, *state)
+	if err != nil {
+		return nil, "", err
+	}
+	return []model.EngineEvent{event}, narration, nil
 }

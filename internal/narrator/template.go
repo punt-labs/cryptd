@@ -71,6 +71,40 @@ func (t *Template) Narrate(_ context.Context, event model.EngineEvent, _ model.G
 		return "You have nothing equipped there.", nil
 	case "not_equippable":
 		return "You can't equip that.", nil
+	case "combat_started":
+		if names, ok := event.Details["enemy_names"].(string); ok {
+			return fmt.Sprintf("Combat begins! You face: %s", names), nil
+		}
+		return "Combat begins!", nil
+	case "attack_hit":
+		target, _ := event.Details["target"].(string)
+		damage, _ := event.Details["damage"].(int)
+		return fmt.Sprintf("You strike the %s for %d damage.", target, damage), nil
+	case "attack_kill":
+		target, _ := event.Details["target"].(string)
+		xp, _ := event.Details["xp"].(int)
+		return fmt.Sprintf("You defeat the %s! (+%d XP)", target, xp), nil
+	case "enemy_attacks":
+		enemy, _ := event.Details["enemy"].(string)
+		damage, _ := event.Details["damage"].(int)
+		return fmt.Sprintf("The %s attacks you for %d damage.", enemy, damage), nil
+	case "enemy_flees":
+		enemy, _ := event.Details["enemy"].(string)
+		return fmt.Sprintf("The %s flees!", enemy), nil
+	case "defend":
+		return "You raise your guard.", nil
+	case "flee_success":
+		return "You flee from combat!", nil
+	case "flee_fail":
+		return "You fail to escape!", nil
+	case "combat_won":
+		return "Combat is over. You are victorious.", nil
+	case "hero_died":
+		return "You have fallen...", nil
+	case "not_in_combat":
+		return "You are not in combat.", nil
+	case "in_combat":
+		return "You can't do that during combat!", nil
 	case "quit":
 		return "Farewell, adventurer.", nil
 	case "unknown_action":

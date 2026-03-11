@@ -76,6 +76,56 @@ func TestTemplateNarrator_ExaminedWithDescription(t *testing.T) {
 	assert.Equal(t, "A blade of fine steel.", text)
 }
 
+func TestTemplateNarrator_CombatEvents(t *testing.T) {
+	n := narrator.NewTemplate()
+	state := model.GameState{}
+
+	events := []string{
+		"combat_started", "attack_hit", "attack_kill",
+		"enemy_attacks", "enemy_flees", "defend",
+		"flee_success", "flee_fail", "combat_won",
+		"hero_died", "not_in_combat", "in_combat",
+	}
+	for _, evType := range events {
+		t.Run(evType, func(t *testing.T) {
+			text, err := n.Narrate(context.Background(), model.EngineEvent{
+				Type: evType,
+				Details: map[string]any{
+					"target":      "Goblin",
+					"damage":      5,
+					"xp":          8,
+					"enemy":       "Goblin",
+					"enemy_names": "Goblin",
+				},
+			}, state)
+			require.NoError(t, err)
+			assert.NotEmpty(t, text, "expected non-empty narration for event %q", evType)
+		})
+	}
+}
+
+func TestTemplateNarrator_AttackHitContainsDetails(t *testing.T) {
+	n := narrator.NewTemplate()
+	text, err := n.Narrate(context.Background(), model.EngineEvent{
+		Type:    "attack_hit",
+		Details: map[string]any{"target": "Goblin", "damage": 5},
+	}, model.GameState{})
+	require.NoError(t, err)
+	assert.Contains(t, text, "Goblin")
+	assert.Contains(t, text, "5")
+}
+
+func TestTemplateNarrator_AttackKillContainsXP(t *testing.T) {
+	n := narrator.NewTemplate()
+	text, err := n.Narrate(context.Background(), model.EngineEvent{
+		Type:    "attack_kill",
+		Details: map[string]any{"target": "Goblin", "xp": 8},
+	}, model.GameState{})
+	require.NoError(t, err)
+	assert.Contains(t, text, "Goblin")
+	assert.Contains(t, text, "8")
+}
+
 func TestTemplateNarrator_ExaminedNoDescription(t *testing.T) {
 	n := narrator.NewTemplate()
 	text, err := n.Narrate(context.Background(), model.EngineEvent{

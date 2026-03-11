@@ -1,0 +1,11 @@
+# Combat walkthrough — pick up sword, equip it, fight the goblin
+look
+take short sword
+equip short sword
+inventory
+south
+attack
+attack
+attack
+attack
+look
