@@ -10,15 +10,13 @@ see it, it is your problem now.
 
 ## Project State
 
-**M0 and M1 are complete.** M2 (thin E2E slice) is the next milestone.
-See `bd ready` for the current unblocked issue (`cryptd-7uw`).
+**M0 and M1 are complete on `main`. M2 (thin E2E slice) is in progress on
+`feat/m2-thin-e2e`.** See `bd ready` for the next unblocked issue.
 
-The binary is named `cryptd` (repo name). The CLI subcommands are `crypt dm`,
-`crypt solo`, `crypt headless`, and `crypt serve`.
+The binary is named `cryptd`. The CLI subcommands are `cryptd headless`,
+`cryptd validate`, and (future) `cryptd dm`, `cryptd solo`, `cryptd serve`.
 
-## Workflow
-
-**Always follow the punt-kit workflow standards (`../punt-kit/standards/workflow.md`):**
+## Feature Branch Workflow
 
 - **Feature branches** — never commit directly to `main`. Branch naming:
   `feat/m2-thin-e2e`, `fix/combat-initiative`, `refactor/interpreter`, etc.
@@ -31,6 +29,36 @@ The binary is named `cryptd` (repo name). The CLI subcommands are `crypt dm`,
 - **Conventional commits**: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`
 - **Quality gates before every commit**: `go vet ./...`, `go test -race ./...`, markdownlint 0 errors
 - **Never commit directly to `main`** — this includes chore/docs changes
+
+
+
+Every milestone ends with a PR merged to `main`. The review cycle:
+
+1. **Create the PR** — always request `copilot-pull-request-reviewer` at creation:
+   ```bash
+   gh pr create --title "..." --body "..." --reviewer copilot-pull-request-reviewer
+   ```
+2. **Wait for reviews** — both `copilot-pull-request-reviewer` (GitHub Copilot) and
+   Cursor Bugbot will post inline review comments.
+3. **Fix all real issues** — commit fixes to the feature branch. No "pre-existing"
+   exemptions.
+4. **Request re-review** — add the reviewer again:
+   ```bash
+   gh pr edit <number> --add-reviewer copilot-pull-request-reviewer
+   ```
+5. **Repeat** until the last round surfaces no substantial new issues.
+6. **Merge** — squash or merge commit, then close the milestone epic bead.
+
+**NEVER use `@copilot` in PR comments.** This triggers the Copilot coding agent,
+which creates sub-PRs — a separate feature not part of this review workflow.
+The `copilot-pull-request-reviewer` app (added as a reviewer) is what posts
+inline review comments. These are two different things.
+
+**Evaluating Copilot sub-PRs** — if the coding agent does create a sub-PR,
+evaluate its diff, incorporate valid changes manually, then close the sub-PR.
+Do not merge sub-PRs directly; they target feature branches and add noise.
+
+
 
 ## Architecture
 
@@ -96,7 +124,7 @@ narrators. Narrators know nothing about renderers.
 ### Engine Deployment
 
 - **Embedded** (`solo`, `headless`): engine runs in-process, no socket.
-- **Daemon** (`dm`, future multi-player): `crypt serve` on a Unix domain socket
+- **Daemon** (`dm`, future multi-player): `cryptd serve` on a Unix domain socket
   (NDJSON, `net.Listen("unix", ...)`). Daemon scope is exactly two things: game
   logic resolution and session-aware push routing. No LLM calls, no orchestration.
 - `mcp-proxy` (design-stage, not yet built): per-session Go shim that bridges
@@ -148,7 +176,7 @@ go test -tags acceptance -timeout 10m ./e2e/acceptance/...
 go run ./cmd/dump-mcp-schema > /tmp/schema.json && diff testdata/mcp-schema.json /tmp/schema.json
 
 # Scenario validation
-go run ./cmd/crypt validate scenarios/minimal.yaml
+go run ./cmd/crypt validate scenarios/minimal.yaml  # or: cryptd validate scenarios/minimal.yaml
 
 # Lint
 go vet ./...
@@ -201,7 +229,7 @@ state corruption.
 `headless` uses `RulesInterpreter + TemplateNarrator + CLIRenderer` — zero external
 dependencies. It is the primary vehicle for integration and acceptance tests.
 Acceptance tests are YAML game scripts in `testdata/scripts/` and
-`e2e/acceptance/`, executed via `crypt headless`.
+`e2e/acceptance/`, executed via `cryptd headless`.
 
 ### Party-Ready from Day One
 
