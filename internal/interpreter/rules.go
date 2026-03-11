@@ -124,6 +124,18 @@ func (r *Rules) Interpret(_ context.Context, input string, _ model.GameState) (m
 	case "inventory", "i":
 		return model.EngineAction{Type: "inventory"}, nil
 
+	case "save":
+		if rest != "" {
+			return model.EngineAction{Type: "save", Target: rest}, nil
+		}
+		return model.EngineAction{Type: "save"}, nil
+
+	case "load":
+		if rest != "" {
+			return model.EngineAction{Type: "load", Target: rest}, nil
+		}
+		return model.EngineAction{Type: "load"}, nil
+
 	case "quit", "exit", "q":
 		return model.EngineAction{Type: "quit"}, nil
 	}

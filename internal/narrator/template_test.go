@@ -89,6 +89,7 @@ func TestTemplateNarrator_CombatEvents(t *testing.T) {
 		"spell_damage", "spell_heal",
 		"unknown_spell", "not_caster", "insufficient_mp",
 		"level_up",
+		"game_saved", "game_loaded", "save_error", "load_error",
 	}
 	for _, evType := range events {
 		t.Run(evType, func(t *testing.T) {
