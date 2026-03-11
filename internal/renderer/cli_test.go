@@ -133,7 +133,16 @@ func TestCLIRenderer_HUDNoMPForFighter(t *testing.T) {
 
 	output := out.String()
 	assert.Contains(t, output, "HP 20/20")
-	assert.NotContains(t, output, "MP")
+	// Find the HUD line and verify it has no MP bar.
+	var hudLine string
+	for _, line := range strings.Split(output, "\n") {
+		if strings.Contains(line, "HP 20/20") {
+			hudLine = line
+			break
+		}
+	}
+	require.NotEmpty(t, hudLine, "HUD line with HP 20/20 not found")
+	assert.NotContains(t, hudLine, "MP ")
 }
 
 func TestCLIRenderer_EnemyListDuringCombat(t *testing.T) {

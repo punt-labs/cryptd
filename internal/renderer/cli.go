@@ -56,8 +56,8 @@ func (c *CLI) startScanner(ctx context.Context) {
 }
 
 // Render prints the room header, status HUD, narration, and prompt.
-// During combat, an enemy list with HP bars is shown. The HUD always
-// displays the hero's HP/MP. All output fits within 80 columns.
+// During combat, an enemy list with HP bars is shown. The HUD displays
+// the hero's HP bar, plus MP bar when MaxMP > 0.
 func (c *CLI) Render(ctx context.Context, state model.GameState, narration string) error {
 	c.startScanner(ctx)
 
@@ -94,7 +94,7 @@ func (c *CLI) Render(ctx context.Context, state model.GameState, narration strin
 	return err
 }
 
-// formatHUD returns a one-line status string like "HP 15/20 [████████░░] MP 3/5".
+// formatHUD returns a one-line status string like "HP 15/20 [████████░░]  MP 3/5 [██████░░░░]".
 func formatHUD(char model.Character) string {
 	hp := formatBar("HP", char.HP, char.MaxHP)
 	if char.MaxMP > 0 {
