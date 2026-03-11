@@ -4,6 +4,7 @@ package engine
 
 import (
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/punt-labs/cryptd/internal/model"
@@ -147,6 +148,7 @@ func exitList(room *scenario.Room) []string {
 		}
 		exits = append(exits, dir)
 	}
+	sort.Strings(exits)
 	return exits
 }
 
