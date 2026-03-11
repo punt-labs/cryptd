@@ -156,12 +156,18 @@ func (l *Loop) dispatch(ctx context.Context, state *model.GameState, action mode
 				return nil, "", err
 			}
 			combatResult, combatErr := l.eng.StartCombat(state)
-			if combatErr == nil {
-				// Combat started — append combat narration.
-				return l.narrateCombatStart(ctx, state, event, narration, combatResult)
+			if combatErr != nil {
+				// Only ignore expected "no combat" errors; propagate real errors.
+				var noEnemies *engine.NoEnemiesError
+				var already *engine.AlreadyInCombatError
+				if !errors.As(combatErr, &noEnemies) && !errors.As(combatErr, &already) {
+					return nil, "", combatErr
+				}
+				// No combat to start — return just the move event.
+				return []model.EngineEvent{event}, narration, nil
 			}
-			// No combat to start — return just the move event.
-			return []model.EngineEvent{event}, narration, nil
+			// Combat started — append combat narration.
+			return l.narrateCombatStart(ctx, state, event, narration, combatResult)
 		}
 
 	case "look":
@@ -437,7 +443,14 @@ func (l *Loop) processEnemyTurns(ctx context.Context, state *model.GameState) ([
 	var events []model.EngineEvent
 	var parts []string
 
-	for i := 0; i < 20 && state.Dungeon.Combat.Active && !l.eng.IsHeroTurn(state); i++ {
+	// Safety cap derived from turn order length — each enemy gets at most one
+	// action per call, so len(TurnOrder) is the maximum iterations needed.
+	maxIter := len(state.Dungeon.Combat.TurnOrder)
+	if maxIter < 1 {
+		maxIter = 1
+	}
+
+	for i := 0; i < maxIter && state.Dungeon.Combat.Active && !l.eng.IsHeroTurn(state); i++ {
 		result, err := l.eng.ProcessEnemyTurn(state)
 		if err != nil {
 			return nil, "", err
@@ -536,9 +549,9 @@ func (l *Loop) narrateCombatError(ctx context.Context, state *model.GameState, e
 	case errors.As(err, &notInCombat):
 		event = model.EngineEvent{Type: "not_in_combat"}
 	case errors.As(err, &notHeroTurn):
-		event = model.EngineEvent{Type: "unknown_action"}
+		event = model.EngineEvent{Type: "not_hero_turn"}
 	case errors.As(err, &invalidTarget):
-		event = model.EngineEvent{Type: "unknown_action"}
+		event = model.EngineEvent{Type: "invalid_target"}
 	case errors.As(err, &heroDead):
 		event = model.EngineEvent{Type: "hero_died"}
 	default:

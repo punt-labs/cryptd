@@ -25,6 +25,7 @@ type Autoplay struct {
 	idx      int
 	events   chan model.InputEvent
 	json     bool
+	quitSent bool
 
 	// Transcript collects all entries for JSON output.
 	Transcript []TranscriptEntry
@@ -42,7 +43,12 @@ func NewAutoplay(out io.Writer, commands []string, jsonMode bool) *Autoplay {
 }
 
 // Render writes the game's response and queues the next command.
-func (a *Autoplay) Render(_ context.Context, state model.GameState, narration string) error {
+func (a *Autoplay) Render(ctx context.Context, state model.GameState, narration string) error {
+	// Once quit has been sent, don't record or queue anything further.
+	if a.quitSent {
+		return nil
+	}
+
 	// The first Render call is the initial room description (no command yet).
 	// Subsequent calls are responses to commands we sent.
 	if a.idx == 0 {
@@ -53,7 +59,9 @@ func (a *Autoplay) Render(_ context.Context, state model.GameState, narration st
 		}
 		a.Transcript = append(a.Transcript, entry)
 		if !a.json {
-			fmt.Fprintf(a.out, "[%s]\n%s\n", entry.Room, entry.Response)
+			if _, err := fmt.Fprintf(a.out, "[%s]\n%s\n", entry.Room, entry.Response); err != nil {
+				return err
+			}
 		}
 	} else {
 		entry := TranscriptEntry{
@@ -63,7 +71,9 @@ func (a *Autoplay) Render(_ context.Context, state model.GameState, narration st
 		}
 		a.Transcript = append(a.Transcript, entry)
 		if !a.json {
-			fmt.Fprintf(a.out, "\n> %s\n[%s]\n%s\n", entry.Command, entry.Room, entry.Response)
+			if _, err := fmt.Fprintf(a.out, "\n> %s\n[%s]\n%s\n", entry.Command, entry.Room, entry.Response); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -71,10 +81,19 @@ func (a *Autoplay) Render(_ context.Context, state model.GameState, narration st
 	if a.idx < len(a.commands) {
 		cmd := a.commands[a.idx]
 		a.idx++
-		go func() { a.events <- model.InputEvent{Type: "input", Payload: cmd} }()
+		select {
+		case a.events <- model.InputEvent{Type: "input", Payload: cmd}:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	} else {
 		// No more commands — send quit.
-		go func() { a.events <- model.InputEvent{Type: "quit"} }()
+		a.quitSent = true
+		select {
+		case a.events <- model.InputEvent{Type: "quit"}:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
 	return nil
 }

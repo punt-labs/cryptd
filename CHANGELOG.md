@@ -14,7 +14,7 @@ All notable changes to this project will be documented in this file.
 - Game loop combat dispatch: auto-starts combat on room entry, blocks non-combat actions during combat, processes enemy turns after hero acts, handles hero death
 - AI patterns: aggressive (always attacks), cautious (flees at ≤30% HP), scripted (attacks every turn)
 - `cryptd autoplay --scenario <id> --script <file> [--json]` — reads a command file (one command per line, `#` comments), feeds commands one at a time through the game loop, and writes a request-response transcript; `--json` outputs structured `[{command, room, response}]` array
-- `AutoplayRenderer` — `Renderer` implementation that pops commands from a queue and collects transcript entries, reusing the game loop without modification
+- `renderer.Autoplay` — `Renderer` implementation that pops commands from a queue and collects transcript entries, reusing the game loop without modification
 - `testdata/demos/combat-walkthrough.txt` — demo script: pick up sword, equip, fight goblin
 - Default hero stats: `STR:14 DEX:12 CON:12 INT:10 WIS:10 CHA:10`, HP 20 (was 10) — enables meaningful combat and flee checks
 - Extracted `loadScenario()` and `defaultHero()` helpers in CLI, eliminating scenario-loading duplication between `headless` and `autoplay`

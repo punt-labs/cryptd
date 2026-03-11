@@ -253,8 +253,8 @@ func (e *Engine) Flee(state *model.GameState) (FleeResult, error) {
 	return FleeResult{Success: false}, nil
 }
 
-// ProcessEnemyTurn executes one enemy's turn. Returns the result and whether
-// the combat should continue processing more enemy turns.
+// ProcessEnemyTurn executes one enemy's turn and returns the outcome of that
+// enemy's action, or an error if the combat state is invalid.
 func (e *Engine) ProcessEnemyTurn(state *model.GameState) (EnemyTurnResult, error) {
 	combat := &state.Dungeon.Combat
 	if !combat.Active {

@@ -28,7 +28,7 @@ func newState(t *testing.T, eng *engine.Engine) model.GameState {
 	t.Helper()
 	char := model.Character{
 		ID: "c1", Name: "Hero", Class: "fighter", Level: 1,
-		HP: 20, MaxHP: 20,
+		HP: 100, MaxHP: 100,
 		Stats: model.Stats{STR: 14, DEX: 12, CON: 12, INT: 10, WIS: 10, CHA: 10},
 	}
 	state, err := eng.NewGame(char)

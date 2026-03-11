@@ -85,6 +85,7 @@ func TestTemplateNarrator_CombatEvents(t *testing.T) {
 		"enemy_attacks", "enemy_flees", "defend",
 		"flee_success", "flee_fail", "combat_won",
 		"hero_died", "not_in_combat", "in_combat",
+		"not_hero_turn", "invalid_target",
 	}
 	for _, evType := range events {
 		t.Run(evType, func(t *testing.T) {

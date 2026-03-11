@@ -220,9 +220,10 @@ func TestDefend_SetsFlag(t *testing.T) {
 
 	_, err = e.Defend(&state)
 	require.NoError(t, err)
-	// After defend, turn advances — HeroDefending should stay true until
-	// hero's next turn. It gets set before advanceTurn.
-	// The flag is checked during enemy attack processing.
+
+	// After defend, the hero should be defending and the turn should have advanced.
+	require.True(t, state.Dungeon.Combat.HeroDefending, "hero should be defending after Defend")
+	require.False(t, e.IsHeroTurn(&state), "hero turn should have advanced after Defend")
 }
 
 func TestDefend_HalvesDamage(t *testing.T) {
@@ -235,18 +236,15 @@ func TestDefend_HalvesDamage(t *testing.T) {
 	_, err = e.Defend(&state)
 	require.NoError(t, err)
 
-	// Now process enemy turn — damage should be halved.
-	if !state.Dungeon.Combat.Active {
-		return
-	}
-	if !e.IsHeroTurn(&state) {
-		result, err := e.ProcessEnemyTurn(&state)
-		require.NoError(t, err)
-		if result.Action == "attack" {
-			// Damage should be halved (1d4 → max 4, halved → max 2).
-			assert.LessOrEqual(t, result.Damage, 2)
-		}
-	}
+	// Combat should still be active after defending.
+	require.True(t, state.Dungeon.Combat.Active, "combat should remain active after Defend")
+	require.False(t, e.IsHeroTurn(&state), "expected enemy turn after hero Defend action")
+
+	result, err := e.ProcessEnemyTurn(&state)
+	require.NoError(t, err)
+	require.Equal(t, "attack", result.Action, "enemy should attack after hero Defend action")
+	// Damage should be halved (1d4 → max 4, halved → max 2).
+	assert.LessOrEqual(t, result.Damage, 2)
 }
 
 func TestDefend_NotInCombat(t *testing.T) {
@@ -258,9 +256,8 @@ func TestDefend_NotInCombat(t *testing.T) {
 }
 
 func TestFlee_Success(t *testing.T) {
-	// Seed so that roll <= DEX (12).
-	// We'll try multiple seeds to find one that works.
-	for seed := int64(0); seed < 100; seed++ {
+	// Try multiple iterations to find one where flee succeeds.
+	for i := 0; i < 100; i++ {
 		e, state := combatGame(t, combatScenario())
 		_, err := e.StartCombat(&state)
 		require.NoError(t, err)
@@ -279,12 +276,12 @@ func TestFlee_Success(t *testing.T) {
 			return
 		}
 	}
-	t.Fatal("could not find seed that produces successful flee")
+	t.Fatal("could not produce successful flee in 100 iterations")
 }
 
 func TestFlee_Failure(t *testing.T) {
-	// Use a high-DEX character scenario where flee still fails sometimes.
-	for seed := int64(0); seed < 100; seed++ {
+	// Use low DEX to make flee harder.
+	for i := 0; i < 100; i++ {
 		s := combatScenario()
 		e := engine.New(s)
 		char := model.Character{
@@ -310,7 +307,7 @@ func TestFlee_Failure(t *testing.T) {
 			return
 		}
 	}
-	t.Fatal("could not find seed that produces failed flee")
+	t.Fatal("could not produce failed flee in 100 iterations")
 }
 
 func TestFlee_NotInCombat(t *testing.T) {
@@ -328,9 +325,7 @@ func TestProcessEnemyTurn_DamagesHero(t *testing.T) {
 
 	// Ensure it's an enemy turn.
 	skipToEnemyTurn(t, e, &state)
-	if !state.Dungeon.Combat.Active {
-		return
-	}
+	require.True(t, state.Dungeon.Combat.Active, "combat should be active for enemy turn test")
 
 	result, err := e.ProcessEnemyTurn(&state)
 	require.NoError(t, err)
@@ -348,9 +343,7 @@ func TestProcessEnemyTurn_HeroDeath(t *testing.T) {
 	state.Party[0].HP = 1
 
 	skipToEnemyTurn(t, e, &state)
-	if !state.Dungeon.Combat.Active {
-		return
-	}
+	require.True(t, state.Dungeon.Combat.Active, "combat should be active for hero death test")
 
 	result, err := e.ProcessEnemyTurn(&state)
 	require.NoError(t, err)
@@ -386,9 +379,7 @@ func TestProcessEnemyTurn_CautiousFlees(t *testing.T) {
 	state.Dungeon.Combat.Enemies[0].HP = 3
 
 	skipToEnemyTurn(t, e, &state)
-	if !state.Dungeon.Combat.Active {
-		return
-	}
+	require.True(t, state.Dungeon.Combat.Active, "combat should be active for cautious flee test")
 
 	result, err := e.ProcessEnemyTurn(&state)
 	require.NoError(t, err)
@@ -424,9 +415,7 @@ func TestProcessEnemyTurn_CautiousAttacksWhenHealthy(t *testing.T) {
 	state.Dungeon.Combat.Enemies[0].HP = 8
 
 	skipToEnemyTurn(t, e, &state)
-	if !state.Dungeon.Combat.Active {
-		return
-	}
+	require.True(t, state.Dungeon.Combat.Active, "combat should be active for cautious attack test")
 
 	result, err := e.ProcessEnemyTurn(&state)
 	require.NoError(t, err)
@@ -437,16 +426,20 @@ func TestProcessEnemyTurn_CautiousAttacksWhenHealthy(t *testing.T) {
 func TestFullCombat_KillGoblin(t *testing.T) {
 	e, state := combatGame(t, combatScenario())
 
-	// Pick up and equip sword.
+	// Pick up and equip sword for reliable damage.
 	_, err := e.PickUp(&state, "sword")
 	require.NoError(t, err)
 	_, err = e.Equip(&state, "sword")
 	require.NoError(t, err)
 
+	// Give hero high HP to guarantee survival.
+	state.Party[0].HP = 100
+	state.Party[0].MaxHP = 100
+
 	_, err = e.StartCombat(&state)
 	require.NoError(t, err)
 
-	// Fight until combat ends or hero dies (max 50 rounds safety).
+	// Fight until combat ends (max 50 rounds safety).
 	for i := 0; i < 50 && state.Dungeon.Combat.Active; i++ {
 		if e.IsHeroTurn(&state) {
 			targetID := e.FirstAliveEnemy(&state)
@@ -459,11 +452,8 @@ func TestFullCombat_KillGoblin(t *testing.T) {
 				break
 			}
 		} else {
-			result, err := e.ProcessEnemyTurn(&state)
+			_, err := e.ProcessEnemyTurn(&state)
 			require.NoError(t, err)
-			if result.HeroDead {
-				t.Skip("hero died — expected with some seeds")
-			}
 		}
 	}
 
@@ -478,9 +468,7 @@ func TestUnarmedDamage(t *testing.T) {
 	_, err := e.StartCombat(&state)
 	require.NoError(t, err)
 	skipToHeroTurn(t, e, &state)
-	if !state.Dungeon.Combat.Active {
-		return
-	}
+	require.True(t, state.Dungeon.Combat.Active, "combat should be active for unarmed damage test")
 
 	// No weapon equipped — should do 1d2 damage (1 or 2).
 	result, err := e.Attack(&state, "goblin_0")

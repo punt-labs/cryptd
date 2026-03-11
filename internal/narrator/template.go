@@ -105,6 +105,10 @@ func (t *Template) Narrate(_ context.Context, event model.EngineEvent, _ model.G
 		return "You are not in combat.", nil
 	case "in_combat":
 		return "You can't do that during combat!", nil
+	case "not_hero_turn":
+		return "It is not your turn.", nil
+	case "invalid_target":
+		return "That is not a valid target.", nil
 	case "quit":
 		return "Farewell, adventurer.", nil
 	case "unknown_action":
