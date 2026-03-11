@@ -143,9 +143,10 @@ func (t *Template) Narrate(_ context.Context, event model.EngineEvent, _ model.G
 		hpGain, _ := event.Details["hp_gain"].(int)
 		return fmt.Sprintf("You have reached level %d! (+%d HP)", level, hpGain), nil
 	case "help":
-		return "Commands: go <dir>, look, take <item>, drop <item>, equip <item>, " +
-			"unequip <slot>, examine <item>, inventory, attack [target], defend, " +
-			"flee, cast <spell> [at <target>], save [slot], load [slot], help, quit.", nil
+		return "Commands: go <dir> (n/s/e/w/u/d), look (l), take <item>, drop <item>, " +
+			"equip <item>, unequip <slot>, examine <item> (x), inventory (i), " +
+			"attack [target] (a), defend, flee, cast <spell> [at <target>], " +
+			"save [slot], load [slot], help (?), quit (q).", nil
 	case "quit":
 		return "Farewell, adventurer.", nil
 	case "unknown_action":
