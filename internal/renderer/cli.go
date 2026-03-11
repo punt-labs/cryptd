@@ -31,24 +31,34 @@ func NewCLI(out io.Writer, in io.Reader) *CLI {
 }
 
 // startScanner launches the background stdin reader exactly once.
-func (c *CLI) startScanner() {
+// The goroutine stops sending when ctx is cancelled to prevent goroutine leaks.
+func (c *CLI) startScanner(ctx context.Context) {
 	c.startOnce.Do(func() {
 		go func() {
 			defer close(c.events)
 			for c.in.Scan() {
-				c.events <- model.InputEvent{Type: "input", Payload: strings.TrimSpace(c.in.Text())}
+				ev := model.InputEvent{Type: "input", Payload: strings.TrimSpace(c.in.Text())}
+				select {
+				case c.events <- ev:
+				case <-ctx.Done():
+					return
+				}
 			}
 			if err := c.in.Err(); err != nil {
-				c.events <- model.InputEvent{Type: "error", Payload: err.Error()}
+				select {
+				case c.events <- model.InputEvent{Type: "error", Payload: err.Error()}:
+				case <-ctx.Done():
+				}
 			}
 		}()
 	})
 }
 
 // Render prints the current room description and narration, then shows a
-// prompt. Input arrives asynchronously via Events().
-func (c *CLI) Render(_ context.Context, state model.GameState, narration string) error {
-	c.startScanner()
+// prompt. Input arrives asynchronously via Events(). The ctx passed to the
+// first call to Render governs the scanner goroutine lifetime.
+func (c *CLI) Render(ctx context.Context, state model.GameState, narration string) error {
+	c.startScanner(ctx)
 	if _, err := fmt.Fprintf(c.out, "\n[%s]\n", state.Dungeon.CurrentRoom); err != nil {
 		return err
 	}

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -65,6 +66,31 @@ func TestCLIRenderer_EOFClosesEvents(t *testing.T) {
 		// ok==false means channel closed — that's the expected path.
 	case <-time.After(time.Second):
 		t.Fatal("timed out waiting for events channel to close")
+	}
+}
+
+func TestCLIRenderer_ContextCancelStopsScanner(t *testing.T) {
+	// Use a pipe so Scan() can block; we'll cancel ctx before writing anything.
+	pr, pw := io.Pipe()
+	defer pw.Close()
+
+	var out bytes.Buffer
+	r := renderer.NewCLI(&out, pr)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	_ = r.Render(ctx, model.GameState{}, "")
+
+	// Write a line so the scanner goroutine unblocks, reads it, then tries to send.
+	// Cancel the context so the send is dropped and the goroutine exits.
+	_, _ = fmt.Fprintln(pw, "some input")
+	cancel()
+
+	// After cancellation the scanner goroutine must exit and close events.
+	select {
+	case <-r.Events():
+		// event received or channel closed — either is acceptable
+	case <-time.After(time.Second):
+		t.Fatal("timed out: scanner goroutine did not exit after context cancellation")
 	}
 }
 
