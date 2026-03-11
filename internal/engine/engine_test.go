@@ -406,6 +406,17 @@ func TestLook_ReturnsRoomItemsFromMutableState(t *testing.T) {
 	assert.NotContains(t, result.Items, "Short Sword")
 }
 
+func TestLook_UnknownItemFallsBackToID(t *testing.T) {
+	e, state := newGame(t)
+	// Inject an item ID that doesn't exist in the scenario items map.
+	rs := state.Dungeon.RoomState[state.Dungeon.CurrentRoom]
+	rs.Items = append(rs.Items, "mystery_widget")
+	state.Dungeon.RoomState[state.Dungeon.CurrentRoom] = rs
+
+	result := e.Look(&state)
+	assert.Contains(t, result.Items, "mystery_widget")
+}
+
 func TestMove_ReturnsRoomItemsFromMutableState(t *testing.T) {
 	e, state := newGame(t)
 	// Drop an item in entrance, move south, move back — should see dropped item.
