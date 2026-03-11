@@ -397,13 +397,13 @@ func TestInventory_AfterPickUp(t *testing.T) {
 func TestLook_ReturnsRoomItemsFromMutableState(t *testing.T) {
 	e, state := newGame(t)
 	result := e.Look(&state)
-	assert.Contains(t, result.Items, "short_sword")
+	assert.Contains(t, result.Items, "Short Sword")
 
 	// Pick up item — look should no longer show it.
 	_, err := e.PickUp(&state, "short_sword")
 	require.NoError(t, err)
 	result = e.Look(&state)
-	assert.NotContains(t, result.Items, "short_sword")
+	assert.NotContains(t, result.Items, "Short Sword")
 }
 
 func TestMove_ReturnsRoomItemsFromMutableState(t *testing.T) {
@@ -488,7 +488,7 @@ func TestEnsureRoomState_FallbackFromScenario(t *testing.T) {
 
 	// Look should also work.
 	look := e.Look(&state)
-	assert.Contains(t, look.Items, "rusty_key")
+	assert.Contains(t, look.Items, "Rusty Key")
 
 	// PickUp should work too.
 	_, err = e.PickUp(&state, "rusty_key")
@@ -503,7 +503,7 @@ func TestEnsureRoomState_NilMap(t *testing.T) {
 
 	// Look should still work via fallback.
 	look := e.Look(&state)
-	assert.Contains(t, look.Items, "short_sword")
+	assert.Contains(t, look.Items, "Short Sword")
 	assert.NotNil(t, state.Dungeon.RoomState)
 }
 

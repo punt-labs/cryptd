@@ -41,6 +41,24 @@ func inventoryErrorEvent(err error) (model.EngineEvent, error) {
 	}
 }
 
+// lookEvent builds an EngineEvent from a LookResult, carrying the room
+// description, exits, and items so the narrator can display them.
+func lookEvent(look engine.LookResult) model.EngineEvent {
+	name := look.Name
+	if name == "" {
+		name = look.Room
+	}
+	return model.EngineEvent{
+		Type: "looked",
+		Room: name,
+		Details: map[string]any{
+			"description": look.Description,
+			"exits":       look.Exits,
+			"items":       look.Items,
+		},
+	}
+}
+
 // combatBlockedActions are action types that cannot be performed during combat.
 var combatBlockedActions = map[string]bool{
 	"move": true, "take": true, "drop": true,
@@ -67,7 +85,7 @@ func (l *Loop) Run(ctx context.Context, state *model.GameState) error {
 	defer cancel()
 	// Render initial state.
 	look := l.eng.Look(state)
-	narration, err := l.narr.Narrate(ctx, model.EngineEvent{Type: "looked", Room: look.Room}, *state)
+	narration, err := l.narr.Narrate(ctx, lookEvent(look), *state)
 	if err != nil {
 		return err
 	}
@@ -148,7 +166,16 @@ func (l *Loop) dispatch(ctx context.Context, state *model.GameState, action mode
 				return nil, "", err
 			}
 		} else {
-			event = model.EngineEvent{Type: "moved", Room: result.NewRoom}
+			look := l.eng.Look(state)
+			roomName := look.Name
+			if roomName == "" {
+				roomName = result.NewRoom
+			}
+			event = model.EngineEvent{Type: "moved", Room: roomName, Details: map[string]any{
+				"description": look.Description,
+				"exits":       look.Exits,
+				"items":       look.Items,
+			}}
 
 			// Auto-start combat if room has enemies and is not cleared.
 			narration, err := l.narr.Narrate(ctx, event, *state)
@@ -172,7 +199,7 @@ func (l *Loop) dispatch(ctx context.Context, state *model.GameState, action mode
 
 	case "look":
 		look := l.eng.Look(state)
-		event = model.EngineEvent{Type: "looked", Room: look.Room}
+		event = lookEvent(look)
 
 	case "take":
 		result, err := l.eng.PickUp(state, action.ItemID)

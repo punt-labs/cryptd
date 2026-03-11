@@ -234,12 +234,21 @@ func (e *Engine) Look(state *model.GameState) LookResult {
 	if !ok {
 		return LookResult{Room: state.Dungeon.CurrentRoom}
 	}
+	itemIDs := e.ensureRoomState(state, state.Dungeon.CurrentRoom).Items
+	itemNames := make([]string, len(itemIDs))
+	for i, id := range itemIDs {
+		if it, ok := e.s.Items[id]; ok {
+			itemNames[i] = it.Name
+		} else {
+			itemNames[i] = id
+		}
+	}
 	return LookResult{
 		Room:        state.Dungeon.CurrentRoom,
 		Name:        room.Name,
 		Description: room.DescriptionSeed,
 		Exits:       exitList(room),
-		Items:       e.ensureRoomState(state, state.Dungeon.CurrentRoom).Items,
+		Items:       itemNames,
 		Enemies:     room.Enemies,
 	}
 }
