@@ -26,7 +26,11 @@ func loadScenario(t *testing.T) *scenario.Scenario {
 
 func newState(t *testing.T, eng *engine.Engine) model.GameState {
 	t.Helper()
-	char := model.Character{ID: "c1", Name: "Hero", Class: "fighter", Level: 1, HP: 10, MaxHP: 10}
+	char := model.Character{
+		ID: "c1", Name: "Hero", Class: "fighter", Level: 1,
+		HP: 20, MaxHP: 20,
+		Stats: model.Stats{STR: 14, DEX: 12, CON: 12, INT: 10, WIS: 10, CHA: 10},
+	}
 	state, err := eng.NewGame(char)
 	require.NoError(t, err)
 	return state
@@ -37,7 +41,13 @@ func TestHeadlessLoop_NewGameMoveLookMove(t *testing.T) {
 	interp := interpreter.NewRules()
 	narr := narrator.NewTemplate()
 
-	inputs := []string{"go south", "look", "go north", "quit"}
+	// Combat auto-starts in goblin_lair; attack until clear, then move north.
+	inputs := []string{
+		"go south",
+		"attack", "attack", "attack", "attack",
+		"attack", "attack", "attack", "attack",
+		"look", "go north", "quit",
+	}
 	fake := &fakeRenderer{events: make(chan model.InputEvent, len(inputs))}
 	for _, inp := range inputs {
 		fake.events <- model.InputEvent{Type: "input", Payload: inp}

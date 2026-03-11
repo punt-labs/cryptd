@@ -1,7 +1,6 @@
 package engine_test
 
 import (
-	"math/rand"
 	"testing"
 
 	"github.com/punt-labs/cryptd/internal/engine"
@@ -73,7 +72,6 @@ func combatGame(t *testing.T, s *scenario.Scenario) (*engine.Engine, model.GameS
 }
 
 func TestStartCombat_CreatesEnemies(t *testing.T) {
-	rand.Seed(42)
 	e, state := combatGame(t, combatScenario())
 
 	result, err := e.StartCombat(&state)
@@ -90,7 +88,6 @@ func TestStartCombat_CreatesEnemies(t *testing.T) {
 }
 
 func TestStartCombat_AlreadyActive(t *testing.T) {
-	rand.Seed(42)
 	e, state := combatGame(t, combatScenario())
 	_, err := e.StartCombat(&state)
 	require.NoError(t, err)
@@ -119,7 +116,6 @@ func TestStartCombat_NoEnemies(t *testing.T) {
 }
 
 func TestStartCombat_ClearedRoom(t *testing.T) {
-	rand.Seed(42)
 	e, state := combatGame(t, combatScenario())
 
 	// Mark room cleared.
@@ -134,7 +130,6 @@ func TestStartCombat_ClearedRoom(t *testing.T) {
 }
 
 func TestAttack_DamagesEnemy(t *testing.T) {
-	rand.Seed(42)
 	e, state := combatGame(t, combatScenario())
 	_, err := e.StartCombat(&state)
 	require.NoError(t, err)
@@ -149,7 +144,6 @@ func TestAttack_DamagesEnemy(t *testing.T) {
 }
 
 func TestAttack_KillsEnemy(t *testing.T) {
-	rand.Seed(42)
 	e, state := combatGame(t, combatScenario())
 	_, err := e.StartCombat(&state)
 	require.NoError(t, err)
@@ -169,7 +163,6 @@ func TestAttack_KillsEnemy(t *testing.T) {
 }
 
 func TestAttack_XPAwarded(t *testing.T) {
-	rand.Seed(42)
 	e, state := combatGame(t, combatScenario())
 	_, err := e.StartCombat(&state)
 	require.NoError(t, err)
@@ -191,7 +184,6 @@ func TestAttack_NotInCombat(t *testing.T) {
 }
 
 func TestAttack_InvalidTarget(t *testing.T) {
-	rand.Seed(42)
 	e, state := combatGame(t, combatScenario())
 	_, err := e.StartCombat(&state)
 	require.NoError(t, err)
@@ -205,7 +197,6 @@ func TestAttack_InvalidTarget(t *testing.T) {
 }
 
 func TestAttack_DeadTarget(t *testing.T) {
-	rand.Seed(42)
 	e, state := combatGame(t, multiEnemyScenario())
 	_, err := e.StartCombat(&state)
 	require.NoError(t, err)
@@ -221,7 +212,6 @@ func TestAttack_DeadTarget(t *testing.T) {
 }
 
 func TestDefend_SetsFlag(t *testing.T) {
-	rand.Seed(42)
 	e, state := combatGame(t, combatScenario())
 	_, err := e.StartCombat(&state)
 	require.NoError(t, err)
@@ -236,7 +226,6 @@ func TestDefend_SetsFlag(t *testing.T) {
 }
 
 func TestDefend_HalvesDamage(t *testing.T) {
-	rand.Seed(42)
 	e, state := combatGame(t, combatScenario())
 	_, err := e.StartCombat(&state)
 	require.NoError(t, err)
@@ -272,7 +261,6 @@ func TestFlee_Success(t *testing.T) {
 	// Seed so that roll <= DEX (12).
 	// We'll try multiple seeds to find one that works.
 	for seed := int64(0); seed < 100; seed++ {
-		rand.Seed(seed)
 		e, state := combatGame(t, combatScenario())
 		_, err := e.StartCombat(&state)
 		require.NoError(t, err)
@@ -297,7 +285,6 @@ func TestFlee_Success(t *testing.T) {
 func TestFlee_Failure(t *testing.T) {
 	// Use a high-DEX character scenario where flee still fails sometimes.
 	for seed := int64(0); seed < 100; seed++ {
-		rand.Seed(seed)
 		s := combatScenario()
 		e := engine.New(s)
 		char := model.Character{
@@ -335,7 +322,6 @@ func TestFlee_NotInCombat(t *testing.T) {
 }
 
 func TestProcessEnemyTurn_DamagesHero(t *testing.T) {
-	rand.Seed(42)
 	e, state := combatGame(t, combatScenario())
 	_, err := e.StartCombat(&state)
 	require.NoError(t, err)
@@ -354,7 +340,6 @@ func TestProcessEnemyTurn_DamagesHero(t *testing.T) {
 }
 
 func TestProcessEnemyTurn_HeroDeath(t *testing.T) {
-	rand.Seed(42)
 	e, state := combatGame(t, combatScenario())
 	_, err := e.StartCombat(&state)
 	require.NoError(t, err)
@@ -374,7 +359,6 @@ func TestProcessEnemyTurn_HeroDeath(t *testing.T) {
 }
 
 func TestProcessEnemyTurn_CautiousFlees(t *testing.T) {
-	rand.Seed(42)
 	s := &scenario.Scenario{
 		ID:           "cautious-test",
 		StartingRoom: "arena",
@@ -413,7 +397,6 @@ func TestProcessEnemyTurn_CautiousFlees(t *testing.T) {
 }
 
 func TestProcessEnemyTurn_CautiousAttacksWhenHealthy(t *testing.T) {
-	rand.Seed(42)
 	s := &scenario.Scenario{
 		ID:           "cautious-attack",
 		StartingRoom: "arena",
@@ -452,7 +435,6 @@ func TestProcessEnemyTurn_CautiousAttacksWhenHealthy(t *testing.T) {
 }
 
 func TestFullCombat_KillGoblin(t *testing.T) {
-	rand.Seed(42)
 	e, state := combatGame(t, combatScenario())
 
 	// Pick up and equip sword.
@@ -491,7 +473,6 @@ func TestFullCombat_KillGoblin(t *testing.T) {
 }
 
 func TestUnarmedDamage(t *testing.T) {
-	rand.Seed(42)
 	e, state := combatGame(t, combatScenario())
 
 	_, err := e.StartCombat(&state)
@@ -509,7 +490,6 @@ func TestUnarmedDamage(t *testing.T) {
 }
 
 func TestFirstAliveEnemy(t *testing.T) {
-	rand.Seed(42)
 	e, state := combatGame(t, multiEnemyScenario())
 	_, err := e.StartCombat(&state)
 	require.NoError(t, err)
@@ -536,7 +516,6 @@ func TestCombatErrorMessages(t *testing.T) {
 }
 
 func TestHeroDeadError_PreventsCombatActions(t *testing.T) {
-	rand.Seed(42)
 	e, state := combatGame(t, combatScenario())
 	_, err := e.StartCombat(&state)
 	require.NoError(t, err)
