@@ -64,11 +64,13 @@ func (e *Engine) SaveGame(state *model.GameState, slot string) (SaveResult, erro
 	if err != nil {
 		return SaveResult{}, err
 	}
-	state.Timestamp = e.Now().UTC().Format(time.RFC3339)
+	stateCopy := *state
+	stateCopy.Timestamp = e.Now().UTC().Format(time.RFC3339)
 	path := filepath.Join(e.saveDir(), slot+".json")
-	if err := save.Save(*state, path); err != nil {
+	if err := save.Save(stateCopy, path); err != nil {
 		return SaveResult{}, fmt.Errorf("save game: %w", err)
 	}
+	state.Timestamp = stateCopy.Timestamp
 	return SaveResult{Slot: slot, Path: path}, nil
 }
 
