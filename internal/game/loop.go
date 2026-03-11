@@ -260,6 +260,27 @@ func (l *Loop) dispatch(ctx context.Context, state *model.GameState, action mode
 	case "cast":
 		return l.dispatchCast(ctx, state, action)
 
+	case "save":
+		result, err := l.eng.SaveGame(state, action.Target)
+		if err != nil {
+			event = model.EngineEvent{Type: "save_error"}
+		} else {
+			event = model.EngineEvent{Type: "game_saved", Details: map[string]any{
+				"slot": result.Slot,
+			}}
+		}
+
+	case "load":
+		loaded, result, err := l.eng.LoadGame(action.Target)
+		if err != nil {
+			event = model.EngineEvent{Type: "load_error"}
+		} else {
+			*state = loaded
+			event = model.EngineEvent{Type: "game_loaded", Details: map[string]any{
+				"slot": result.Slot,
+			}}
+		}
+
 	case "quit":
 		event = model.EngineEvent{Type: "quit"}
 

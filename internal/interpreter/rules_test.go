@@ -208,6 +208,28 @@ func TestRulesInterpreter_Cast(t *testing.T) {
 	assert.Equal(t, "unknown", a.Type)
 }
 
+func TestRulesInterpreter_Save(t *testing.T) {
+	// Default slot.
+	a := interpret(t, "save")
+	assert.Equal(t, "save", a.Type)
+	assert.Equal(t, "", a.Target)
+
+	// Named slot.
+	a = interpret(t, "save slot1")
+	assert.Equal(t, "save", a.Type)
+	assert.Equal(t, "slot1", a.Target)
+}
+
+func TestRulesInterpreter_Load(t *testing.T) {
+	a := interpret(t, "load")
+	assert.Equal(t, "load", a.Type)
+	assert.Equal(t, "", a.Target)
+
+	a = interpret(t, "load slot1")
+	assert.Equal(t, "load", a.Type)
+	assert.Equal(t, "slot1", a.Target)
+}
+
 func TestRulesInterpreter_CaseInsensitive(t *testing.T) {
 	a := interpret(t, "GO NORTH")
 	assert.Equal(t, "move", a.Type)

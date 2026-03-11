@@ -124,6 +124,20 @@ func (t *Template) Narrate(_ context.Context, event model.EngineEvent, _ model.G
 		return "Your class cannot cast that spell.", nil
 	case "insufficient_mp":
 		return "You don't have enough MP.", nil
+	case "game_saved":
+		if slot, ok := event.Details["slot"].(string); ok {
+			return fmt.Sprintf("Game saved to slot %q.", slot), nil
+		}
+		return "Game saved.", nil
+	case "game_loaded":
+		if slot, ok := event.Details["slot"].(string); ok {
+			return fmt.Sprintf("Game loaded from slot %q.", slot), nil
+		}
+		return "Game loaded.", nil
+	case "save_error":
+		return "Failed to save the game.", nil
+	case "load_error":
+		return "Failed to load the game.", nil
 	case "level_up":
 		level, _ := event.Details["level"].(int)
 		hpGain, _ := event.Details["hp_gain"].(int)
