@@ -71,14 +71,19 @@ func (c *CLI) startReadline(ctx context.Context) {
 		return
 	}
 
-	// Close readline on context cancellation to unblock Readline().
-	// The done channel lets the read loop signal this goroutine to exit
-	// when the loop finishes first (e.g. on EOF), preventing a leak.
+	// closeRL ensures readline is closed exactly once, restoring terminal
+	// state and releasing resources regardless of which exit path fires.
+	var closeRL sync.Once
+	doClose := func() { closeRL.Do(func() { rl.Close() }) }
+
+	// Helper goroutine closes readline on context cancellation to unblock
+	// a blocked Readline() call. The done channel lets the read loop signal
+	// this goroutine to exit when the loop finishes first (e.g. on EOF).
 	done := make(chan struct{})
 	go func() {
 		select {
 		case <-ctx.Done():
-			rl.Close()
+			doClose()
 		case <-done:
 		}
 	}()
@@ -86,6 +91,7 @@ func (c *CLI) startReadline(ctx context.Context) {
 	go func() {
 		defer close(c.events)
 		defer close(done)
+		defer doClose()
 		for {
 			// Wait for Render to finish before showing the prompt.
 			select {
