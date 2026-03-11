@@ -77,7 +77,8 @@ exists yet. Every subsequent milestone builds on this foundation.
 - `internal/testutil/` package:
   - `FakeLLMInterpreter` — returns canned action from a fixture file
   - `FakeLLMNarrator` — returns fixture string
-  - `FakeSLMServer` — `httptest.Server` serving OpenAI-compatible JSON
+  - `FakeSLMServer` — `httptest.Server` serving canned ollama `/api/generate`
+    responses (will switch to OpenAI-compatible endpoints in M6)
   - `FakeLuxServer` — records `show()`/`update()` calls; injects events
   - `ScriptRunner` — skeleton for running game scripts (no engine yet)
 - `testdata/` layout: `scenarios/`, `saves/`, `scripts/`, `fixtures/`
@@ -288,8 +289,10 @@ running SmolLM2-135M, communicating via OpenAI-compatible HTTP API.
   - Uses `inference` client with room seed + moved event
   - Returns model prose verbatim
   - Timeout → fallback to `TemplateNarrator`
-- Runtime auto-detection: probe ollama `/api/tags` → llama.cpp
-  `/v1/models` → fall back to tiny tier (regex+templates)
+- Runtime auto-detection: probe for already-running ollama (`/api/tags`)
+  → probe for already-running llama.cpp (`/v1/models`) → fall back to
+  tiny tier (regex+templates). cryptd does not spawn inference servers;
+  it discovers what the user has running.
 - `testdata/fixtures/openai-*.json` — canned `/v1/chat/completions`
   responses for all test cases
 
@@ -493,7 +496,7 @@ Some work can proceed in parallel once its dependencies are met:
 | Can run in parallel | After |
 |---|---|
 | `FakeLuxServer` + `LuxRenderer` | M2 (interfaces defined) |
-| `FakeSLMServer` (OpenAI-compat) + SLM interpreters + llama.cpp sidecar | M2 (interfaces defined) |
+| `FakeSLMServer` + SLM interpreters (OpenAI-compat switch in M6) | M2 (interfaces defined) |
 | Additional scenario YAML files | M1 (parser exists) |
 | Additional acceptance scripts | M3 (engine complete) |
 | SKILL.md DM role draft | M3 (game mechanics stable) |

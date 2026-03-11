@@ -1145,7 +1145,7 @@ Claude    ollama     llama.cpp  regex+templates
 | Tier | Interpreter | Narrator | Runtime | Default Model | Distribution |
 |------|-------------|----------|---------|---------------|-------------|
 | Tiny | RulesInterpreter (regex) | TemplateNarrator | None | None | `brew install cryptd` |
-| Small | SLMInterpreter | SLMNarrator | llama.cpp (sidecar) | SmolLM2-135M | Bundled in brew bottle |
+| Small | SLMInterpreter | SLMNarrator | llama.cpp (sidecar) | SmolLM2-135M | User-installed (`cryptd setup` or manual) |
 | Medium | SLMInterpreter | SLMNarrator | ollama | User's choice | `brew install ollama` + model pull |
 | Large | LLMInterpreter | LLMNarrator | Claude API | Claude | API key |
 
@@ -1182,9 +1182,9 @@ Default and recommended models are from Western labs only:
 ### Small Tier: llama.cpp Sidecar
 
 For the small tier, cryptd prefers a local SmolLM2-135M (~100MB quantized GGUF) served
-via a llama.cpp sidecar process when available. cryptd spawns `llama-server` as a
-subprocess and communicates via the same HTTP API as ollama (OpenAI-compatible
-`/v1/chat/completions`).
+via a llama.cpp server when available. cryptd discovers an already-running `llama-server`
+(or one started by the user) and communicates via the OpenAI-compatible
+`/v1/chat/completions` HTTP API.
 
 Distribution artifacts (GitHub Releases, Homebrew bottle) remain binary-only: they ship
 the pre-built `cryptd` binary (plus LICENSE) and do not bundle GGUF model files or
