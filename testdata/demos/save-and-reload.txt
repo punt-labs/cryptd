@@ -1,0 +1,5 @@
+# save-and-reload — save the game, then load it back
+look
+save test-slot
+load test-slot
+look

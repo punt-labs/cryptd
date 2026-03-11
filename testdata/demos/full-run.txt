@@ -1,0 +1,10 @@
+# full-run — explore, pick up items, navigate, quit
+look
+take short sword
+inventory
+go south
+look
+go north
+look
+help
+quit
