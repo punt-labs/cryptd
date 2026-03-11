@@ -336,6 +336,17 @@ func (l *Loop) dispatchAttack(ctx context.Context, state *model.GameState, actio
 			return nil, "", err
 		}
 		parts = append(parts, narr)
+
+		// Check for level-up after combat victory.
+		lvlEvents, lvlNarr, err := l.narrateLevelUp(ctx, state)
+		if err != nil {
+			return nil, "", err
+		}
+		events = append(events, lvlEvents...)
+		if lvlNarr != "" {
+			parts = append(parts, lvlNarr)
+		}
+
 		return events, strings.Join(parts, " "), nil
 	}
 
@@ -558,6 +569,17 @@ func (l *Loop) dispatchCast(ctx context.Context, state *model.GameState, action 
 				return nil, "", err
 			}
 			parts = append(parts, narr)
+
+			// Check for level-up after combat victory.
+			lvlEvents, lvlNarr, err := l.narrateLevelUp(ctx, state)
+			if err != nil {
+				return nil, "", err
+			}
+			events = append(events, lvlEvents...)
+			if lvlNarr != "" {
+				parts = append(parts, lvlNarr)
+			}
+
 			return events, strings.Join(parts, " "), nil
 		}
 
@@ -628,6 +650,25 @@ func (l *Loop) narrateSpellError(ctx context.Context, state *model.GameState, er
 		return nil, "", err
 	}
 
+	narration, err := l.narr.Narrate(ctx, event, *state)
+	if err != nil {
+		return nil, "", err
+	}
+	return []model.EngineEvent{event}, narration, nil
+}
+
+// narrateLevelUp checks for a level-up and returns the narration event if one occurred.
+func (l *Loop) narrateLevelUp(ctx context.Context, state *model.GameState) ([]model.EngineEvent, string, error) {
+	result := l.eng.CheckLevelUp(state)
+	if !result.Leveled {
+		return nil, "", nil
+	}
+
+	event := model.EngineEvent{Type: "level_up", Details: map[string]any{
+		"level":   result.NewLevel,
+		"hp_gain": result.HPGain,
+		"mp_gain": result.MPGain,
+	}}
 	narration, err := l.narr.Narrate(ctx, event, *state)
 	if err != nil {
 		return nil, "", err

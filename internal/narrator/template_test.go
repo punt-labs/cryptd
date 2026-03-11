@@ -88,6 +88,7 @@ func TestTemplateNarrator_CombatEvents(t *testing.T) {
 		"not_hero_turn", "invalid_target",
 		"spell_damage", "spell_heal",
 		"unknown_spell", "not_caster", "insufficient_mp",
+		"level_up",
 	}
 	for _, evType := range events {
 		t.Run(evType, func(t *testing.T) {
@@ -99,6 +100,8 @@ func TestTemplateNarrator_CombatEvents(t *testing.T) {
 					"xp":          8,
 					"enemy":       "Goblin",
 					"enemy_names": "Goblin",
+					"level":       2,
+					"hp_gain":     8,
 				},
 			}, state)
 			require.NoError(t, err)
