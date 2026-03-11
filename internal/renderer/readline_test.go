@@ -38,6 +38,7 @@ func TestReadline_InputEvent(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	c.startReadline(ctx)
+	require.True(t, c.useReadline, "expected readline path, got scanner fallback")
 
 	// Signal readGate so readline can prompt.
 	c.readGate <- struct{}{}
@@ -56,6 +57,7 @@ func TestReadline_InputEvent(t *testing.T) {
 
 func TestReadline_EOFSendsQuit(t *testing.T) {
 	pr, pw := io.Pipe()
+	defer pr.Close()
 
 	var out bytes.Buffer
 	c := newReadlineCLI(&out, pr)
@@ -63,6 +65,7 @@ func TestReadline_EOFSendsQuit(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	c.startReadline(ctx)
+	require.True(t, c.useReadline, "expected readline path, got scanner fallback")
 
 	// Signal readGate then close write end to trigger EOF.
 	c.readGate <- struct{}{}
@@ -89,6 +92,7 @@ func TestReadline_ContextCancelUnblocks(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	c.startReadline(ctx)
+	require.True(t, c.useReadline, "expected readline path, got scanner fallback")
 
 	// Signal readGate so readline blocks on Readline().
 	c.readGate <- struct{}{}
@@ -123,6 +127,7 @@ func TestReadline_EmptyLineReSignalsGate(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	c.startReadline(ctx)
+	require.True(t, c.useReadline, "expected readline path, got scanner fallback")
 
 	// Signal readGate, send empty line, then a real command.
 	c.readGate <- struct{}{}
