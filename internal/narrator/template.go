@@ -109,6 +109,21 @@ func (t *Template) Narrate(_ context.Context, event model.EngineEvent, _ model.G
 		return "It is not your turn.", nil
 	case "invalid_target":
 		return "That is not a valid target.", nil
+	case "spell_damage":
+		spell, _ := event.Details["spell"].(string)
+		target, _ := event.Details["target"].(string)
+		damage, _ := event.Details["damage"].(int)
+		return fmt.Sprintf("You cast %s on the %s for %d damage.", spell, target, damage), nil
+	case "spell_heal":
+		spell, _ := event.Details["spell"].(string)
+		power, _ := event.Details["power"].(int)
+		return fmt.Sprintf("You cast %s and recover %d HP.", spell, power), nil
+	case "unknown_spell":
+		return "You don't know that spell.", nil
+	case "not_caster":
+		return "Your class cannot cast that spell.", nil
+	case "insufficient_mp":
+		return "You don't have enough MP.", nil
 	case "quit":
 		return "Farewell, adventurer.", nil
 	case "unknown_action":

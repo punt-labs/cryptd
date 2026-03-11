@@ -107,6 +107,17 @@ func (r *Rules) Interpret(_ context.Context, input string, _ model.GameState) (m
 	case "defend", "block", "guard":
 		return model.EngineAction{Type: "defend"}, nil
 
+	case "cast":
+		if rest != "" {
+			// "cast fireball" or "cast fireball at goblin_0"
+			// The underscore-join turns "fireball at goblin_0" into "fireball_at_goblin_0".
+			parts := strings.SplitN(rest, "_at_", 2)
+			if len(parts) == 2 {
+				return model.EngineAction{Type: "cast", SpellID: parts[0], Target: parts[1]}, nil
+			}
+			return model.EngineAction{Type: "cast", SpellID: rest}, nil
+		}
+
 	case "flee", "run", "escape":
 		return model.EngineAction{Type: "flee"}, nil
 

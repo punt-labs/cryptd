@@ -12,6 +12,7 @@ type Scenario struct {
 	Rooms        map[string]*Room             `yaml:"rooms"`
 	Items        map[string]*ScenarioItem     `yaml:"items"`
 	Enemies      map[string]*EnemyTemplate    `yaml:"enemies"`
+	Spells       map[string]*SpellTemplate    `yaml:"spells"`
 }
 
 // Room is a single location in the dungeon.
@@ -47,4 +48,13 @@ type EnemyTemplate struct {
 	HP     int    `yaml:"hp"`
 	Attack string `yaml:"attack"` // dice notation, e.g. "1d4"
 	AI     string `yaml:"ai"`     // aggressive|cautious|scripted
+}
+
+// SpellTemplate defines a spell that can be cast in the scenario.
+type SpellTemplate struct {
+	Name    string   `yaml:"name"`
+	MP      int      `yaml:"mp"`       // mana cost
+	Effect  string   `yaml:"effect"`   // damage|heal
+	Power   string   `yaml:"power"`    // dice notation for effect magnitude
+	Classes []string `yaml:"classes"`  // which classes can cast this spell
 }
