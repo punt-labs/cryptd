@@ -137,12 +137,10 @@ toolchain on the user's machine.
 For contributors who have the Go toolchain:
 
 ```bash
-go install github.com/punt-labs/cryptd/cmd/crypt@latest
+go build -o cryptd ./cmd/crypt
 ```
 
-This builds from source at the latest tagged version. It is not the
-recommended path for end users — they should use the plugin installer or
-Homebrew.
+This builds from source. It is not the recommended path for end users — they should use the plugin installer or Homebrew.
 
 ---
 

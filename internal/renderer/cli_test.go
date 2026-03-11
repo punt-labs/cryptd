@@ -70,9 +70,10 @@ func TestCLIRenderer_EOFClosesEvents(t *testing.T) {
 }
 
 func TestCLIRenderer_ContextCancelStopsScanner(t *testing.T) {
-	// Use a pipe so Scan() blocks waiting for input.
-	// Cancelling ctx closes the pipe reader, unblocking Scan() and letting the goroutine exit.
+	// Use a pipe so Scan() can block. We write a line, then cancel ctx so the
+	// goroutine exits via ctx.Done() on the send select rather than blocking forever.
 	pr, pw := io.Pipe()
+	defer pr.Close()
 	defer pw.Close()
 
 	var out bytes.Buffer
@@ -81,7 +82,9 @@ func TestCLIRenderer_ContextCancelStopsScanner(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	_ = r.Render(ctx, model.GameState{}, "")
 
-	// Cancel the context — this should close pr and unblock the scanner goroutine.
+	// Write a line so the scanner goroutine unblocks from Scan(), then cancel
+	// so the send is dropped and the goroutine exits.
+	_, _ = fmt.Fprintln(pw, "some input")
 	cancel()
 
 	// After cancellation the scanner goroutine must exit and close events.

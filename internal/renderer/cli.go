@@ -17,38 +17,24 @@ import (
 type CLI struct {
 	out       io.Writer
 	inScanner *bufio.Scanner
-	inCloser  io.Closer
 	events    chan model.InputEvent
 	startOnce sync.Once
 }
 
 // NewCLI creates a CLIRenderer that writes to out and reads from in.
-// If in implements io.Closer, it will be closed on context cancellation to
-// unblock the scanner and avoid leaking the background goroutine.
 func NewCLI(out io.Writer, in io.Reader) *CLI {
-	var closer io.Closer
-	if c, ok := in.(io.Closer); ok {
-		closer = c
-	}
 	return &CLI{
 		out:       out,
 		inScanner: bufio.NewScanner(in),
-		inCloser:  closer,
 		events:    make(chan model.InputEvent, 1),
 	}
 }
 
 // startScanner launches the background stdin reader exactly once.
-// If the input implements io.Closer, it is closed on context cancellation so
-// that any blocking Scan call is interrupted and the goroutine can exit.
+// The goroutine stops sending when ctx is cancelled. The underlying reader
+// is NOT closed — callers are responsible for its lifetime.
 func (c *CLI) startScanner(ctx context.Context) {
 	c.startOnce.Do(func() {
-		if c.inCloser != nil {
-			go func() {
-				<-ctx.Done()
-				_ = c.inCloser.Close()
-			}()
-		}
 		go func() {
 			defer close(c.events)
 			for c.inScanner.Scan() {

@@ -63,12 +63,12 @@ func runHeadless(args []string) {
 		fmt.Fprintf(os.Stderr, "error resolving scenario path: %v\n", err)
 		os.Exit(1)
 	}
-	if absPath != absScenarioDir && !strings.HasPrefix(absPath, absScenarioDir+string(os.PathSeparator)) {
+	rel, err := filepath.Rel(absScenarioDir, absPath)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) || filepath.IsAbs(rel) {
 		fmt.Fprintln(os.Stderr, "error: invalid scenario ID")
 		os.Exit(1)
 	}
-	path := absPath
-	s, err := scenario.Load(path)
+	s, err := scenario.Load(absPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error loading scenario: %v\n", err)
 		os.Exit(1)
