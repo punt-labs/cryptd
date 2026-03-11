@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Interpreter verb: `help`/`?` — lists all available commands
+- Narrator template: `help` event with full command reference
+- Game loop dispatch for `help` action
 - In-game save/load: `SaveGame` and `LoadGame` engine methods with named slots (default: `quicksave`)
 - Interpreter verbs: `save [slot]`, `load [slot]`
 - Narrator templates: `game_saved`, `game_loaded`, `save_error`, `load_error`

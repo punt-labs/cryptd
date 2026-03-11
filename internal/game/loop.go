@@ -281,6 +281,9 @@ func (l *Loop) dispatch(ctx context.Context, state *model.GameState, action mode
 			}}
 		}
 
+	case "help":
+		event = model.EngineEvent{Type: "help"}
+
 	case "quit":
 		event = model.EngineEvent{Type: "quit"}
 

@@ -136,6 +136,9 @@ func (r *Rules) Interpret(_ context.Context, input string, _ model.GameState) (m
 		}
 		return model.EngineAction{Type: "load"}, nil
 
+	case "help", "?":
+		return model.EngineAction{Type: "help"}, nil
+
 	case "quit", "exit", "q":
 		return model.EngineAction{Type: "quit"}, nil
 	}
