@@ -45,7 +45,7 @@ type LockedError struct {
 }
 
 func (e *LockedError) Error() string {
-	return fmt.Sprintf("the way %s is locked", e.Direction)
+	return fmt.Sprintf("the way %s to %s is locked", e.Direction, e.Room)
 }
 
 // Engine is the deterministic rules machine. All game state transitions go
