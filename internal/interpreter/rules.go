@@ -98,6 +98,18 @@ func (r *Rules) Interpret(_ context.Context, input string, _ model.GameState) (m
 			return model.EngineAction{Type: "unequip", Target: rest}, nil
 		}
 
+	case "attack", "a", "hit", "strike", "kill":
+		if rest != "" {
+			return model.EngineAction{Type: "attack", Target: rest}, nil
+		}
+		return model.EngineAction{Type: "attack"}, nil
+
+	case "defend", "block", "guard":
+		return model.EngineAction{Type: "defend"}, nil
+
+	case "flee", "run", "escape":
+		return model.EngineAction{Type: "flee"}, nil
+
 	case "inventory", "i":
 		return model.EngineAction{Type: "inventory"}, nil
 
