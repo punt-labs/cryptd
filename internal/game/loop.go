@@ -512,6 +512,16 @@ func (l *Loop) processEnemyTurns(ctx context.Context, state *model.GameState) ([
 					return nil, "", err
 				}
 				parts = append(parts, narr)
+
+				// Check for level-up after combat victory (enemy flee path).
+				lvlEvents, lvlNarr, err := l.narrateLevelUp(ctx, state)
+				if err != nil {
+					return nil, "", err
+				}
+				events = append(events, lvlEvents...)
+				if lvlNarr != "" {
+					parts = append(parts, lvlNarr)
+				}
 			}
 		case "skip":
 			// Dead enemy — no narration needed.
