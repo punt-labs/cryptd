@@ -777,8 +777,7 @@ Rejected because:
 ## DES-015: SLM Integration — ollama over localhost HTTP
 
 **Date:** 2026-03-10
-**Status:** SUPERSEDED by DES-023
-**Notes:** Partially superseded — ollama is now the medium tier; small tier uses llama.cpp sidecar.
+**Status:** SUPERSEDED by DES-023 (partially — ollama is now the medium tier; small tier uses llama.cpp sidecar)
 **Topic:** How the solo mode SLM is invoked
 
 ### Design
@@ -1182,13 +1181,16 @@ Default and recommended models are from Western labs only:
 
 ### Small Tier: llama.cpp Sidecar
 
-The small tier ships SmolLM2-135M (~100MB quantized GGUF) in the Homebrew bottle and
-uses llama.cpp as a sidecar process. The Homebrew formula declares `llama.cpp` as a
-dependency. cryptd spawns `llama-server` as a subprocess and communicates via the same
-HTTP API as ollama (OpenAI-compatible `/v1/chat/completions`).
+For the small tier, cryptd prefers a local SmolLM2-135M (~100MB quantized GGUF) served
+via a llama.cpp sidecar process when available. cryptd spawns `llama-server` as a
+subprocess and communicates via the same HTTP API as ollama (OpenAI-compatible
+`/v1/chat/completions`).
 
-This avoids CGo in the cryptd binary while providing zero-setup model inference. The
-user runs `brew install cryptd` and solo mode works immediately.
+Distribution artifacts (GitHub Releases, Homebrew bottle) remain binary-only: they ship
+the pre-built `cryptd` binary (plus LICENSE) and do not bundle GGUF model files or
+declare `llama.cpp` as a hard dependency. A future `cryptd setup` command (or helper
+script) will install llama.cpp and obtain the SmolLM2-135M GGUF. cryptd detects and
+uses the sidecar if present, otherwise falls through to the tiny tier.
 
 ### Why Not Embed (Revisiting DES-015)
 

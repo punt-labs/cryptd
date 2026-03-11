@@ -77,7 +77,7 @@ exists yet. Every subsequent milestone builds on this foundation.
 - `internal/testutil/` package:
   - `FakeLLMInterpreter` — returns canned action from a fixture file
   - `FakeLLMNarrator` — returns fixture string
-  - `FakeSLMServer` — `httptest.Server` serving canned ollama JSON
+  - `FakeSLMServer` — `httptest.Server` serving OpenAI-compatible JSON
   - `FakeLuxServer` — records `show()`/`update()` calls; injects events
   - `ScriptRunner` — skeleton for running game scripts (no engine yet)
 - `testdata/` layout: `scenarios/`, `saves/`, `scripts/`, `fixtures/`
