@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Leveling system: `CheckLevelUp` engine method with per-class XP thresholds (Wizardry-inspired), HP/MP gains, and stat deltas on level-up
+- Per-class XP tables: fighter (cheapest), thief, priest, mage (most expensive), max level 10
+- Per-class stat gains on level-up: fighter (+STR/+CON), mage (+INT/+WIS), priest (+WIS/+CHA), thief (+DEX/+CHA)
+- Game loop level-up narration after combat victory (attack kill or spell damage kill)
+- Narrator template: `level_up` event with level and HP gain
 - Spell system: `CastSpell` engine method with MP cost deduction, class gates (mage/priest), damage and heal effects
 - Spell error types: `UnknownSpellError`, `NotCasterError`, `InsufficientMPError`
 - `MP` and `MaxMP` fields on `Character` model
