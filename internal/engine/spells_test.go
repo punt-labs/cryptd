@@ -168,6 +168,18 @@ func TestCastSpell_HealInCombatConsumesTurn(t *testing.T) {
 	assert.False(t, e.IsHeroTurn(&state))
 }
 
+func TestCastSpell_DeadHeroCannotCast(t *testing.T) {
+	e, state := mageGame(t)
+	state.Party[0].HP = 0
+
+	_, err := e.CastSpell(&state, "heal", "")
+	require.Error(t, err)
+	var heroDead *engine.HeroDeadError
+	require.ErrorAs(t, err, &heroDead)
+	// MP must not have been deducted.
+	assert.Equal(t, 10, state.Party[0].MP)
+}
+
 func TestCastSpell_ErrorMessages(t *testing.T) {
 	assert.Contains(t, (&engine.NotCasterError{Class: "thief"}).Error(), "thief")
 	assert.Contains(t, (&engine.InsufficientMPError{Have: 1, Need: 5}).Error(), "1")

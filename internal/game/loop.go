@@ -606,6 +606,7 @@ func (l *Loop) narrateSpellError(ctx context.Context, state *model.GameState, er
 	var notInCombat *engine.NotInCombatError
 	var notHeroTurn *engine.NotHeroTurnError
 	var invalidTarget *engine.InvalidTargetError
+	var heroDead *engine.HeroDeadError
 
 	var event model.EngineEvent
 	switch {
@@ -621,6 +622,8 @@ func (l *Loop) narrateSpellError(ctx context.Context, state *model.GameState, er
 		event = model.EngineEvent{Type: "not_hero_turn"}
 	case errors.As(err, &invalidTarget):
 		event = model.EngineEvent{Type: "invalid_target"}
+	case errors.As(err, &heroDead):
+		event = model.EngineEvent{Type: "hero_died"}
 	default:
 		return nil, "", err
 	}

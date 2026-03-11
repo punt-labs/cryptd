@@ -50,6 +50,11 @@ func (e *UnknownSpellError) Error() string {
 func (e *Engine) CastSpell(state *model.GameState, spellID, targetID string) (CastResult, error) {
 	h := hero(state)
 
+	// Dead heroes cannot cast spells (consistent with Attack/Defend/Flee).
+	if h.HP <= 0 {
+		return CastResult{}, &HeroDeadError{}
+	}
+
 	// Look up spell definition.
 	if e.s.Spells == nil {
 		return CastResult{}, &UnknownSpellError{SpellID: spellID}
