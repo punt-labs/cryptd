@@ -41,7 +41,7 @@ jobs:
         run: |
           go test -cover -coverprofile=coverage.out ./internal/engine/... 2>/dev/null || true
           if [ -f coverage.out ]; then
-            pct=$(go tool cover -func=coverage.out | awk '/total/{gsub(/%/,"",$3); print $3}')
+            pct=$(go tool cover -func=coverage.out | awk '/^total:/{gsub(/%/,"",$3); print $3}')
             echo "Engine coverage: ${pct}%"
             awk "BEGIN{if(${pct:-100}<90){print \"Coverage ${pct}% < 90% required\"; exit 1}}"
           else

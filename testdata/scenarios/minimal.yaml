@@ -16,6 +16,7 @@ rooms:
       north:
         room: secret_room
         type: hidden
+    items: [short_sword]
   goblin_lair:
     name: "Goblin Lair"
     description_seed: "Damp and foul-smelling. Bones crunch underfoot."
@@ -51,6 +52,14 @@ enemies:
     ai: aggressive
 
 items:
+  short_sword:
+    name: "Short Sword"
+    description: "A simple but serviceable blade."
+    type: weapon
+    damage: "1d6"
+    weight: 3.0
+    value: 10
+
   rusty_key:
     name: "Rusty Key"
     description: "An old iron key, pitted with rust."

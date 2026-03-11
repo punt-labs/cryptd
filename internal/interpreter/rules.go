@@ -45,6 +45,13 @@ func (r *Rules) Interpret(_ context.Context, input string, _ model.GameState) (m
 		return model.EngineAction{Type: "move", Direction: verb}, nil
 	}
 
+	// Join remaining fields for multi-word targets, using underscores to
+	// match scenario item IDs (e.g. "short sword" → "short_sword").
+	rest := ""
+	if len(fields) >= 2 {
+		rest = strings.Join(fields[1:], "_")
+	}
+
 	switch verb {
 	case "go":
 		if len(fields) >= 2 {
@@ -58,10 +65,41 @@ func (r *Rules) Interpret(_ context.Context, input string, _ model.GameState) (m
 	case "look", "l":
 		return model.EngineAction{Type: "look"}, nil
 
-	case "examine":
-		if len(fields) >= 2 && fields[1] == "room" {
+	case "examine", "x":
+		if rest == "" || rest == "room" {
 			return model.EngineAction{Type: "look"}, nil
 		}
+		return model.EngineAction{Type: "examine", ItemID: rest}, nil
+
+	case "take", "get", "grab":
+		if rest != "" {
+			return model.EngineAction{Type: "take", ItemID: rest}, nil
+		}
+
+	case "pick":
+		// "pick up <item>"
+		if len(fields) >= 3 && fields[1] == "up" {
+			target := strings.Join(fields[2:], "_")
+			return model.EngineAction{Type: "take", ItemID: target}, nil
+		}
+
+	case "drop":
+		if rest != "" {
+			return model.EngineAction{Type: "drop", ItemID: rest}, nil
+		}
+
+	case "equip", "wear", "wield":
+		if rest != "" {
+			return model.EngineAction{Type: "equip", ItemID: rest}, nil
+		}
+
+	case "unequip", "remove":
+		if rest != "" {
+			return model.EngineAction{Type: "unequip", Target: rest}, nil
+		}
+
+	case "inventory", "i":
+		return model.EngineAction{Type: "inventory"}, nil
 
 	case "quit", "exit", "q":
 		return model.EngineAction{Type: "quit"}, nil

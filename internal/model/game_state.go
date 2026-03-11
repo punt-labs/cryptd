@@ -19,9 +19,13 @@ type DungeonState struct {
 	RoomState    map[string]RoomState `json:"room_state"`
 }
 
+// MaxCarryWeight is the base inventory weight limit for all characters.
+const MaxCarryWeight = 50.0
+
 // RoomState holds per-room mutable state (e.g. whether it has been cleared).
 type RoomState struct {
-	Cleared bool `json:"cleared"`
+	Cleared bool     `json:"cleared"`
+	Items   []string `json:"items"` // item IDs currently in this room
 }
 
 // Character represents one member of the party.

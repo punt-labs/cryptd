@@ -29,6 +29,48 @@ func (t *Template) Narrate(_ context.Context, event model.EngineEvent, _ model.G
 		return "That way is locked.", nil
 	case "no_exit":
 		return "You can't go that way.", nil
+	case "picked_up":
+		if name, ok := event.Details["item_name"].(string); ok {
+			return fmt.Sprintf("You pick up the %s.", name), nil
+		}
+		return "You pick something up.", nil
+	case "dropped":
+		if name, ok := event.Details["item_name"].(string); ok {
+			return fmt.Sprintf("You drop the %s.", name), nil
+		}
+		return "You drop something.", nil
+	case "equipped":
+		if name, ok := event.Details["item_name"].(string); ok {
+			return fmt.Sprintf("You equip the %s.", name), nil
+		}
+		return "You equip an item.", nil
+	case "unequipped":
+		if name, ok := event.Details["item_name"].(string); ok {
+			return fmt.Sprintf("You unequip the %s.", name), nil
+		}
+		return "You unequip an item.", nil
+	case "examined":
+		if desc, ok := event.Details["description"].(string); ok && desc != "" {
+			return desc, nil
+		}
+		if name, ok := event.Details["item_name"].(string); ok {
+			return fmt.Sprintf("You see nothing special about the %s.", name), nil
+		}
+		return "You examine it closely.", nil
+	case "inventory_listed":
+		return "You check your belongings.", nil
+	case "item_not_found":
+		return "You don't see that here.", nil
+	case "not_in_inventory":
+		return "You don't have that.", nil
+	case "too_heavy":
+		return "That's too heavy to carry.", nil
+	case "slot_occupied":
+		return "You already have something equipped there.", nil
+	case "slot_empty":
+		return "You have nothing equipped there.", nil
+	case "not_equippable":
+		return "You can't equip that.", nil
 	case "quit":
 		return "Farewell, adventurer.", nil
 	case "unknown_action":

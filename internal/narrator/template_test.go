@@ -14,7 +14,12 @@ func TestTemplateNarrator_AllEventTypes(t *testing.T) {
 	n := narrator.NewTemplate()
 	state := model.GameState{}
 
-	events := []string{"moved", "looked", "unknown_action", "quit", "locked_door", "no_exit"}
+	events := []string{
+		"moved", "looked", "unknown_action", "quit", "locked_door", "no_exit",
+		"picked_up", "dropped", "equipped", "unequipped", "examined",
+		"inventory_listed", "item_not_found", "not_in_inventory",
+		"too_heavy", "slot_occupied", "slot_empty", "not_equippable",
+	}
 	for _, evType := range events {
 		t.Run(evType, func(t *testing.T) {
 			text, err := n.Narrate(context.Background(), model.EngineEvent{Type: evType}, state)
@@ -49,4 +54,34 @@ func TestTemplateNarrator_UnknownEventFallback(t *testing.T) {
 	text, err := n.Narrate(context.Background(), model.EngineEvent{Type: "some_future_event"}, model.GameState{})
 	require.NoError(t, err)
 	assert.NotEmpty(t, text)
+}
+
+func TestTemplateNarrator_PickedUpWithName(t *testing.T) {
+	n := narrator.NewTemplate()
+	text, err := n.Narrate(context.Background(), model.EngineEvent{
+		Type:    "picked_up",
+		Details: map[string]any{"item_name": "Rusty Key"},
+	}, model.GameState{})
+	require.NoError(t, err)
+	assert.Contains(t, text, "Rusty Key")
+}
+
+func TestTemplateNarrator_ExaminedWithDescription(t *testing.T) {
+	n := narrator.NewTemplate()
+	text, err := n.Narrate(context.Background(), model.EngineEvent{
+		Type:    "examined",
+		Details: map[string]any{"description": "A blade of fine steel.", "item_name": "Sword"},
+	}, model.GameState{})
+	require.NoError(t, err)
+	assert.Equal(t, "A blade of fine steel.", text)
+}
+
+func TestTemplateNarrator_ExaminedNoDescription(t *testing.T) {
+	n := narrator.NewTemplate()
+	text, err := n.Narrate(context.Background(), model.EngineEvent{
+		Type:    "examined",
+		Details: map[string]any{"item_name": "Rock"},
+	}, model.GameState{})
+	require.NoError(t, err)
+	assert.Contains(t, text, "Rock")
 }
