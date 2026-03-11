@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- 5 acceptance scripts: `full-run`, `combat-walkthrough`, `pick-up-item`, `combat-and-level`, `save-and-reload` — all passing via `cryptd autoplay --json`
+- 5 acceptance scripts: `full-run`, `combat-walkthrough`, `pick-up-item`, `combat`, `save-and-reload` — all passing via `cryptd autoplay --json`
 - E2E acceptance test suite (`e2e/acceptance_test.go`) with structured JSON transcript assertions
 - MCP schema contract: `cmd/dump-mcp-schema` generates `testdata/mcp-schema.json`; CI diffs generated vs committed to catch unintentional API changes
 - 15 MCP tools defined: new_game, move, look, pick_up, drop, equip, unequip, examine, inventory, attack, defend, flee, cast_spell, save_game, load_game

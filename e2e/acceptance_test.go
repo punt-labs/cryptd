@@ -76,27 +76,29 @@ func TestAcceptance_CombatWalkthrough(t *testing.T) {
 
 	require.True(t, len(entries) > 5, "expected >5 transcript entries")
 
-	// Should see combat started.
+	// Should reach goblin_lair and see combat start.
+	var reachedGoblinLair bool
 	var combatStarted bool
 	for _, e := range entries {
-		if e.Command == "go south" || e.Room == "goblin_lair" {
-			if e.Response != "" {
-				combatStarted = true
-				break
-			}
+		if e.Command == "south" && e.Room == "goblin_lair" {
+			reachedGoblinLair = true
+		}
+		if strings.Contains(e.Response, "Combat begins") {
+			combatStarted = true
 		}
 	}
-	assert.True(t, combatStarted, "expected combat in goblin_lair")
+	assert.True(t, reachedGoblinLair, "expected to reach goblin_lair via 'south'")
+	assert.True(t, combatStarted, "expected combat start message in transcript")
 
-	// Should see victory or attack events.
-	var sawCombatEvent bool
+	// Should see attack commands in transcript.
+	var sawAttack bool
 	for _, e := range entries {
 		if e.Command == "attack" {
-			sawCombatEvent = true
+			sawAttack = true
 			break
 		}
 	}
-	assert.True(t, sawCombatEvent, "expected attack commands in transcript")
+	assert.True(t, sawAttack, "expected attack commands in transcript")
 }
 
 func TestAcceptance_PickUpItem(t *testing.T) {
@@ -129,10 +131,10 @@ func TestAcceptance_PickUpItem(t *testing.T) {
 	assert.True(t, equipped, "expected to equip Short Sword")
 }
 
-func TestAcceptance_CombatAndLevel(t *testing.T) {
+func TestAcceptance_Combat(t *testing.T) {
 	bin := binary(t)
 	root := repoRoot(t)
-	entries := runAutoplay(t, bin, root, "combat-and-level.txt")
+	entries := runAutoplay(t, bin, root, "combat.txt")
 
 	require.True(t, len(entries) > 5)
 
