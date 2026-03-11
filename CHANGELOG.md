@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- CLIRenderer HUD: HP/MP progress bars with filled/empty block characters, auto-hidden MP for non-caster classes
+- CLIRenderer combat display: live enemy list with per-enemy HP bars, dead enemies hidden
 - Interpreter verb: `help`/`?` — lists all available commands
 - Narrator template: `help` event with full command reference
 - Game loop dispatch for `help` action

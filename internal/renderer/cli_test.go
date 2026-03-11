@@ -96,6 +96,73 @@ func TestCLIRenderer_ContextCancelStopsScanner(t *testing.T) {
 	}
 }
 
+func TestCLIRenderer_HUDShowsHPMP(t *testing.T) {
+	var out bytes.Buffer
+	in := strings.NewReader("")
+	r := renderer.NewCLI(&out, in)
+
+	state := model.GameState{
+		Dungeon: model.DungeonState{CurrentRoom: "entrance"},
+		Party: []model.Character{{
+			HP: 15, MaxHP: 20, MP: 3, MaxMP: 5,
+		}},
+	}
+	err := r.Render(context.Background(), state, "")
+	require.NoError(t, err)
+
+	output := out.String()
+	assert.Contains(t, output, "HP 15/20")
+	assert.Contains(t, output, "MP 3/5")
+	assert.Contains(t, output, "█")
+	assert.Contains(t, output, "░")
+}
+
+func TestCLIRenderer_HUDNoMPForFighter(t *testing.T) {
+	var out bytes.Buffer
+	in := strings.NewReader("")
+	r := renderer.NewCLI(&out, in)
+
+	state := model.GameState{
+		Dungeon: model.DungeonState{CurrentRoom: "entrance"},
+		Party: []model.Character{{
+			HP: 20, MaxHP: 20, MP: 0, MaxMP: 0,
+		}},
+	}
+	err := r.Render(context.Background(), state, "")
+	require.NoError(t, err)
+
+	output := out.String()
+	assert.Contains(t, output, "HP 20/20")
+	assert.NotContains(t, output, "MP")
+}
+
+func TestCLIRenderer_EnemyListDuringCombat(t *testing.T) {
+	var out bytes.Buffer
+	in := strings.NewReader("")
+	r := renderer.NewCLI(&out, in)
+
+	state := model.GameState{
+		Dungeon: model.DungeonState{
+			CurrentRoom: "lair",
+			Combat: model.CombatState{
+				Active: true,
+				Enemies: []model.EnemyInstance{
+					{Name: "Goblin", HP: 5, MaxHP: 8},
+					{Name: "Rat", HP: 0, MaxHP: 3},
+				},
+			},
+		},
+		Party: []model.Character{{HP: 20, MaxHP: 20}},
+	}
+	err := r.Render(context.Background(), state, "Combat!")
+	require.NoError(t, err)
+
+	output := out.String()
+	assert.Contains(t, output, "Goblin")
+	assert.Contains(t, output, "HP 5/8")
+	assert.NotContains(t, output, "Rat") // dead enemies hidden
+}
+
 // errWriter always returns an error on write.
 type errWriter struct{ err error }
 
