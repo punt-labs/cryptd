@@ -1,0 +1,9 @@
+# pick-up-item — take, examine, equip, unequip, drop
+look
+take short sword
+examine short sword
+equip short sword
+inventory
+unequip weapon
+drop short sword
+inventory

@@ -1,0 +1,12 @@
+# combat-and-level — equip weapon, fight goblin, gain XP
+take short sword
+equip short sword
+go south
+attack
+attack
+attack
+attack
+attack
+attack
+attack
+attack
