@@ -79,17 +79,25 @@ func (e *Engine) CastSpell(state *model.GameState, spellID, targetID string) (Ca
 		power = 1
 	}
 
-	// Deduct MP.
-	h.MP -= spell.MP
+	// Dispatch by effect — MP is deducted only after the effect succeeds,
+	// so a failed cast (e.g. not in combat, not hero's turn) never spends MP.
+	var result CastResult
+	var castErr error
 
 	switch spell.Effect {
 	case "damage":
-		return e.castDamage(state, spell.Name, spell.MP, power, targetID)
+		result, castErr = e.castDamage(state, spell.Name, spell.MP, power, targetID)
 	case "heal":
-		return e.castHeal(state, spell.Name, spell.MP, power)
+		result, castErr = e.castHeal(state, spell.Name, spell.MP, power)
 	default:
 		return CastResult{}, fmt.Errorf("unknown spell effect %q", spell.Effect)
 	}
+	if castErr != nil {
+		return CastResult{}, castErr
+	}
+
+	h.MP -= spell.MP
+	return result, nil
 }
 
 func (e *Engine) castDamage(state *model.GameState, spellName string, mpCost, power int, targetID string) (CastResult, error) {
@@ -138,6 +146,15 @@ func (e *Engine) castDamage(state *model.GameState, spellName string, mpCost, po
 }
 
 func (e *Engine) castHeal(state *model.GameState, spellName string, mpCost, power int) (CastResult, error) {
+	// Validate before mutate: if in combat, ensure it's the hero's turn
+	// before touching any state.
+	combat := &state.Dungeon.Combat
+	if combat.Active {
+		if !e.isHeroTurn(combat) {
+			return CastResult{}, &NotHeroTurnError{}
+		}
+	}
+
 	h := hero(state)
 	h.HP += power
 	if h.HP > h.MaxHP {
@@ -145,11 +162,7 @@ func (e *Engine) castHeal(state *model.GameState, spellName string, mpCost, powe
 	}
 
 	// If in combat, consume the hero's turn.
-	combat := &state.Dungeon.Combat
 	if combat.Active {
-		if !e.isHeroTurn(combat) {
-			return CastResult{}, &NotHeroTurnError{}
-		}
 		combat.HeroDefending = false
 		e.advanceTurn(combat)
 	}

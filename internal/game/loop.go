@@ -511,18 +511,24 @@ func (l *Loop) processEnemyTurns(ctx context.Context, state *model.GameState) ([
 }
 
 func (l *Loop) dispatchCast(ctx context.Context, state *model.GameState, action model.EngineAction) ([]model.EngineEvent, string, error) {
-	// Capture enemy name before cast (same pattern as dispatchAttack).
-	enemyName := action.Target
+	// Resolve empty target to first alive enemy (same pattern as dispatchAttack).
+	targetID := action.Target
+	if targetID == "" && state.Dungeon.Combat.Active {
+		targetID = l.eng.FirstAliveEnemy(state)
+	}
+
+	// Capture enemy name before cast — endCombat zeroes the slice on kill.
+	enemyName := targetID
 	if state.Dungeon.Combat.Active {
 		for _, e := range state.Dungeon.Combat.Enemies {
-			if e.ID == action.Target {
+			if e.ID == targetID {
 				enemyName = e.Name
 				break
 			}
 		}
 	}
 
-	result, err := l.eng.CastSpell(state, action.SpellID, action.Target)
+	result, err := l.eng.CastSpell(state, action.SpellID, targetID)
 	if err != nil {
 		return l.narrateSpellError(ctx, state, err)
 	}
