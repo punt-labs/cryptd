@@ -27,6 +27,8 @@ func NewLoop(eng *engine.Engine, interp model.CommandInterpreter, narr model.Nar
 
 // Run drives the game loop until the player quits or the context is cancelled.
 func (l *Loop) Run(ctx context.Context, state *model.GameState) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	// Render initial state.
 	look := l.eng.Look(state)
 	narration, err := l.narr.Narrate(ctx, model.EngineEvent{Type: "looked", Room: look.Room}, *state)

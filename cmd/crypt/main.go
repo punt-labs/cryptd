@@ -44,7 +44,7 @@ func runHeadless(args []string) {
 		fmt.Fprintln(os.Stderr, "usage: cryptd headless --scenario <id>")
 		os.Exit(1)
 	}
-	if strings.ContainsAny(*scenarioID, `/\`) || strings.Contains(*scenarioID, "..") {
+	if strings.ContainsAny(*scenarioID, `/\`) || strings.Contains(*scenarioID, "..") || filepath.VolumeName(*scenarioID) != "" {
 		fmt.Fprintln(os.Stderr, "error: invalid scenario ID")
 		os.Exit(1)
 	}
@@ -53,7 +53,21 @@ func runHeadless(args []string) {
 	if scenarioDir == "" {
 		scenarioDir = "scenarios"
 	}
-	path := filepath.Join(scenarioDir, *scenarioID+".yaml")
+	absScenarioDir, err := filepath.Abs(scenarioDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error resolving scenario directory: %v\n", err)
+		os.Exit(1)
+	}
+	absPath, err := filepath.Abs(filepath.Join(scenarioDir, *scenarioID+".yaml"))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error resolving scenario path: %v\n", err)
+		os.Exit(1)
+	}
+	if absPath != absScenarioDir && !strings.HasPrefix(absPath, absScenarioDir+string(os.PathSeparator)) {
+		fmt.Fprintln(os.Stderr, "error: invalid scenario ID")
+		os.Exit(1)
+	}
+	path := absPath
 	s, err := scenario.Load(path)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error loading scenario: %v\n", err)

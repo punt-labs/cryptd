@@ -10,7 +10,7 @@ All notable changes to this project will be documented in this file.
 - `internal/engine` — deterministic game rules engine: `NewGame`, `Move`, `Look`; typed errors `NoExitError` and `LockedError`
 - `internal/interpreter` — `RulesInterpreter`: maps `go <dir>`, `look`, `quit` (and aliases) to `EngineAction` without LLM involvement
 - `internal/narrator` — `TemplateNarrator`: fixed-template narrations for `moved`, `looked`, `unknown_action`, `quit`, and fallback events
-- `internal/renderer` — `CLIRenderer`: writes room description + narration to stdout, reads one line of input per render cycle
+- `internal/renderer` — `CLIRenderer`: writes room ID header and narration to stdout, reads one line of input per render cycle
 - `internal/game` — `Loop`: wires engine + interpreter + narrator + renderer; drives full game until quit or context cancel
 - `e2e/headless_test.go` — E2E test (build tag `e2e`) that compiles the binary and runs a scripted headless session
 - `testdata/scripts/minimal-run.yaml` — M2 acceptance script: move south → look → move north → quit

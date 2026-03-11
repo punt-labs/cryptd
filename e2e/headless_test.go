@@ -37,7 +37,7 @@ func TestHeadless_MinimalRunCommands(t *testing.T) {
 	bin := binary(t)
 	root := repoRoot(t)
 
-	// Build stdin from script steps.
+	// Provide headless commands via stdin.
 	stdin := "go south\nlook\ngo north\nquit\n"
 
 	cmd := exec.Command(bin, "headless", "--scenario", "minimal")

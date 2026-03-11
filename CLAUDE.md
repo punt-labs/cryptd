@@ -10,7 +10,7 @@ There is no such thing as a "pre-existing" issue. If you see a problem — in co
 
 **M0 (foundation) and M1 (data contracts) are complete. M2 (thin E2E slice) is substantially complete on `feat/m2-thin-e2e`.**
 
-The binary is `cryptd`. CLI subcommands: `crypt headless`, `crypt validate`. Future: `crypt dm`, `crypt solo`, `crypt serve`.
+The binary is `cryptd`. CLI subcommands: `cryptd headless`, `cryptd validate`. Future: `cryptd dm`, `cryptd solo`, `cryptd serve`.
 
 Check `bd ready` for current unblocked work.
 
@@ -138,7 +138,7 @@ npx markdownlint-cli2 "**/*.md" "#node_modules"
 | Unit | (none) | < 5s | Pure functions, table-driven, no I/O |
 | Integration | `integration` | < 30s | Real implementations wired together, fakes for external systems |
 | E2E | `e2e` | < 2min | Compiled binary, black-box stdin/stdout |
-| Acceptance | `acceptance` | < 10min | YAML game scripts via `crypt headless` |
+| Acceptance | `acceptance` | < 10min | YAML game scripts via `cryptd headless` |
 
 **No real LLM, SLM, or Lux instance is ever required for CI.** Every external dependency has a fake in `internal/testutil/`.
 
