@@ -14,7 +14,7 @@ rooms:
 
   home_dir:
     name: "/home/guest"
-    description_seed: "A sparse home directory. A .bashrc file glows faintly on the floor. Three paths branch out: a well-worn path west to /tmp, a narrow corridor east to /var/log, and a sealed door south with /etc/shadow stenciled on it."
+    description_seed: "A sparse home directory. A .bashrc file glows faintly on the floor. Three paths branch out: a well-worn path west to /tmp, a narrow corridor east to /var/log, and a passage south with /etc/shadow stenciled above it."
     connections:
       north:
         room: login_terminal
@@ -54,7 +54,7 @@ rooms:
 
   pipe_maze:
     name: "The Pipe Maze"
-    description_seed: "You are inside a network of UNIX pipes connecting processes. Data streams flow in every direction. Pipes branch in all directions — some loop back on themselves, one leads to the void of /dev/null. A faint light glows from the south, but a locked gate blocks the way."
+    description_seed: "You are inside a network of UNIX pipes connecting processes. Data streams flow in every direction. Pipes branch in all directions — some loop back on themselves, one leads to the void of /dev/null. A faint light glows from the south where an open gate leads onward."
     connections:
       north:
         room: tmp_wasteland
