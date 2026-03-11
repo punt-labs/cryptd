@@ -424,6 +424,136 @@ func TestMove_ReturnsRoomItemsFromMutableState(t *testing.T) {
 	assert.Contains(t, result.Items, "short_sword")
 }
 
+func TestExamine_Equipped(t *testing.T) {
+	e, state := newGame(t)
+	_, err := e.PickUp(&state, "short_sword")
+	require.NoError(t, err)
+	_, err = e.Equip(&state, "short_sword")
+	require.NoError(t, err)
+
+	// Examine should find equipped items.
+	result, err := e.Examine(&state, "short_sword")
+	require.NoError(t, err)
+	assert.Equal(t, "Short Sword", result.Item.Name)
+}
+
+func TestWeight_IncludesEquipped(t *testing.T) {
+	e, state := newGame(t)
+	_, err := e.PickUp(&state, "short_sword")
+	require.NoError(t, err)
+	_, err = e.Equip(&state, "short_sword")
+	require.NoError(t, err)
+
+	// Weight should still reflect the equipped sword (3.0).
+	result := e.Inventory(&state)
+	assert.Equal(t, 3.0, result.Weight)
+}
+
+func TestPickUp_WeightCheckDoesNotCorruptRoom(t *testing.T) {
+	s := &scenario.Scenario{
+		ID:           "heavy-room",
+		StartingRoom: "room",
+		Rooms: map[string]*scenario.Room{
+			"room": {Name: "Room", Items: []string{"light", "heavy"}},
+		},
+		Items: map[string]*scenario.ScenarioItem{
+			"light": {Name: "Feather", Type: "misc", Weight: 1},
+			"heavy": {Name: "Boulder", Type: "misc", Weight: model.MaxCarryWeight + 1},
+		},
+	}
+	e := engine.New(s)
+	char := model.Character{ID: "c1", Name: "Test", Class: "fighter", Level: 1, HP: 10, MaxHP: 10}
+	state, err := e.NewGame(char)
+	require.NoError(t, err)
+
+	// Failed pickup should not remove the item from the room.
+	_, err = e.PickUp(&state, "heavy")
+	require.Error(t, err)
+	assert.Contains(t, state.Dungeon.RoomState["room"].Items, "heavy",
+		"item must stay in room after failed weight check")
+	assert.Contains(t, state.Dungeon.RoomState["room"].Items, "light",
+		"other items must not be disturbed")
+}
+
+func TestEnsureRoomState_FallbackFromScenario(t *testing.T) {
+	// Simulate an older save where RoomState is missing entries.
+	e, state := newGame(t)
+	// Delete the RoomState for goblin_lair to simulate a legacy save.
+	delete(state.Dungeon.RoomState, "goblin_lair")
+
+	// Move to goblin_lair — should still see rusty_key via fallback.
+	result, err := e.Move(&state, "south")
+	require.NoError(t, err)
+	assert.Contains(t, result.Items, "rusty_key")
+
+	// Look should also work.
+	look := e.Look(&state)
+	assert.Contains(t, look.Items, "rusty_key")
+
+	// PickUp should work too.
+	_, err = e.PickUp(&state, "rusty_key")
+	require.NoError(t, err)
+	assert.NotContains(t, state.Dungeon.RoomState["goblin_lair"].Items, "rusty_key")
+}
+
+func TestEnsureRoomState_NilMap(t *testing.T) {
+	// Simulate an older save with a nil RoomState map.
+	e, state := newGame(t)
+	state.Dungeon.RoomState = nil
+
+	// Look should still work via fallback.
+	look := e.Look(&state)
+	assert.Contains(t, look.Items, "short_sword")
+	assert.NotNil(t, state.Dungeon.RoomState)
+}
+
+func TestGetSlot_AllTypes(t *testing.T) {
+	s := &scenario.Scenario{
+		ID:           "all-slots",
+		StartingRoom: "room",
+		Rooms: map[string]*scenario.Room{
+			"room": {Name: "Room", Items: []string{"w", "a", "r", "am"}},
+		},
+		Items: map[string]*scenario.ScenarioItem{
+			"w":  {Name: "Sword", Type: "weapon", Damage: "1d6", Weight: 1},
+			"a":  {Name: "Plate", Type: "armor", Weight: 5},
+			"r":  {Name: "Band", Type: "ring", Weight: 0.1},
+			"am": {Name: "Amulet", Type: "amulet", Weight: 0.2},
+		},
+	}
+	e := engine.New(s)
+	char := model.Character{ID: "c1", Name: "Test", Class: "fighter", Level: 1, HP: 10, MaxHP: 10}
+	state, err := e.NewGame(char)
+	require.NoError(t, err)
+
+	// Equip all four slots.
+	for _, id := range []string{"w", "a", "r", "am"} {
+		_, err = e.PickUp(&state, id)
+		require.NoError(t, err)
+		_, err = e.Equip(&state, id)
+		require.NoError(t, err)
+	}
+	assert.Equal(t, "w", state.Party[0].Equipped.Weapon)
+	assert.Equal(t, "a", state.Party[0].Equipped.Armor)
+	assert.Equal(t, "r", state.Party[0].Equipped.Ring)
+	assert.Equal(t, "am", state.Party[0].Equipped.Amulet)
+
+	// Weight should include all equipped.
+	result := e.Inventory(&state)
+	assert.InDelta(t, 6.3, result.Weight, 0.01)
+
+	// Unequip all four slots.
+	for _, slot := range []string{"weapon", "armor", "ring", "amulet"} {
+		_, err = e.Unequip(&state, slot)
+		require.NoError(t, err)
+	}
+	assert.Equal(t, "", state.Party[0].Equipped.Weapon)
+	assert.Equal(t, "", state.Party[0].Equipped.Armor)
+	assert.Equal(t, "", state.Party[0].Equipped.Ring)
+	assert.Equal(t, "", state.Party[0].Equipped.Amulet)
+	require.Len(t, state.Party[0].Inventory, 4)
+}
+
 func TestInventoryErrorMessages(t *testing.T) {
 	assert.Contains(t, (&engine.ItemNotInRoomError{ItemID: "key"}).Error(), "key")
 	assert.Contains(t, (&engine.ItemNotInInventoryError{ItemID: "key"}).Error(), "key")

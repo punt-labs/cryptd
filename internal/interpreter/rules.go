@@ -45,10 +45,11 @@ func (r *Rules) Interpret(_ context.Context, input string, _ model.GameState) (m
 		return model.EngineAction{Type: "move", Direction: verb}, nil
 	}
 
-	// Join remaining fields for multi-word targets.
+	// Join remaining fields for multi-word targets, using underscores to
+	// match scenario item IDs (e.g. "short sword" → "short_sword").
 	rest := ""
 	if len(fields) >= 2 {
-		rest = strings.Join(fields[1:], " ")
+		rest = strings.Join(fields[1:], "_")
 	}
 
 	switch verb {
@@ -78,7 +79,7 @@ func (r *Rules) Interpret(_ context.Context, input string, _ model.GameState) (m
 	case "pick":
 		// "pick up <item>"
 		if len(fields) >= 3 && fields[1] == "up" {
-			target := strings.Join(fields[2:], " ")
+			target := strings.Join(fields[2:], "_")
 			return model.EngineAction{Type: "take", ItemID: target}, nil
 		}
 

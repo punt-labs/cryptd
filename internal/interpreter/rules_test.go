@@ -162,3 +162,25 @@ func TestRulesInterpreter_ExtraWhitespace(t *testing.T) {
 	assert.Equal(t, "move", a.Type)
 	assert.Equal(t, "south", a.Direction)
 }
+
+func TestRulesInterpreter_MultiWordItemNormalized(t *testing.T) {
+	// "take short sword" should produce ItemID "short_sword" (spaces → underscores)
+	a := interpret(t, "take short sword")
+	assert.Equal(t, "take", a.Type)
+	assert.Equal(t, "short_sword", a.ItemID)
+
+	// "pick up rusty key" too
+	a = interpret(t, "pick up rusty key")
+	assert.Equal(t, "take", a.Type)
+	assert.Equal(t, "rusty_key", a.ItemID)
+
+	// "examine short sword"
+	a = interpret(t, "examine short sword")
+	assert.Equal(t, "examine", a.Type)
+	assert.Equal(t, "short_sword", a.ItemID)
+
+	// "drop short sword"
+	a = interpret(t, "drop short sword")
+	assert.Equal(t, "drop", a.Type)
+	assert.Equal(t, "short_sword", a.ItemID)
+}

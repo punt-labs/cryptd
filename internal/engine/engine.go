@@ -222,7 +222,7 @@ func (e *Engine) Move(state *model.GameState, direction string) (MoveResult, err
 	return MoveResult{
 		NewRoom: conn.Room,
 		Exits:   exitList(dest),
-		Items:   state.Dungeon.RoomState[conn.Room].Items,
+		Items:   e.ensureRoomState(state, conn.Room).Items,
 		Enemies: dest.Enemies,
 	}, nil
 }
@@ -238,7 +238,7 @@ func (e *Engine) Look(state *model.GameState) LookResult {
 		Name:        room.Name,
 		Description: room.DescriptionSeed,
 		Exits:       exitList(room),
-		Items:       state.Dungeon.RoomState[state.Dungeon.CurrentRoom].Items,
+		Items:       e.ensureRoomState(state, state.Dungeon.CurrentRoom).Items,
 		Enemies:     room.Enemies,
 	}
 }
@@ -270,13 +270,57 @@ func hero(state *model.GameState) *model.Character {
 	return &state.Party[0]
 }
 
-// inventoryWeight returns the total weight of items in the character's inventory.
-func inventoryWeight(char *model.Character, s *scenario.Scenario) float64 {
+// totalCarryWeight returns the total weight of all carried items (inventory + equipped).
+func totalCarryWeight(char *model.Character, s *scenario.Scenario) float64 {
 	var w float64
 	for _, item := range char.Inventory {
 		w += item.Weight
 	}
+	for _, id := range equippedIDs(char) {
+		if si, ok := s.Items[id]; ok {
+			w += si.Weight
+		}
+	}
 	return w
+}
+
+// equippedIDs returns the non-empty item IDs from all equipment slots.
+func equippedIDs(char *model.Character) []string {
+	var ids []string
+	for _, id := range []string{char.Equipped.Weapon, char.Equipped.Armor, char.Equipped.Ring, char.Equipped.Amulet} {
+		if id != "" {
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
+
+// containsItem checks whether itemID is in the items slice.
+func containsItem(items []string, itemID string) bool {
+	for _, id := range items {
+		if id == itemID {
+			return true
+		}
+	}
+	return false
+}
+
+// ensureRoomState returns the RoomState for the given room, seeding from the
+// scenario if no entry exists (handles older save files that lack item state).
+func (e *Engine) ensureRoomState(state *model.GameState, roomID string) model.RoomState {
+	if rs, ok := state.Dungeon.RoomState[roomID]; ok {
+		return rs
+	}
+	rs := model.RoomState{}
+	if room, ok := e.s.Rooms[roomID]; ok && len(room.Items) > 0 {
+		rs.Items = make([]string, len(room.Items))
+		copy(rs.Items, room.Items)
+	}
+	if state.Dungeon.RoomState == nil {
+		state.Dungeon.RoomState = make(map[string]model.RoomState)
+	}
+	state.Dungeon.RoomState[roomID] = rs
+	return rs
 }
 
 // scenarioItem converts a scenario item definition to a model.Item.
@@ -305,9 +349,8 @@ func removeItem(items []string, itemID string) ([]string, bool) {
 
 // PickUp removes an item from the current room and adds it to the character's inventory.
 func (e *Engine) PickUp(state *model.GameState, itemID string) (PickUpResult, error) {
-	rs := state.Dungeon.RoomState[state.Dungeon.CurrentRoom]
-	newItems, found := removeItem(rs.Items, itemID)
-	if !found {
+	rs := e.ensureRoomState(state, state.Dungeon.CurrentRoom)
+	if !containsItem(rs.Items, itemID) {
 		return PickUpResult{}, &ItemNotInRoomError{ItemID: itemID}
 	}
 
@@ -316,8 +359,9 @@ func (e *Engine) PickUp(state *model.GameState, itemID string) (PickUpResult, er
 		return PickUpResult{}, fmt.Errorf("item %q not defined in scenario", itemID)
 	}
 
+	// Check weight before mutating state so a failed pickup leaves the room intact.
 	char := hero(state)
-	current := inventoryWeight(char, e.s)
+	current := totalCarryWeight(char, e.s)
 	if current+si.Weight > model.MaxCarryWeight {
 		return PickUpResult{}, &TooHeavyError{
 			ItemID: itemID, Weight: si.Weight,
@@ -325,6 +369,8 @@ func (e *Engine) PickUp(state *model.GameState, itemID string) (PickUpResult, er
 		}
 	}
 
+	// All checks passed — now mutate state.
+	newItems, _ := removeItem(rs.Items, itemID)
 	rs.Items = newItems
 	state.Dungeon.RoomState[state.Dungeon.CurrentRoom] = rs
 
@@ -356,7 +402,7 @@ func (e *Engine) Drop(state *model.GameState, itemID string) (DropResult, error)
 	item := char.Inventory[idx]
 	char.Inventory = append(char.Inventory[:idx], char.Inventory[idx+1:]...)
 
-	rs := state.Dungeon.RoomState[state.Dungeon.CurrentRoom]
+	rs := e.ensureRoomState(state, state.Dungeon.CurrentRoom)
 	rs.Items = append(rs.Items, itemID)
 	state.Dungeon.RoomState[state.Dungeon.CurrentRoom] = rs
 
@@ -466,18 +512,30 @@ func (e *Engine) Unequip(state *model.GameState, slot string) (UnequipResult, er
 	return UnequipResult{Item: item, Slot: slot}, nil
 }
 
-// Examine returns details about an item in inventory or the current room.
+// Examine returns details about an item in inventory, equipped, or the current room.
 func (e *Engine) Examine(state *model.GameState, itemID string) (ExamineResult, error) {
-	// Check inventory first.
 	char := hero(state)
+
+	// Check inventory.
 	for _, item := range char.Inventory {
 		if item.ID == itemID {
 			return ExamineResult{Item: item}, nil
 		}
 	}
 
+	// Check equipped items.
+	for _, id := range equippedIDs(char) {
+		if id == itemID {
+			si, ok := e.s.Items[id]
+			if !ok {
+				return ExamineResult{}, fmt.Errorf("equipped item %q not defined in scenario", id)
+			}
+			return ExamineResult{Item: scenarioItem(id, si)}, nil
+		}
+	}
+
 	// Check room.
-	rs := state.Dungeon.RoomState[state.Dungeon.CurrentRoom]
+	rs := e.ensureRoomState(state, state.Dungeon.CurrentRoom)
 	for _, id := range rs.Items {
 		if id == itemID {
 			si, ok := e.s.Items[id]
@@ -497,7 +555,7 @@ func (e *Engine) Inventory(state *model.GameState) InventoryResult {
 	return InventoryResult{
 		Items:    char.Inventory,
 		Equipped: char.Equipped,
-		Weight:   inventoryWeight(char, e.s),
+		Weight:   totalCarryWeight(char, e.s),
 		Capacity: model.MaxCarryWeight,
 	}
 }

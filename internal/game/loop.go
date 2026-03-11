@@ -12,9 +12,9 @@ import (
 )
 
 // inventoryErrorEvent converts a typed inventory error into a narration-friendly
-// EngineEvent. Internal (unexpected) errors are not converted — they propagate
-// as-is from the dispatch caller.
-func inventoryErrorEvent(err error) model.EngineEvent {
+// EngineEvent. Returns (event, nil) for expected user errors, or (zero, err)
+// for unexpected internal errors that should propagate to the caller.
+func inventoryErrorEvent(err error) (model.EngineEvent, error) {
 	var notInRoom *engine.ItemNotInRoomError
 	var notInInv *engine.ItemNotInInventoryError
 	var tooHeavy *engine.TooHeavyError
@@ -24,21 +24,19 @@ func inventoryErrorEvent(err error) model.EngineEvent {
 
 	switch {
 	case errors.As(err, &notInRoom):
-		return model.EngineEvent{Type: "item_not_found"}
+		return model.EngineEvent{Type: "item_not_found"}, nil
 	case errors.As(err, &notInInv):
-		return model.EngineEvent{Type: "not_in_inventory"}
+		return model.EngineEvent{Type: "not_in_inventory"}, nil
 	case errors.As(err, &tooHeavy):
-		return model.EngineEvent{Type: "too_heavy"}
+		return model.EngineEvent{Type: "too_heavy"}, nil
 	case errors.As(err, &notEquippable):
-		return model.EngineEvent{Type: "not_equippable"}
+		return model.EngineEvent{Type: "not_equippable"}, nil
 	case errors.As(err, &occupied):
-		return model.EngineEvent{Type: "slot_occupied"}
+		return model.EngineEvent{Type: "slot_occupied"}, nil
 	case errors.As(err, &slotEmpty):
-		return model.EngineEvent{Type: "slot_empty"}
+		return model.EngineEvent{Type: "slot_empty"}, nil
 	default:
-		// Unknown error — this shouldn't happen for inventory operations.
-		// Return a generic event; caller can inspect further if needed.
-		return model.EngineEvent{Type: "unknown_action"}
+		return model.EngineEvent{}, err
 	}
 }
 
@@ -138,7 +136,10 @@ func (l *Loop) dispatch(ctx context.Context, state *model.GameState, action mode
 	case "take":
 		result, err := l.eng.PickUp(state, action.ItemID)
 		if err != nil {
-			event = inventoryErrorEvent(err)
+			event, err = inventoryErrorEvent(err)
+			if err != nil {
+				return model.EngineEvent{}, "", err
+			}
 		} else {
 			event = model.EngineEvent{Type: "picked_up", Details: map[string]any{
 				"item_name": result.Item.Name, "item_id": result.Item.ID,
@@ -148,7 +149,10 @@ func (l *Loop) dispatch(ctx context.Context, state *model.GameState, action mode
 	case "drop":
 		result, err := l.eng.Drop(state, action.ItemID)
 		if err != nil {
-			event = inventoryErrorEvent(err)
+			event, err = inventoryErrorEvent(err)
+			if err != nil {
+				return model.EngineEvent{}, "", err
+			}
 		} else {
 			event = model.EngineEvent{Type: "dropped", Details: map[string]any{
 				"item_name": result.Item.Name, "item_id": result.Item.ID,
@@ -158,7 +162,10 @@ func (l *Loop) dispatch(ctx context.Context, state *model.GameState, action mode
 	case "equip":
 		result, err := l.eng.Equip(state, action.ItemID)
 		if err != nil {
-			event = inventoryErrorEvent(err)
+			event, err = inventoryErrorEvent(err)
+			if err != nil {
+				return model.EngineEvent{}, "", err
+			}
 		} else {
 			event = model.EngineEvent{Type: "equipped", Details: map[string]any{
 				"item_name": result.Item.Name, "slot": result.Slot,
@@ -168,7 +175,10 @@ func (l *Loop) dispatch(ctx context.Context, state *model.GameState, action mode
 	case "unequip":
 		result, err := l.eng.Unequip(state, action.Target)
 		if err != nil {
-			event = inventoryErrorEvent(err)
+			event, err = inventoryErrorEvent(err)
+			if err != nil {
+				return model.EngineEvent{}, "", err
+			}
 		} else {
 			event = model.EngineEvent{Type: "unequipped", Details: map[string]any{
 				"item_name": result.Item.Name, "slot": result.Slot,
@@ -178,7 +188,10 @@ func (l *Loop) dispatch(ctx context.Context, state *model.GameState, action mode
 	case "examine":
 		result, err := l.eng.Examine(state, action.ItemID)
 		if err != nil {
-			event = inventoryErrorEvent(err)
+			event, err = inventoryErrorEvent(err)
+			if err != nil {
+				return model.EngineEvent{}, "", err
+			}
 		} else {
 			event = model.EngineEvent{Type: "examined", Details: map[string]any{
 				"item_name": result.Item.Name, "description": result.Item.Description,
@@ -186,7 +199,13 @@ func (l *Loop) dispatch(ctx context.Context, state *model.GameState, action mode
 		}
 
 	case "inventory":
-		event = model.EngineEvent{Type: "inventory_listed"}
+		result := l.eng.Inventory(state)
+		event = model.EngineEvent{Type: "inventory_listed", Details: map[string]any{
+			"items":    result.Items,
+			"equipped": result.Equipped,
+			"weight":   result.Weight,
+			"capacity": result.Capacity,
+		}}
 
 	case "quit":
 		event = model.EngineEvent{Type: "quit"}
