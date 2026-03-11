@@ -777,7 +777,8 @@ Rejected because:
 ## DES-015: SLM Integration — ollama over localhost HTTP
 
 **Date:** 2026-03-10
-**Status:** SETTLED (partially superseded by DES-023 — ollama is now the medium tier; small tier uses llama.cpp sidecar)
+**Status:** SUPERSEDED by DES-023
+**Notes:** Partially superseded — ollama is now the medium tier; small tier uses llama.cpp sidecar.
 **Topic:** How the solo mode SLM is invoked
 
 ### Design

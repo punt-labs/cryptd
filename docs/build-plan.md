@@ -109,7 +109,7 @@ coverage. No engine logic, no command processing, no rendering.
   - Load and validate `minimal.yaml`
   - Typed errors for missing required fields, broken room references,
     unknown enemy templates, invalid dice notation
-  - `crypt validate <file>` CLI command (first runnable command)
+  - `cryptd validate <file>` CLI command (first runnable command)
 - `internal/save/` — JSON save/load:
   - `Save(state GameState, path string) error`
   - `Load(path string) (GameState, error)`
@@ -125,14 +125,14 @@ coverage. No engine logic, no command processing, no rendering.
 - Dice parser: all notation forms; boundary rolls; invalid → error
 
 **Done when:** `go test ./internal/...` passes with ≥ 90% coverage on all
-Milestone 1 packages. `crypt validate testdata/scenarios/minimal.yaml`
+Milestone 1 packages. `cryptd validate testdata/scenarios/minimal.yaml`
 prints "OK" and exits 0.
 
 ---
 
 ## Milestone 2 — Thin End-to-End Slice
 
-**Goal:** A player can type `crypt headless` and move between two rooms.
+**Goal:** A player can type `cryptd headless` and move between two rooms.
 The full pipeline — interpreter → engine → narrator → renderer — exists and
 is wired together, even though each layer is a thin stub. This is the most
 important milestone; it validates the architecture before any real logic is
@@ -155,8 +155,8 @@ built.
   - Prints room name, exits list, narration text to stdout
   - Reads one line from stdin, returns it as `InputEvent`
 - `cmd/crypt/` — `headless` subcommand:
-  - `crypt headless --scenario <id>` starts a game loop
-  - `crypt headless --script <file>` runs a script non-interactively
+  - `cryptd headless --scenario <id>` starts a game loop
+  - `cryptd headless --script <file>` runs a script non-interactively
 - `testdata/scripts/minimal-run.yaml` — move north, move south, verify rooms
 
 **Tests written:**
@@ -167,10 +167,10 @@ built.
 - Unit: `TemplateNarrator` — each event type produces non-empty string
 - Integration (headless loop): `new_game → move(S) → look → move(N)`
   — wires all three interfaces; asserts `GameState` after each step
-- E2E: `crypt headless --script minimal-run.yaml` exits 0 and prints
+- E2E: `cryptd headless --script minimal-run.yaml` exits 0 and prints
   expected room names
 
-**Done when:** `crypt headless --script testdata/scripts/minimal-run.yaml`
+**Done when:** `cryptd headless --script testdata/scripts/minimal-run.yaml`
 passes. You can watch the full pipeline execute in one command. CI is green.
 
 ---
@@ -206,13 +206,13 @@ complete, playable mode. The acceptance test suite runs for the first time.
 - CI diffs generated vs. committed; any unintentional API change fails build
 
 **Done when:** All five acceptance scripts pass. Engine coverage ≥ 90%.
-A real human can play a complete game via `crypt headless`.
+A real human can play a complete game via `cryptd headless`.
 
 ---
 
 ## Milestone 4 — Lux Thin Slice
 
-**Goal:** `crypt solo` starts, connects to Lux, and shows a minimal HUD.
+**Goal:** `cryptd solo` starts, connects to Lux, and shows a minimal HUD.
 A player can move rooms and see the narration log update in Lux. No SLM yet —
 `solo` still uses `RulesInterpreter` as the interpreter in this milestone.
 
@@ -223,7 +223,7 @@ A player can move rooms and see the narration log update in Lux. No SLM yet —
     narration in a single Lux text panel
   - `update()` for log appends
   - `recv()` event loop for Lux button presses → `InputEvent`
-- `cmd/crypt/solo.go` — `crypt solo` subcommand:
+- `cmd/crypt/solo.go` — `cryptd solo` subcommand:
   - Wires `RulesInterpreter` + `TemplateNarrator` + `LuxRenderer`
   - Falls back to `CLIRenderer` if Lux is not running
 
@@ -238,7 +238,7 @@ A player can move rooms and see the narration log update in Lux. No SLM yet —
 - Integration: `FakeLuxServer` injects a synthetic button press event;
   assert engine receives correct `InputEvent`
 
-**Done when:** `crypt solo --scenario minimal` connects to a running Lux
+**Done when:** `cryptd solo --scenario minimal` connects to a running Lux
 instance and displays room transitions. `FakeLuxServer` tests pass in CI
 without Lux installed.
 
@@ -267,7 +267,7 @@ press events from `FakeLuxServer` drive combat actions without any LLM.
 
 ## Milestone 6 — Small Tier Thin Slice (DES-023)
 
-**Goal:** `crypt solo` uses a real small language model for command
+**Goal:** `cryptd solo` uses a real small language model for command
 interpretation and narration. The thin slice handles only movement commands;
 full verb coverage comes in M7. This milestone introduces the **small tier**
 of the four-tier inference architecture (DES-023): a llama.cpp sidecar process
@@ -310,7 +310,7 @@ never real llama.cpp or ollama):**
 - Runtime detection: probe sequence tested with fake endpoints
 - Full failover chain: all tiers unavailable → tiny tier plays the game
 
-**Done when:** `crypt solo` with a running llama.cpp or ollama instance uses
+**Done when:** `cryptd solo` with a running llama.cpp or ollama instance uses
 the small model for movement narration. All tests pass in CI without any
 inference backend installed.
 
@@ -328,37 +328,37 @@ flag allows explicit model selection.
 - Expand `SLMNarrator` templates to all event types: combat, items, leveling
 - **Medium tier defaults:** ollama with Gemma 3 1B (primary) or Llama 3.2 3B
   (fallback) — richer narration than the 135M small tier
-- **`--model` flag:** `crypt solo --model smollm2:135m` or
-  `crypt solo --model gemma3:1b` — user picks the model explicitly;
+- **`--model` flag:** `cryptd solo --model smollm2:135m` or
+  `cryptd solo --model gemma3:1b` — user picks the model explicitly;
   runtime (llama.cpp vs ollama) auto-detected from what's available
 - Model eval harness: `cmd/eval-slm` runs the full verb table through each
   tier's default model and scores classification accuracy (not CI — manual)
 - Eval covers: SmolLM2-135M (small), Gemma 3 1B (medium), Llama 3.2 3B
   (medium alt) — measures verb classification accuracy and narration quality
-- `crypt solo` declared feature-complete
+- `cryptd solo` declared feature-complete
 
 ---
 
 ## Milestone 8 — Daemon Thin Slice
 
-**Goal:** `crypt serve` starts and handles a single MCP client connection.
+**Goal:** `cryptd serve` starts and handles a single MCP client connection.
 The full daemon topology (Section 4.2 of architecture spec) is exercised for
 the first time, even though session routing is not yet implemented.
 
 **What gets built:**
 
-- `cmd/crypt/serve.go` — `crypt serve` subcommand:
+- `cmd/crypt/serve.go` — `cryptd serve` subcommand:
   - Starts daemon, listens on Unix socket
   - Accepts one MCP client connection
   - Dispatches all MCP tools to embedded engine
   - Responds with same JSON as embedded mode
-- Auto-start: if socket is not present, `crypt dm` starts the daemon
+- Auto-start: if socket is not present, `cryptd dm` starts the daemon
 
 **Tests written:**
 
 - Integration (in-process): spawn daemon, connect one fake MCP client,
   call `new_game` + `move` + `save_game`, verify JSON responses
-- E2E: spawn `crypt serve` subprocess, connect minimal MCP client over
+- E2E: spawn `cryptd serve` subprocess, connect minimal MCP client over
   stdio, call each tool once, assert valid JSON, no stderr
 
 **Done when:** MCP wire smoke tests pass. Daemon can handle a complete game
@@ -368,7 +368,7 @@ session from a single client.
 
 ## Milestone 9 — DM Thin Slice
 
-**Goal:** `crypt dm` works. A Claude Code session can connect via MCP,
+**Goal:** `cryptd dm` works. A Claude Code session can connect via MCP,
 start a game, and receive narration from the LLM. The thin slice covers only
 movement and basic narration.
 
@@ -383,7 +383,7 @@ movement and basic narration.
 - `skills/crypt/SKILL.md` — rewritten for DM role:
   - Narration instructions, not game rules
   - Handles room descriptions, item examine responses
-- `cmd/crypt/dm.go` — `crypt dm` subcommand
+- `cmd/crypt/dm.go` — `cryptd dm` subcommand
 
 **Tests written (using `FakeLLMInterpreter` and `FakeLLMNarrator`):**
 
@@ -392,7 +392,7 @@ movement and basic narration.
 - The LLM is never called in tests; the fakes assert correct
   prompt structure is assembled
 
-**Done when:** `crypt dm` invoked by `/crypt` skill starts a playable
+**Done when:** `cryptd dm` invoked by `/crypt` skill starts a playable
 game with Claude narrating room descriptions. E2E: daemon + one DM session +
 movement + narration all working together.
 
@@ -429,7 +429,7 @@ DM-generated scenario creation.
 - `LLMInterpreter` and `LLMNarrator` cover all game actions
 - `/crypt:create` skill command: DM generates scenario YAML interactively
 - DM can generate encounter backstories and puzzle hints on demand
-- `crypt dm` declared feature-complete
+- `cryptd dm` declared feature-complete
 
 ---
 
@@ -467,9 +467,9 @@ M2  Thin E2E Slice  Move pipeline: interpreter → engine → narrator → rende
 M3  Full Headless   All engine mechanics; full headless mode; acceptance tests   ✓ DONE
 M4  Lux Thin Slice  LuxRenderer stub; crypt solo shows minimal HUD
 M5  Full Lux HUD    Four-panel HUD; nav buttons; combat panel
-M6  SLM Thin Slice  SLMInterpreter + SLMNarrator (llama.cpp sidecar + SmolLM2-135M);
+M6  Small Tier      SLMInterpreter + SLMNarrator (llama.cpp sidecar + SmolLM2-135M);
                     movement only; four-tier failover tested (DES-023)
-M7  Full SLM        All verbs; solo mode complete; ollama medium tier; --model flag
+M7  Full SLM+Med    All verbs; solo mode complete; ollama medium tier; --model flag
 M8  Daemon Slice    crypt serve; single-session; MCP wire tests
 M9  DM Thin Slice   LLM in the loop; crypt dm; SKILL.md rewrite
                     ← FIRST FULL DM MODE VALIDATION →
