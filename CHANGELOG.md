@@ -6,6 +6,14 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Spell system: `CastSpell` engine method with MP cost deduction, class gates (mage/priest), damage and heal effects
+- Spell error types: `UnknownSpellError`, `NotCasterError`, `InsufficientMPError`
+- `MP` and `MaxMP` fields on `Character` model
+- `SpellTemplate` in scenario YAML: name, MP cost, effect (damage/heal), power (dice notation), allowed classes
+- Interpreter verb: `cast <spell>`, `cast <spell> at <target>`
+- Narrator templates for spell events: `spell_damage`, `spell_heal`, `unknown_spell`, `not_caster`, `insufficient_mp`
+- Game loop spell dispatch: damage spells require active combat, heal spells work in or out of combat, both consume hero turn in combat
+- `fireball` (2d6 damage, 3 MP, mage/priest) and `heal` (1d6+2, 2 MP, priest/mage) added to minimal scenario
 - Turn-based combat system: `StartCombat`, `Attack`, `Defend`, `Flee`, `ProcessEnemyTurn` engine methods with initiative rolls, damage resolution, XP awards, and room clearing on victory
 - Combat model types: `CombatState` and `EnemyInstance` on `DungeonState` for tracking active encounters with turn order, rounds, and per-enemy mutable state
 - Combat error types: `NotInCombatError`, `NotHeroTurnError`, `InvalidTargetError`, `HeroDeadError`, `AlreadyInCombatError`, `NoEnemiesError`

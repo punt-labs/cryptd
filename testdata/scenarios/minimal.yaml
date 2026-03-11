@@ -51,6 +51,20 @@ enemies:
     attack: "1d4"
     ai: aggressive
 
+spells:
+  fireball:
+    name: Fireball
+    mp: 3
+    effect: damage
+    power: "2d6"
+    classes: [mage, priest]
+  heal:
+    name: Heal
+    mp: 2
+    effect: heal
+    power: "1d6+2"
+    classes: [priest, mage]
+
 items:
   short_sword:
     name: "Short Sword"

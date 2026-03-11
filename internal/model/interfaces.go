@@ -9,6 +9,7 @@ type EngineAction struct {
 	Target      string
 	ItemID      string
 	CharacterID string // optional; for party-ready multi-character support (DES-021)
+	SpellID     string
 }
 
 // EngineEvent is emitted by the engine after resolving an action.

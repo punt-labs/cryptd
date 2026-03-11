@@ -26,7 +26,9 @@ type EnemyInstance struct {
 	TemplateID string      `json:"template_id"`
 	Name       string      `json:"name"`
 	HP         int         `json:"hp"`
+	MP         int         `json:"mp"`
 	MaxHP      int         `json:"max_hp"`
+	MaxMP      int         `json:"max_mp"`
 	Attack     string      `json:"attack"`
 	AI         string      `json:"ai"`
 	Conditions []Condition `json:"conditions"`
@@ -60,7 +62,9 @@ type Character struct {
 	Class      string      `json:"class"` // fighter|mage|thief|priest
 	Level      int         `json:"level"`
 	HP         int         `json:"hp"`
+	MP         int         `json:"mp"`
 	MaxHP      int         `json:"max_hp"`
+	MaxMP      int         `json:"max_mp"`
 	XP         int         `json:"xp"`
 	Gold       int         `json:"gold"`
 	Stats      Stats       `json:"stats"`

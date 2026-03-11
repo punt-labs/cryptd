@@ -190,6 +190,24 @@ func TestRulesInterpreter_Flee(t *testing.T) {
 	}
 }
 
+func TestRulesInterpreter_Cast(t *testing.T) {
+	// Simple cast.
+	a := interpret(t, "cast fireball")
+	assert.Equal(t, "cast", a.Type)
+	assert.Equal(t, "fireball", a.SpellID)
+	assert.Equal(t, "", a.Target)
+
+	// Cast with target using "at".
+	a = interpret(t, "cast fireball at goblin_0")
+	assert.Equal(t, "cast", a.Type)
+	assert.Equal(t, "fireball", a.SpellID)
+	assert.Equal(t, "goblin_0", a.Target)
+
+	// Cast alone — no spell specified.
+	a = interpret(t, "cast")
+	assert.Equal(t, "unknown", a.Type)
+}
+
 func TestRulesInterpreter_CaseInsensitive(t *testing.T) {
 	a := interpret(t, "GO NORTH")
 	assert.Equal(t, "move", a.Type)
