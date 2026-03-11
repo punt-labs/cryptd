@@ -10,6 +10,12 @@ rooms:
       south:
         room: goblin_lair
         type: open
+      west:
+        room: vault
+        type: locked
+      north:
+        room: secret_room
+        type: hidden
   goblin_lair:
     name: "Goblin Lair"
     description_seed: "Damp and foul-smelling. Bones crunch underfoot."
@@ -19,6 +25,23 @@ rooms:
         type: open
     enemies: [goblin]
     items: [rusty_key]
+
+  secret_room:
+    name: "Secret Room"
+    description_seed: "A hidden chamber behind the entrance."
+    connections:
+      south:
+        room: entrance
+        type: open
+
+  vault:
+    name: "Vault"
+    description_seed: "A heavy iron door seals whatever lies within."
+    connections:
+      east:
+        room: entrance
+        type: locked
+    items: [gold_coin]
 
 enemies:
   goblin:
@@ -34,3 +57,10 @@ items:
     type: key
     weight: 0.1
     value: 0
+
+  gold_coin:
+    name: "Gold Coin"
+    description: "A single gold coin, worn smooth."
+    type: misc
+    weight: 0.01
+    value: 1

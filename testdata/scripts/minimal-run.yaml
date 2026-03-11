@@ -1,0 +1,17 @@
+# minimal-run.yaml — M2 E2E acceptance script
+# Consumed by the headless acceptance test runner (not a direct CLI entrypoint).
+# It exercises the "minimal" scenario used by `cryptd headless --scenario minimal`.
+
+name: minimal-run
+
+steps:
+  - input: "go south"
+    expect: "goblin_lair"
+
+  - input: "look"
+    expect: "goblin_lair"
+
+  - input: "go north"
+    expect: "entrance"
+
+  - input: "quit"
