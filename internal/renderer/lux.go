@@ -131,9 +131,7 @@ func availableActions(state model.GameState) []string {
 		return []string{"attack", "defend", "flee", "cast"}
 	}
 	actions := make([]string, 0, len(state.Dungeon.Exits)+2)
-	for _, dir := range state.Dungeon.Exits {
-		actions = append(actions, dir)
-	}
+	actions = append(actions, state.Dungeon.Exits...)
 	actions = append(actions, "look", "inventory")
 	return actions
 }
