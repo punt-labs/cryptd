@@ -95,7 +95,7 @@ ollama-start: ollama-install               ## Start ollama server (background)
 	fi
 
 ollama-pull: ollama-start                  ## Pull the preferred SLM model
-	ollama pull $(SLM_MODEL)
+	@ollama pull $(SLM_MODEL) > /dev/null 2>&1 && echo "model $(SLM_MODEL) ready"
 
 ollama-setup: ollama-pull                  ## Install ollama, start server, pull model
 
