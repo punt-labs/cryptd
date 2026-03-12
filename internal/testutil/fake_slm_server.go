@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"sync"
+	"time"
 )
 
 // FakeSLMServer is an httptest.Server that serves OpenAI-compatible
@@ -16,6 +17,7 @@ type FakeSLMServer struct {
 	pos       int
 	calls     []FakeSLMCall
 	server    *httptest.Server
+	delay     time.Duration // artificial delay before responding
 }
 
 // FakeSLMCall records a single request to the fake server.
@@ -37,16 +39,22 @@ func NewFakeSLMServer(responses []string) *FakeSLMServer {
 	return f
 }
 
+// SetDelay configures an artificial delay before each response. Use with
+// a short client timeout to test timeout→fallback behavior.
+func (f *FakeSLMServer) SetDelay(d time.Duration) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.delay = d
+}
+
 func (f *FakeSLMServer) handleChatCompletions(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	// Record the call.
+	// Decode and record the request before any delay, so timeout calls
+	// are still visible in Calls().
 	var req struct {
 		Model       string            `json:"model"`
 		Messages    []json.RawMessage `json:"messages"`
@@ -57,19 +65,45 @@ func (f *FakeSLMServer) handleChatCompletions(w http.ResponseWriter, r *http.Req
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
+
+	f.mu.Lock()
 	f.calls = append(f.calls, FakeSLMCall{
 		Model:       req.Model,
 		Messages:    req.Messages,
 		Temperature: req.Temperature,
 		MaxTokens:   req.MaxTokens,
 	})
+	delay := f.delay
 
-	if len(f.responses) == 0 {
+	// Reserve the response before delay so timed-out requests consume
+	// their slot and keep ordering deterministic for later calls.
+	var content string
+	hasResponse := len(f.responses) > 0
+	if hasResponse {
+		content = f.responses[f.pos%len(f.responses)]
+		f.pos++
+	}
+	f.mu.Unlock()
+
+	if delay > 0 {
+		timer := time.NewTimer(delay)
+		select {
+		case <-timer.C:
+		case <-r.Context().Done():
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
+			return
+		}
+	}
+
+	if !hasResponse {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		return
 	}
-	content := f.responses[f.pos%len(f.responses)]
-	f.pos++
 
 	resp := map[string]any{
 		"id":      "fake-completion",
