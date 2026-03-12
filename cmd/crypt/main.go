@@ -137,8 +137,10 @@ func resolveRuntime(serverURL, modelName string) (string, string) {
 	rt := inference.Probe(context.Background(), inference.DefaultEndpoints(), time.Second)
 	if rt == nil {
 		if serverURL != "" {
-			// User specified a server but no model — can't proceed without model name.
-			return "", ""
+			fmt.Fprintf(os.Stderr, "warning: ignoring --server %q — no model could be determined\n", serverURL)
+		}
+		if modelName != "" {
+			fmt.Fprintf(os.Stderr, "warning: ignoring --model %q — no inference server found\n", modelName)
 		}
 		return "", ""
 	}
