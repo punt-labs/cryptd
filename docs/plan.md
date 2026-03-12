@@ -76,23 +76,23 @@ Switching modes mid-adventure is valid — save in `dm`, resume in `solo`.
 | `LuxRenderer` | `dm`, `solo` | Calls Lux via MCP tools; full HUD with map, HP bars, combat UI |
 | `CLIRenderer` | `headless`, SSH | ANSI terminal output; ASCII map, text HP bar, stdin input loop |
 
-### Engine Deployment: Embedded vs. Daemon
+### Engine Deployment: Embedded vs. Server
 
-The engine runs in two modes depending on play context. The MCP tool API, play modes, and
+The engine runs in two modes depending on play context. The tool API, play modes, and
 interfaces are identical in both. This is not a deployment detail — it directly enables
-multi-player without redesign.
+multi-player and remote play without redesign. See DES-025.
 
 ```text
-SOLO / HEADLESS                         DM MODE (single-player) / MULTI-PLAYER
-────────────────                        ──────────────────────────────────────
-Engine embedded in CLI process.         Engine runs as a shared daemon.
-No daemon, no proxy, no network.        Each Claude Code session connects via mcp-proxy.
+EMBEDDED (crypt solo/headless)          SERVER (cryptd serve)
+──────────────────────────────          ─────────────────────────────────────
+Engine runs in-process.                 Engine runs as a network service.
+No server, no network.                  Clients connect via Unix socket or TCP.
 
- player                                  DM Claude Code session
- (stdin)                                 └─ mcp-proxy ──► dungeon daemon
-    │                                                          │
- Engine (in-process)                     Player Claude Code    │  (future Biff)
-    │                                    └─ mcp-proxy ──►──────┘
+ player                                  crypt connect ─────► cryptd serve
+ (stdin)                                 crypt plugin ──────►    (TCP or
+    │                                    future web client ──►  Unix socket)
+ Engine (in-process)
+    │
  CLIRenderer or LuxRenderer (direct)
 ```
 
@@ -116,8 +116,9 @@ bidirectional transport (WebSocket or NDJSON Unix socket). The daemon:
 **Daemon scope**: Game logic and push routing only. No LLM calls, no orchestration logic.
 The beads project deleted 70K lines after their daemon grew too large — this daemon stays small.
 
-**`dungeon serve`**: Starts the daemon (follows SageOx NDJSON-over-Unix-socket pattern).
-Auto-start option for single-player DM convenience. Liveness via socket ping.
+**`cryptd serve`**: Starts the game server (JSON-RPC 2.0 over NDJSON). Supports Unix sockets
+(`--socket`) for local dev and TCP (`--listen`) for remote play. Client-agnostic — serves
+CLI clients, Claude Code plugins, and future web clients identically.
 
 ### What Stays the Same Across All Modes
 
@@ -381,21 +382,21 @@ The interface is language-agnostic. Go and Python implementations are drop-in eq
 
 ---
 
-## Biff Extension Points (designed in, not yet implemented)
+## Multiplayer Extension Points (designed in, not yet implemented)
 
 The engine is party-ready from day one:
 
 - `GameState` carries `party: []Character` (length 1 for single-player)
 - `move`, `attack`, `flee`, `defend` all accept an optional `character_id`
 - Combat turn order already handles multiple actors
-- Save file carries a `party` array (empty until Biff is added)
+- Save file carries a `party` array (empty until multiplayer is added)
 
-When Biff is added:
-
-- Each Biff participant controls one character
-- `PostToolUse` hook notifies party members of state-change events
-- DM narrates for the full party
-- Turn tokens passed via Biff `/write` messages
+With `cryptd serve` as a general-purpose game server (DES-025), multiplayer may
+not require Biff as the transport. Players connect to the same server instance
+directly. However, Biff's communication primitives (mailboxes, `/wall`, `/talk`,
+presence) could still add value as a coordination layer between players — social
+features on top of the game, not game state transport. This will be evaluated
+when multiplayer is implemented (M13).
 
 ---
 

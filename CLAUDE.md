@@ -1,6 +1,6 @@
 # cryptd
 
-Go game engine daemon for [crypt](https://github.com/punt-labs/crypt), a text adventure game for Claude Code.
+Game engine and server for [crypt](https://github.com/punt-labs/crypt), a text adventure game playable via Claude Code, CLI, or (future) web client.
 
 ## Principal Engineer Mindset
 
@@ -8,9 +8,9 @@ There is no such thing as a "pre-existing" issue. If you see a problem — in co
 
 ## Project State
 
-**M0 (foundation) and M1 (data contracts) are complete. M2 (thin E2E slice) is substantially complete on `feat/m2-thin-e2e`.**
+**M0 (foundation) and M1 (data contracts) are complete. M2 (thin E2E slice) is substantially complete on `feat/m2-thin-e2e`. M8 (server thin slice) in progress.**
 
-The binary is `cryptd`. CLI subcommands: `cryptd headless`, `cryptd validate`. Future: `cryptd dm`, `cryptd solo`, `cryptd serve`.
+Two binaries (DES-025): `cryptd` (server) and `crypt` (client). Current subcommands: `cryptd serve`, `cryptd headless`, `cryptd solo`, `cryptd autoplay`, `cryptd validate`. The `crypt` client binary will be split out in a future milestone.
 
 Check `bd ready` for current unblocked work.
 
@@ -29,13 +29,15 @@ L1 — Lux (ImGui)            Display surface (receives element trees via MCP)
 
 ### Play Modes
 
-A play mode is a named triple of interface implementations. All modes share the same engine, save format, and scenario YAML. Switching modes mid-adventure is valid.
+A play mode is a named combination of brain + UI. Engine access (embedded vs server) is orthogonal — any mode can run against either. All modes share the same engine, save format, and scenario YAML. Switching modes mid-adventure is valid.
 
-| Mode       | CommandInterpreter | Narrator         | Renderer    | Engine   |
-|------------|-------------------|------------------|-------------|----------|
-| `dm`       | LLMInterpreter    | LLMNarrator      | LuxRenderer | daemon   |
-| `solo`     | SLMInterpreter    | SLMNarrator      | Lux or CLI  | embedded |
-| `headless` | RulesInterpreter  | TemplateNarrator | CLIRenderer | embedded |
+| Mode       | CommandInterpreter | Narrator         | Renderer    |
+|------------|-------------------|------------------|-------------|
+| `dm`       | LLMInterpreter    | LLMNarrator      | LuxRenderer |
+| `solo`     | SLMInterpreter    | SLMNarrator      | Lux or CLI  |
+| `headless` | RulesInterpreter  | TemplateNarrator | CLIRenderer |
+
+Engine access is a separate axis: embedded (in-process) or server (`cryptd serve` over Unix socket or TCP). See DES-025.
 
 ### The Three Interfaces
 
@@ -74,8 +76,9 @@ The engine knows nothing about interpreters. Interpreters know nothing about nar
 
 | Package | What It Does |
 |---------|-------------|
-| `cmd/crypt` | CLI entry point; wires play modes |
+| `cmd/crypt` | CLI entry point; wires play modes and server |
 | `cmd/dump-mcp-schema` | Generates MCP schema JSON for CI contract check |
+| `internal/daemon` | Game server: JSON-RPC 2.0 handler, tool dispatcher, Unix socket/TCP listener |
 | `internal/engine` | Deterministic game rules: `NewGame`, `Move`, `Look` |
 | `internal/inference` | OpenAI-compatible HTTP client for `/v1/chat/completions` (DES-024) |
 | `internal/game` | Game loop: drives engine + interpreter + narrator + renderer |
@@ -196,7 +199,7 @@ git push
 
 ## Design Decisions
 
-**Before proposing any design change, read `DESIGN.md`.** It contains 22 settled decisions (DES-001–022) with alternatives considered and outcomes. Do not revisit a settled decision without new evidence. Log any new decision there before implementing.
+**Before proposing any design change, read `DESIGN.md`.** It contains 25 settled decisions (DES-001–025) with alternatives considered and outcomes. Do not revisit a settled decision without new evidence. Log any new decision there before implementing.
 
 ## Documentation Maintenance
 
@@ -220,7 +223,7 @@ for the full specification.
 
 | File | Contents |
 |------|---------|
-| `DESIGN.md` | Authoritative decision log (DES-001–022) |
+| `DESIGN.md` | Authoritative decision log (DES-001–025) |
 | `docs/build-plan.md` | 14-milestone roadmap with guiding principles and red lines |
 | `docs/plan.md` | Architecture evolution plan: interfaces, engine design, MCP tool surface |
 | `docs/testing.md` | Full test architecture: pyramid, fixture layout, fakes reference, CI config |

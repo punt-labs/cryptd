@@ -658,58 +658,53 @@ JSON-RPC is an acceptable alternative if the SDK proves too heavy.
 
 ---
 
-## DES-013: Engine Deployment — Daemon vs. Embedded
+## DES-013: Engine Deployment — Server vs. Embedded
 
 **Date:** 2026-03-10
-**Status:** SETTLED
-**Topic:** Whether the engine runs as a daemon or embedded in the CLI process
+**Status:** SETTLED (updated 2026-03-12 per DES-025)
+**Topic:** Whether the engine runs as a server or embedded in the client process
 
 ### Design
 
-Two deployment modes, selected by play mode:
+Two deployment modes, orthogonal to play mode:
 
-- **Daemon mode** (`dm`, future multi-player): `dungeon serve` starts a persistent background
-  process. The engine holds all game state, accepts connections from mcp-proxy shims (one
-  per Claude Code session), and can push events to specific sessions. Auto-start option:
-  if the daemon is not running when `dungeon dm` is invoked, start it automatically.
+- **Server mode** (`cryptd serve`): The engine runs as a persistent network service,
+  accepting connections over Unix sockets or TCP. Any client can connect — the CLI
+  (`crypt connect`), the Claude Code plugin, a future web client. The server does not
+  know or care what brain (LLM/SLM/templates) or UI the client uses.
 
-- **Embedded mode** (`solo`, `headless`): The engine runs in-process as part of the CLI
-  binary. No network, no IPC. The SLMInterpreter/SLMNarrator call ollama over localhost
-  HTTP, but the engine itself is in-process.
+- **Embedded mode** (`crypt solo`, `crypt headless`): The engine runs in-process as part
+  of the `crypt` client binary. No network, no IPC. The SLMInterpreter/SLMNarrator call
+  ollama over localhost HTTP, but the engine itself is in-process.
 
-The engine code is identical in both deployments. The daemon adds a connection handler and
-session-aware push routing on top.
+The engine code is identical in both deployments. The server adds a connection handler and
+(future) session-aware push routing on top.
 
-### Why Not Always a Daemon
+### Why Not Always a Server
 
 The beads project (Go CLI, 92.9% Go) deleted their daemon in v0.51.0 after it accumulated
 ~70K lines. Their lesson: "Keep it small." Running the engine embedded for solo/headless
-avoids all the complexity of daemon lifecycle management (auto-start, liveness, cleanup)
+avoids all the complexity of server lifecycle management (auto-start, liveness, cleanup)
 for the common single-player case.
 
-The daemon is only justified when its unique capabilities are needed: shared state across
-multiple connections (multi-player) and server push to specific sessions (DM notification
-on player action). Solo mode needs neither.
+The server is justified when its unique capabilities are needed: shared state across
+multiple connections (multi-player), remote play, and server push to specific sessions.
 
-### Daemon Transport: NDJSON over Unix Domain Socket
+### Server Transport: NDJSON over Unix Socket or TCP
 
-Following SageOx's pattern: newline-delimited JSON over a Unix domain socket. Chosen over
-WebSocket for the daemon-to-proxy leg because:
+JSON-RPC 2.0 over newline-delimited JSON. Supports both Unix sockets (local dev, auto-start)
+and TCP (remote play, multiplayer). Chosen over WebSocket because:
 
-- No third-party Go dependency (stdlib `net.Listen("unix", ...)`)
-- Debuggable: `echo '{"type":"ping"}' | socat - UNIX:/path/sock`
-- Local-only: no port conflicts, owner-only socket permissions (mode 0600)
+- No third-party Go dependency (stdlib `net.Listen`)
+- Debuggable: `echo '{"jsonrpc":"2.0",...}' | socat - UNIX:/path/sock`
+- Works identically over Unix socket or TCP — just a different listener address
 
-The mcp-proxy README leans toward WebSocket for the proxy-to-daemon transport to gain
-built-in keepalive and framing (RFC 6455). When mcp-proxy ships, the daemon transport
-will align with whatever the proxy implements.
+### Server Scope
 
-### Daemon Scope
-
-The daemon does exactly two things:
+The server does exactly two things:
 
 1. Game logic resolution (state transitions, combat, inventory)
-2. Session-aware push routing (`tools/list_changed` to DM when player acts)
+2. Session-aware push routing (future: `tools/list_changed` to DM when player acts)
 
 No LLM calls. No SLM calls. No orchestration. No business logic beyond the game rules.
 The beads lesson is taken seriously.
@@ -1260,3 +1255,83 @@ makes the inference package aware of game-layer types, violating dependency dire
 The inference package stays small and decoupled. It knows about HTTP and the OpenAI
 chat completions API. It knows nothing about game actions, events, or narration. Callers
 translate between raw text and their domain types.
+
+---
+
+## DES-025: Two Binaries — cryptd (Server) and crypt (Client)
+
+**Date:** 2026-03-12
+**Status:** SETTLED
+**Topic:** Binary architecture, client-server separation, and the daemon's role
+
+### Context
+
+The initial M8 implementation coupled the daemon to DM mode — setting `PlayMode = "dm"`,
+assuming the daemon was only for LLM-driven play. In reality, the daemon is the engine as
+a network service, orthogonal to who or what connects to it.
+
+### Design
+
+The cryptd repo produces two binaries:
+
+```text
+cryptd — the game server
+  cryptd serve [--listen :9000] [--socket /path]     TCP or Unix socket
+
+crypt — the game client
+  crypt connect [--server host:9000]                 play via remote server
+  crypt solo [--scenario id]                         embedded engine, local SLM
+  crypt headless [--scenario id]                     embedded engine, templates
+  crypt autoplay [--scenario id --script file]       embedded engine, scripted
+```
+
+The crypt plugin (Claude Code) is a separate repo that provides SKILL.md and plugin.json.
+It connects to `cryptd serve` the same way `crypt connect` does — same protocol, same tools.
+
+### Three orthogonal axes
+
+| Axis | Options |
+|------|---------|
+| **Engine access** | Embedded (in-process) or Server (network) |
+| **Brain** | LLM (Claude), SLM (ollama), Templates |
+| **UI** | CLI, Lux, Claude Code conversation |
+
+The daemon is only the engine access axis. It does not choose the brain or the UI. The
+client decides those.
+
+### Transport
+
+The server supports both Unix sockets (local dev, auto-start) and TCP (remote play,
+multiplayer). The wire protocol is JSON-RPC 2.0 over NDJSON — the same framing regardless
+of transport. The protocol uses MCP method names (`initialize`, `tools/list`, `tools/call`)
+for compatibility with the MCP ecosystem.
+
+For multiplayer (M10+), the protocol will add session identity. The server is designed as
+a general-purpose game server that handles multiple concurrent connections.
+
+### Alternatives Considered
+
+**Single binary** — `cryptd` does everything (server, client, embedded modes). Rejected
+because a client that can connect to a remote server is a fundamentally different artifact
+from a server that holds game state. Combining them bloats the client and conflates the
+deployment model.
+
+**Daemon only for DM mode** — the original M8 assumption. Rejected because the daemon is
+useful for any mode that benefits from a persistent server: multiplayer, remote play,
+web clients. The daemon and the LLM are orthogonal.
+
+### Outcome
+
+- `cryptd serve` is the game server. Transport-agnostic (Unix socket or TCP). Client-agnostic.
+- `crypt` is the player-facing binary. Can embed the engine (solo/headless) or connect to a server.
+- The crypt plugin is a Claude Code package that connects to `cryptd serve` and provides the
+  MCP tool surface + SKILL.md for DM mode.
+- `PlayMode` is not set by the server — it's a client-side concept.
+
+### Impact on Biff
+
+With a general-purpose game server, Biff may not be needed as the multiplayer transport.
+Players connect to the same `cryptd serve` instance directly. However, Biff's mailboxes,
+presence, and broadcast capabilities (`/wall`, `/talk`) could still add value as a
+communication layer on top of the game — coordination between players rather than game
+state transport. This will be evaluated when multiplayer is implemented (M13).
