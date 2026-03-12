@@ -73,6 +73,7 @@ func NewLux(display LuxDisplay) *Lux {
 
 // Render presents the game state and narration. Calls show() on scene
 // transitions (new room, combat state change) and update() otherwise.
+// Returns any transport write error from the underlying display.
 func (l *Lux) Render(_ context.Context, state model.GameState, narration string) error {
 	combatActive := state.Dungeon.Combat.Active
 	roomChanged := state.Dungeon.CurrentRoom != l.lastRoom
@@ -82,11 +83,24 @@ func (l *Lux) Render(_ context.Context, state model.GameState, narration string)
 		l.lastRoom = state.Dungeon.CurrentRoom
 		l.inCombat = combatActive
 		l.display.RecordShow(buildScene(state, narration))
-		return nil
+		return l.displayErr()
 	}
 
 	// Incremental update — narration + current HP/enemy state.
 	l.display.RecordUpdate(buildUpdate(state, narration))
+	return l.displayErr()
+}
+
+// displayErr checks if the display supports error reporting and returns
+// the first error, if any. Displays without error reporting (e.g.
+// FakeLuxServer) always return nil.
+func (l *Lux) displayErr() error {
+	type errReporter interface {
+		WriteErr() error
+	}
+	if r, ok := l.display.(errReporter); ok {
+		return r.WriteErr()
+	}
 	return nil
 }
 
