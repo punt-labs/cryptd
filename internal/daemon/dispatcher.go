@@ -444,13 +444,15 @@ func (s *Server) dispatchCastSpell(raw json.RawMessage) (any, *RPCError) {
 
 	if result.Effect == "damage" {
 		response["target"] = result.TargetID
-		if !s.state.Dungeon.Combat.Active {
-			// Combat ended — spell killed last enemy.
-			response["combat_over"] = true
-			response["level_up"] = s.checkLevelUp()
-		} else if !s.eng.IsHeroTurn(s.state) {
-			response["enemy_turns"] = s.processEnemyTurns()
-		}
+	}
+
+	// After any spell (damage or heal), check combat state and process enemy turns.
+	if s.state.Dungeon.Combat.Active && !s.eng.IsHeroTurn(s.state) {
+		response["enemy_turns"] = s.processEnemyTurns()
+	} else if result.Effect == "damage" && !s.state.Dungeon.Combat.Active {
+		// Combat ended — spell killed last enemy.
+		response["combat_over"] = true
+		response["level_up"] = s.checkLevelUp()
 	}
 
 	return response, nil

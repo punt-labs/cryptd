@@ -11,7 +11,7 @@ import (
 
 func runServe(args []string) {
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
-	socketPath := fs.String("socket", defaultSocketPath(), "Unix socket path")
+	socketPath := fs.String("socket", "", "Unix socket path (default ~/.crypt/daemon.sock)")
 	listenAddr := fs.String("listen", "", "TCP listen address (e.g. :9000)")
 	if err := fs.Parse(args); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -43,7 +43,11 @@ func runServe(args []string) {
 	if *listenAddr != "" {
 		srv = daemon.NewTCPServer(*listenAddr, absScenarioDir)
 	} else {
-		srv = daemon.NewServer(*socketPath, absScenarioDir)
+		sock := *socketPath
+		if sock == "" {
+			sock = defaultSocketPath()
+		}
+		srv = daemon.NewServer(sock, absScenarioDir)
 	}
 	if err := srv.ListenAndServe(); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -52,10 +56,11 @@ func runServe(args []string) {
 }
 
 // defaultSocketPath returns ~/.crypt/daemon.sock.
+// Only called when --listen is not set, so $HOME must be available.
 func defaultSocketPath() string {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: cannot determine home directory: %v\nUse --socket to specify a socket path explicitly.\n", err)
+		fmt.Fprintf(os.Stderr, "error: cannot determine home directory: %v\nUse --socket or --listen to specify an address explicitly.\n", err)
 		os.Exit(1)
 	}
 	return filepath.Join(home, ".crypt", "daemon.sock")

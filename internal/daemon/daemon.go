@@ -92,13 +92,17 @@ func (s *Server) listenTCP() error {
 // Use this when you need to control listener creation (e.g., for ":0" port assignment).
 func (s *Server) Serve(ln net.Listener) error {
 	s.listener = ln
+	s.address = ln.Addr().String()
 
 	defer ln.Close()
 
 	// Handle signals for graceful shutdown.
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-	defer signal.Stop(sigCh)
+	defer func() {
+		signal.Stop(sigCh)
+		close(sigCh)
+	}()
 	go func() {
 		sig, ok := <-sigCh
 		if !ok {

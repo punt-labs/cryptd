@@ -35,15 +35,18 @@ func startTestDaemon(t *testing.T) string {
 	}()
 
 	// Poll until socket is ready.
+	ready := false
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
 		conn, err := net.Dial("unix", sockPath)
 		if err == nil {
 			conn.Close()
+			ready = true
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
+	require.True(t, ready, "daemon socket %s not ready within timeout", sockPath)
 
 	t.Cleanup(func() {
 		if srv.listener != nil {
@@ -174,15 +177,18 @@ func startTestTCPDaemon(t *testing.T) string {
 	}()
 
 	// Poll until accepting connections.
+	ready := false
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
 		conn, dialErr := net.Dial("tcp", addr)
 		if dialErr == nil {
 			conn.Close()
+			ready = true
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
+	require.True(t, ready, "TCP server at %s not ready within timeout", addr)
 
 	t.Cleanup(func() {
 		ln.Close()

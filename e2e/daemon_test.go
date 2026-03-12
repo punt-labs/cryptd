@@ -38,15 +38,18 @@ func TestDaemon_ServeAndCallTools(t *testing.T) {
 	})
 
 	// Wait for socket to appear.
+	ready := false
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		conn, err := net.Dial("unix", sockPath)
 		if err == nil {
 			conn.Close()
+			ready = true
 			break
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
+	require.True(t, ready, "daemon socket %s not ready within timeout", sockPath)
 
 	// Connect and run a session.
 	conn, err := net.Dial("unix", sockPath)
