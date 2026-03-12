@@ -124,6 +124,24 @@ func titleCase(s string) string {
 	return strings.ToUpper(s[:1]) + s[1:]
 }
 
+// maxLogEntries is the number of recent adventure log entries included in
+// Lux payloads. Both show() and update() use this to keep the narration
+// panel consistent.
+const maxLogEntries = 5
+
+// recentLog returns the last maxLogEntries adventure log texts.
+func recentLog(log []model.LogEntry) []string {
+	start := len(log) - maxLogEntries
+	if start < 0 {
+		start = 0
+	}
+	entries := make([]string, 0, len(log)-start)
+	for _, entry := range log[start:] {
+		entries = append(entries, entry.Text)
+	}
+	return entries
+}
+
 // availableActions returns the action labels the frontend should present
 // as buttons. In combat: attack/defend/flee/cast. Outside combat: movement
 // directions plus look/inventory.
@@ -171,16 +189,7 @@ func buildScene(state model.GameState, narration string) LuxScene {
 		}
 	}
 
-	// Last few log entries for context.
-	logLen := len(state.AdventureLog)
-	start := logLen - 5
-	if start < 0 {
-		start = 0
-	}
-	for _, entry := range state.AdventureLog[start:] {
-		scene.Log = append(scene.Log, entry.Text)
-	}
-
+	scene.Log = recentLog(state.AdventureLog)
 	scene.Exits = state.Dungeon.Exits
 	scene.Actions = availableActions(state)
 
@@ -223,16 +232,7 @@ func buildUpdate(state model.GameState, narration string) LuxUpdate {
 	}
 
 	update.Actions = availableActions(state)
-
-	// Include recent log entries so the frontend can refresh its narration panel.
-	logLen := len(state.AdventureLog)
-	start := logLen - 5
-	if start < 0 {
-		start = 0
-	}
-	for _, entry := range state.AdventureLog[start:] {
-		update.Log = append(update.Log, entry.Text)
-	}
+	update.Log = recentLog(state.AdventureLog)
 
 	return update
 }
