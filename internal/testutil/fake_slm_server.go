@@ -74,6 +74,15 @@ func (f *FakeSLMServer) handleChatCompletions(w http.ResponseWriter, r *http.Req
 		MaxTokens:   req.MaxTokens,
 	})
 	delay := f.delay
+
+	// Reserve the response before delay so timed-out requests consume
+	// their slot and keep ordering deterministic for later calls.
+	var content string
+	hasResponse := len(f.responses) > 0
+	if hasResponse {
+		content = f.responses[f.pos%len(f.responses)]
+		f.pos++
+	}
 	f.mu.Unlock()
 
 	if delay > 0 {
@@ -81,20 +90,20 @@ func (f *FakeSLMServer) handleChatCompletions(w http.ResponseWriter, r *http.Req
 		select {
 		case <-timer.C:
 		case <-r.Context().Done():
-			timer.Stop()
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
 			return
 		}
 	}
 
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	if len(f.responses) == 0 {
+	if !hasResponse {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		return
 	}
-	content := f.responses[f.pos%len(f.responses)]
-	f.pos++
 
 	resp := map[string]any{
 		"id":      "fake-completion",
