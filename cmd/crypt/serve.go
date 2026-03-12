@@ -10,11 +10,10 @@ import (
 )
 
 func runServe(args []string) {
-	fs := flag.NewFlagSet("serve", flag.ExitOnError)
+	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
 	socketPath := fs.String("socket", "", "Unix socket path (default ~/.crypt/daemon.sock)")
 	listenAddr := fs.String("listen", "", "TCP listen address (e.g. :9000)")
 	if err := fs.Parse(args); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
 
