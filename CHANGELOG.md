@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- `narrator.SLM`: expands room `description` into 2-4 atmospheric sentences via local SLM; non-room events and empty descriptions delegate to fallback `Narrator`
+- `narrator.SLM`: atmospheric narration via local SLM for room descriptions (moved/looked), combat moments (combat_started, combat_won, hero_died), item examination, and level-up; tactical events (damage, errors) use deterministic template narrator for speed and precision; all SLM events fall back gracefully on inference failure
 - `interpreter.SLM`: sends free-text player input to a local SLM via `inference.Client`, parses JSON response into `EngineAction`, falls back to `interpreter.Rules` on failure
 - DES-024: Inference client — generic text interface (returns raw text, callers own JSON parsing)
 - `internal/inference`: OpenAI-compatible HTTP client for `/v1/chat/completions` (works with llama.cpp and ollama)
