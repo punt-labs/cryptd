@@ -6,11 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- `cryptd serve [--socket <path>]` — Unix socket daemon serving 15 MCP tools as JSON-RPC 2.0 over NDJSON; single-connection, signal-handled shutdown, stale socket cleanup; default socket at `~/.crypt/daemon.sock`
+- `cryptd serve [--socket <path> | --listen <addr>]` — daemon serving 15 MCP tools as JSON-RPC 2.0 over NDJSON; Unix socket (default `~/.crypt/daemon.sock`) or TCP transport; single-connection, signal-handled shutdown, stale socket cleanup
 - `internal/daemon` package: protocol types, dispatcher (maps tool names → engine methods with combat auto-processing and level-up checks), JSON-RPC handler (initialize, tools/list, tools/call), and server with Unix socket lifecycle
 - Daemon error mapping: engine typed errors → JSON-RPC error codes (-32602 invalid params, -32001 state blocked, -32002 game over, -32003 no active game)
 - Daemon unit tests (17 tests): all 15 tools, protocol errors, combat-blocked actions, save/load
-- Daemon integration tests (3 tests): socket-level initialize, multi-tool session, cross-connection state persistence
+- Daemon integration tests (5 tests): socket-level initialize, multi-tool session, cross-connection state persistence, TCP initialize, TCP game session
 - Daemon E2E test: subprocess spawn, socket connect, full 6-step game session (initialize → tools/list → new_game → look → pick_up → move with combat)
 
 - Makefile: build, test, demo, and ollama management targets with `make help`; `CRYPT_SCENARIO_DIR` set centrally so demo commands work without env vars

@@ -21,7 +21,7 @@ func newSLM(responses []string) (*interpreter.SLM, *testutil.FakeSLMServer) {
 }
 
 func TestSLM_RulesOnlyForNoIDActions(t *testing.T) {
-	// Actions without IDs (move, look, inventory, help, quit) skip SLM entirely.
+	// Actions that don't require ID resolution (move, look, combat verbs, etc.) skip SLM entirely.
 	slm, srv := newSLM(nil) // no SLM responses configured
 	defer srv.Close()
 

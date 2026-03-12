@@ -85,6 +85,11 @@ func (s *Server) handleConnection(r io.Reader, w io.Writer) {
 		}
 
 		resp := s.safeHandleRequest(req)
+
+		// JSON-RPC 2.0: requests without an ID are notifications — no response.
+		if req.ID == nil {
+			continue
+		}
 		s.writeResponse(w, resp)
 	}
 

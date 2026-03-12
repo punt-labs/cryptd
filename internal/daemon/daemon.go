@@ -73,6 +73,12 @@ func (s *Server) listenUnix() error {
 		return fmt.Errorf("listen unix: %w", err)
 	}
 
+	// Restrict socket permissions to owner only, independent of umask.
+	if err := os.Chmod(s.address, 0o600); err != nil {
+		ln.Close()
+		return fmt.Errorf("set unix socket permissions: %w", err)
+	}
+
 	// Clean up socket file on shutdown.
 	defer os.Remove(s.address)
 

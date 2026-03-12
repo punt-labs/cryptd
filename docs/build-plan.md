@@ -363,8 +363,8 @@ Claude Code plugin, future web client). See DES-025 for design rationale.
 
 - Unit (17 tests): all 15 tools dispatched correctly, protocol errors, combat-blocked
   actions, save/load, error code mapping
-- Integration (3 tests): socket-level initialize, multi-tool session, cross-connection
-  state persistence
+- Integration (5 tests): socket-level initialize, multi-tool session, cross-connection
+  state persistence, TCP initialize, TCP game session
 - E2E: spawn `cryptd serve` subprocess, connect over socket, run 6-step game session
 
 **Done when:** Server handles a complete game session from a single client. All tests

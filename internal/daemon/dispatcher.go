@@ -512,7 +512,9 @@ func (s *Server) dispatchLoadGame(raw json.RawMessage) (any, *RPCError) {
 // Returns a slice of per-enemy action summaries.
 func (s *Server) processEnemyTurns() []map[string]any {
 	var turns []map[string]any
-	maxIter := len(s.state.Dungeon.Combat.TurnOrder)
+	// Budget allows for all enemies + skips without premature exit.
+	// Skips don't count against the budget since they don't represent real turns.
+	maxIter := len(s.state.Dungeon.Combat.TurnOrder) * 2
 	if maxIter < 1 {
 		maxIter = 1
 	}

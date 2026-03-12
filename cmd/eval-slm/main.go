@@ -139,8 +139,8 @@ func main() {
 	client := inference.NewClient(base, mdl, *timeout)
 	ctx := context.Background()
 
-	// Realistic game state for context injection — mirrors the minimal scenario
-	// entrance room so the SLM can resolve item names and exits.
+	// Realistic game state for context injection — includes combat, enemies,
+	// inventory, and exits so the SLM can resolve all ID types.
 	evalState := model.GameState{
 		Party: []model.Character{{
 			ID: "hero", Name: "Adventurer", Class: "fighter",

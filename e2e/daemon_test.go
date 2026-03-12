@@ -33,8 +33,15 @@ func TestDaemon_ServeAndCallTools(t *testing.T) {
 	cmd.Stderr = os.Stderr
 	require.NoError(t, cmd.Start())
 	t.Cleanup(func() {
-		cmd.Process.Signal(os.Interrupt)
-		cmd.Wait()
+		_ = cmd.Process.Signal(os.Interrupt)
+		done := make(chan error, 1)
+		go func() { done <- cmd.Wait() }()
+		select {
+		case <-time.After(5 * time.Second):
+			_ = cmd.Process.Kill()
+			_ = cmd.Wait()
+		case <-done:
+		}
 	})
 
 	// Wait for socket to appear.
