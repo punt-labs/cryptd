@@ -118,28 +118,50 @@ func TestSLM_FallbackOnUnknownActionType(t *testing.T) {
 }
 
 func TestSLM_FallbackOnMissingRequiredFields(t *testing.T) {
-	for _, tt := range []struct {
-		name       string
-		response   string
-		input      string
-		wantType   string
-		wantDetail string // Direction, ItemID, or SpellID depending on type
-	}{
-		{"move without direction", `{"type":"move"}`, "go north", "move", "north"},
-		{"move with invalid direction", `{"type":"move","direction":"sideways"}`, "go north", "move", "north"},
-		{"take without item_id", `{"type":"take"}`, "take sword", "take", "sword"},
-		{"cast without spell_id", `{"type":"cast","target":"goblin_0"}`, "cast fireball", "cast", "fireball"},
-		{"unequip without target", `{"type":"unequip"}`, "unequip weapon", "unequip", "weapon"},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			slm, srv := newSLM([]string{tt.response})
-			defer srv.Close()
+	t.Run("move without direction", func(t *testing.T) {
+		slm, srv := newSLM([]string{`{"type":"move"}`})
+		defer srv.Close()
+		action, err := slm.Interpret(context.Background(), "go north", model.GameState{})
+		require.NoError(t, err)
+		assert.Equal(t, "move", action.Type)
+		assert.Equal(t, "north", action.Direction)
+	})
 
-			action, err := slm.Interpret(context.Background(), tt.input, model.GameState{})
-			require.NoError(t, err)
-			assert.Equal(t, tt.wantType, action.Type)
-		})
-	}
+	t.Run("move with invalid direction", func(t *testing.T) {
+		slm, srv := newSLM([]string{`{"type":"move","direction":"sideways"}`})
+		defer srv.Close()
+		action, err := slm.Interpret(context.Background(), "go north", model.GameState{})
+		require.NoError(t, err)
+		assert.Equal(t, "move", action.Type)
+		assert.Equal(t, "north", action.Direction)
+	})
+
+	t.Run("take without item_id", func(t *testing.T) {
+		slm, srv := newSLM([]string{`{"type":"take"}`})
+		defer srv.Close()
+		action, err := slm.Interpret(context.Background(), "take sword", model.GameState{})
+		require.NoError(t, err)
+		assert.Equal(t, "take", action.Type)
+		assert.Equal(t, "sword", action.ItemID)
+	})
+
+	t.Run("cast without spell_id", func(t *testing.T) {
+		slm, srv := newSLM([]string{`{"type":"cast","target":"goblin_0"}`})
+		defer srv.Close()
+		action, err := slm.Interpret(context.Background(), "cast fireball", model.GameState{})
+		require.NoError(t, err)
+		assert.Equal(t, "cast", action.Type)
+		assert.Equal(t, "fireball", action.SpellID)
+	})
+
+	t.Run("unequip without target", func(t *testing.T) {
+		slm, srv := newSLM([]string{`{"type":"unequip"}`})
+		defer srv.Close()
+		action, err := slm.Interpret(context.Background(), "unequip weapon", model.GameState{})
+		require.NoError(t, err)
+		assert.Equal(t, "unequip", action.Type)
+		assert.Equal(t, "weapon", action.Target)
+	})
 }
 
 func TestSLM_StripsMarkdownFences(t *testing.T) {

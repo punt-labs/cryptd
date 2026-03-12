@@ -39,7 +39,7 @@ Supported action types and their fields:
 - {"type":"attack","target":"<enemy>"}
 - {"type":"defend"}
 - {"type":"flee"}
-- {"type":"cast","spell_id":"<spell>","target":"<enemy>"}
+- {"type":"cast","spell_id":"<spell>","target":"<enemy>"}  (target is optional)
 - {"type":"save","target":"<slot_name>"}
 - {"type":"load","target":"<slot_name>"}
 - {"type":"help"}
