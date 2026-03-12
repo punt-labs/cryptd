@@ -31,8 +31,7 @@ func TestLux_InitialRenderCallsShow(t *testing.T) {
 	lux, fake := newLuxRenderer()
 
 	state := baseState("entrance")
-	err := lux.Render(context.Background(), state, "You stand in a dark corridor.")
-	require.NoError(t, err)
+	require.NoError(t, lux.Render(context.Background(), state, "You stand in a dark corridor."))
 
 	calls := fake.Calls()
 	require.Len(t, calls, 1)
@@ -52,10 +51,10 @@ func TestLux_RoomChangeCallsShow(t *testing.T) {
 	lux, fake := newLuxRenderer()
 
 	state := baseState("entrance")
-	_ = lux.Render(context.Background(), state, "You enter the entrance.")
+	require.NoError(t, lux.Render(context.Background(), state, "You enter the entrance."))
 
 	state.Dungeon.CurrentRoom = "goblin_lair"
-	_ = lux.Render(context.Background(), state, "A foul stench fills the air.")
+	require.NoError(t, lux.Render(context.Background(), state, "A foul stench fills the air."))
 
 	calls := fake.Calls()
 	require.Len(t, calls, 2)
@@ -70,8 +69,8 @@ func TestLux_SameRoomCallsUpdate(t *testing.T) {
 	lux, fake := newLuxRenderer()
 
 	state := baseState("entrance")
-	_ = lux.Render(context.Background(), state, "You enter the entrance.")
-	_ = lux.Render(context.Background(), state, "You look around.")
+	require.NoError(t, lux.Render(context.Background(), state, "You enter the entrance."))
+	require.NoError(t, lux.Render(context.Background(), state, "You look around."))
 
 	calls := fake.Calls()
 	require.Len(t, calls, 2)
@@ -87,7 +86,7 @@ func TestLux_CombatStartCallsShow(t *testing.T) {
 	lux, fake := newLuxRenderer()
 
 	state := baseState("goblin_lair")
-	_ = lux.Render(context.Background(), state, "You enter the lair.")
+	require.NoError(t, lux.Render(context.Background(), state, "You enter the lair."))
 
 	// Combat starts — same room but combat state changed.
 	state.Dungeon.Combat = model.CombatState{
@@ -96,7 +95,7 @@ func TestLux_CombatStartCallsShow(t *testing.T) {
 			{Name: "Goblin", HP: 8, MaxHP: 8},
 		},
 	}
-	_ = lux.Render(context.Background(), state, "A goblin attacks!")
+	require.NoError(t, lux.Render(context.Background(), state, "A goblin attacks!"))
 
 	calls := fake.Calls()
 	require.Len(t, calls, 2)
@@ -115,11 +114,11 @@ func TestLux_CombatEndCallsShow(t *testing.T) {
 
 	state := baseState("goblin_lair")
 	state.Dungeon.Combat = model.CombatState{Active: true}
-	_ = lux.Render(context.Background(), state, "Combat begins!")
+	require.NoError(t, lux.Render(context.Background(), state, "Combat begins!"))
 
 	// Combat ends.
 	state.Dungeon.Combat = model.CombatState{Active: false}
-	_ = lux.Render(context.Background(), state, "Victory!")
+	require.NoError(t, lux.Render(context.Background(), state, "Victory!"))
 
 	calls := fake.Calls()
 	require.Len(t, calls, 2)
@@ -137,12 +136,12 @@ func TestLux_DamageDuringCombatCallsUpdate(t *testing.T) {
 			{Name: "Goblin", HP: 8, MaxHP: 8},
 		},
 	}
-	_ = lux.Render(context.Background(), state, "Combat begins!")
+	require.NoError(t, lux.Render(context.Background(), state, "Combat begins!"))
 
 	// Damage tick — same room, same combat state.
 	state.Party[0].HP = 15
 	state.Dungeon.Combat.Enemies[0].HP = 5
-	_ = lux.Render(context.Background(), state, "You strike the goblin for 3 damage.")
+	require.NoError(t, lux.Render(context.Background(), state, "You strike the goblin for 3 damage."))
 
 	calls := fake.Calls()
 	require.Len(t, calls, 2)
@@ -167,7 +166,7 @@ func TestLux_DeadEnemiesHidden(t *testing.T) {
 			{Name: "Skeleton", HP: 6, MaxHP: 6},
 		},
 	}
-	_ = lux.Render(context.Background(), state, "The goblin falls.")
+	require.NoError(t, lux.Render(context.Background(), state, "The goblin falls."))
 
 	scene := fake.Calls()[0].Payload.(renderer.LuxScene)
 	require.Len(t, scene.Enemies, 1)
@@ -181,11 +180,22 @@ func TestLux_MPShownForCasters(t *testing.T) {
 	state.Party[0].Class = "mage"
 	state.Party[0].MP = 5
 	state.Party[0].MaxMP = 10
-	_ = lux.Render(context.Background(), state, "You arrive.")
+	require.NoError(t, lux.Render(context.Background(), state, "You arrive."))
 
 	scene := fake.Calls()[0].Payload.(renderer.LuxScene)
 	assert.Equal(t, 5, scene.Party[0].MP)
 	assert.Equal(t, 10, scene.Party[0].MaxMP)
+}
+
+func TestLux_EmptyClassDoesNotPanic(t *testing.T) {
+	lux, fake := newLuxRenderer()
+
+	state := baseState("entrance")
+	state.Party[0].Class = ""
+	require.NoError(t, lux.Render(context.Background(), state, "You arrive."))
+
+	scene := fake.Calls()[0].Payload.(renderer.LuxScene)
+	assert.Equal(t, "", scene.Party[0].Class)
 }
 
 func TestLux_EventsFromDisplay(t *testing.T) {
@@ -212,7 +222,7 @@ func TestLux_LogEntriesInScene(t *testing.T) {
 		{Text: "Moved to entrance."},
 		{Text: "Picked up key."},
 	}
-	_ = lux.Render(context.Background(), state, "Welcome.")
+	require.NoError(t, lux.Render(context.Background(), state, "Welcome."))
 
 	scene := fake.Calls()[0].Payload.(renderer.LuxScene)
 	require.Len(t, scene.Log, 3)
@@ -228,7 +238,7 @@ func TestLux_LogTruncatedToFive(t *testing.T) {
 			Text: strings.Repeat("x", i+1),
 		})
 	}
-	_ = lux.Render(context.Background(), state, "Welcome.")
+	require.NoError(t, lux.Render(context.Background(), state, "Welcome."))
 
 	scene := fake.Calls()[0].Payload.(renderer.LuxScene)
 	require.Len(t, scene.Log, 5, "log should be truncated to last 5 entries")
@@ -241,12 +251,12 @@ func TestLux_PerformanceRedLine_NoShowForIncrementalUpdates(t *testing.T) {
 	lux, fake := newLuxRenderer()
 
 	state := baseState("entrance")
-	_ = lux.Render(context.Background(), state, "Initial.")
+	require.NoError(t, lux.Render(context.Background(), state, "Initial."))
 
 	// 10 consecutive renders in the same room.
 	for i := range 10 {
 		state.Party[0].HP = 20 - i
-		_ = lux.Render(context.Background(), state, "Something happens.")
+		require.NoError(t, lux.Render(context.Background(), state, "Something happens."))
 	}
 
 	calls := fake.Calls()
