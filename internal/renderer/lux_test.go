@@ -2,6 +2,7 @@ package renderer_test
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -269,4 +270,20 @@ func TestLux_PerformanceRedLine_NoShowForIncrementalUpdates(t *testing.T) {
 		}
 	}
 	assert.Equal(t, 1, showCount, "only the initial render should call show; all others must be update")
+}
+
+func TestLux_RenderReturnsTransportError(t *testing.T) {
+	transport := renderer.NewJSONTransport(&failingWriter{}, strings.NewReader(""))
+	lux := renderer.NewLux(transport)
+
+	state := baseState("entrance")
+	err := lux.Render(context.Background(), state, "You arrive.")
+	require.Error(t, err, "Render must return transport write errors")
+	assert.Contains(t, err.Error(), "write show")
+}
+
+type failingWriter struct{}
+
+func (f *failingWriter) Write([]byte) (int, error) {
+	return 0, fmt.Errorf("broken pipe")
 }
