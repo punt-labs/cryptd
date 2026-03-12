@@ -84,6 +84,8 @@ func (l *Loop) enrichForDisplay(state *model.GameState) {
 	for i := range state.Party {
 		state.Party[i].NextLevelXP = engine.NextLevelXP(state.Party[i].Class, state.Party[i].Level)
 	}
+	look := l.eng.Look(state)
+	state.Dungeon.Exits = look.Exits
 }
 
 // Run drives the game loop until the player quits or the context is cancelled.

@@ -166,6 +166,57 @@ func TestLux_CombatTransitionsCallShow(t *testing.T) {
 	assert.False(t, combatShows[0], "initial entrance should not be in combat")
 }
 
+// TestLux_SceneContainsExitsAndActions verifies that the full game loop
+// populates exits (from engine.Look) and context-appropriate actions in
+// LuxScene payloads.
+func TestLux_SceneContainsExitsAndActions(t *testing.T) {
+	inputs := []string{}
+	loop, fake, state := newLuxLoop(t, inputs)
+
+	require.NoError(t, loop.Run(context.Background(), &state))
+
+	calls := fake.Calls()
+	require.NotEmpty(t, calls)
+
+	scene := calls[0].Payload.(renderer.LuxScene)
+	// Entrance room in minimal scenario has a south exit.
+	assert.Contains(t, scene.Exits, "south", "entrance should have south exit")
+	// Not in combat — actions should include directions + look + inventory.
+	assert.Contains(t, scene.Actions, "south")
+	assert.Contains(t, scene.Actions, "look")
+	assert.Contains(t, scene.Actions, "inventory")
+	assert.NotContains(t, scene.Actions, "attack", "exploration mode should not have attack")
+}
+
+// TestLux_CombatActionsInScene verifies that combat state produces attack/defend/flee/cast actions.
+func TestLux_CombatActionsInScene(t *testing.T) {
+	// Move south to goblin_lair → triggers combat.
+	inputs := []string{
+		"go south",
+		"attack", "attack", "attack", "attack",
+		"attack", "attack", "attack", "attack",
+	}
+	loop, fake, state := newLuxLoop(t, inputs)
+
+	require.NoError(t, loop.Run(context.Background(), &state))
+
+	calls := fake.Calls()
+
+	// Find the first show call for goblin_lair in combat.
+	var combatScene *renderer.LuxScene
+	for _, c := range calls {
+		if c.Method == "show" {
+			s := c.Payload.(renderer.LuxScene)
+			if s.InCombat {
+				combatScene = &s
+				break
+			}
+		}
+	}
+	require.NotNil(t, combatScene, "should have a combat show call")
+	assert.Equal(t, []string{"attack", "defend", "flee", "cast"}, combatScene.Actions)
+}
+
 // TestLux_SceneContainsCorrectPartyData verifies the element structure
 // sent to FakeLuxServer has correct party member data.
 func TestLux_SceneContainsCorrectPartyData(t *testing.T) {

@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- `LuxScene.Exits` and `LuxScene.Actions` / `LuxUpdate.Actions`: navigation exits and context-sensitive action buttons in Lux payloads — exploration mode shows directional exits + look/inventory; combat mode shows attack/defend/flee/cast; game loop populates exits via `enrichForDisplay()` transient field on `DungeonState`
 - `cryptd solo --lux` — Lux JSON-lines display mode; writes scene/update payloads as newline-delimited JSON to stdout, reads `InputEvent` JSON from stdin; falls back to CLI renderer when `--lux` is omitted
 - `renderer.JSONTransport`: `LuxDisplay` implementation over JSON-lines on arbitrary `io.Reader`/`io.Writer` streams — the wire format for Lux frontends
 - `renderer.Lux`: Lux ImGui display surface renderer (Wizardry I layout) — `show()` on scene transitions (room change, combat start/end), `update()` for incremental changes (HP tick, narration); `LuxDisplay` interface abstracts MCP transport; FakeLuxServer-backed tests with performance red line guard (no `show()` for incremental updates)
