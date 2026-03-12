@@ -1236,9 +1236,9 @@ produced them. The game is always playable.
 func (c *Client) ChatCompletion(ctx context.Context, messages []Message, opts *Options) (string, error)
 ```
 
-It returns raw text. Callers (SLMInterpreter, SLMNarrator) own their own JSON parsing
-and error recovery. The client handles HTTP transport, timeouts, retries on transient
-errors, and the OpenAI-compatible `/v1/chat/completions` wire format.
+It returns raw text. Callers (SLMInterpreter, SLMNarrator) own their own JSON parsing,
+error recovery, and any retry logic around malformed output. The client handles HTTP
+transport, timeouts, and the OpenAI-compatible `/v1/chat/completions` wire format.
 
 ### Alternatives Considered
 

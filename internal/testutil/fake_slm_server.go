@@ -20,8 +20,10 @@ type FakeSLMServer struct {
 
 // FakeSLMCall records a single request to the fake server.
 type FakeSLMCall struct {
-	Model    string            `json:"model"`
-	Messages []json.RawMessage `json:"messages"`
+	Model       string            `json:"model"`
+	Messages    []json.RawMessage `json:"messages"`
+	Temperature *float64          `json:"temperature,omitempty"`
+	MaxTokens   int               `json:"max_tokens,omitempty"`
 }
 
 // NewFakeSLMServer creates a FakeSLMServer that will return the provided
@@ -41,12 +43,21 @@ func (f *FakeSLMServer) handleChatCompletions(w http.ResponseWriter, r *http.Req
 
 	// Record the call.
 	var req struct {
-		Model    string            `json:"model"`
-		Messages []json.RawMessage `json:"messages"`
+		Model       string            `json:"model"`
+		Messages    []json.RawMessage `json:"messages"`
+		Temperature *float64          `json:"temperature,omitempty"`
+		MaxTokens   int               `json:"max_tokens,omitempty"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err == nil {
-		f.calls = append(f.calls, FakeSLMCall{Model: req.Model, Messages: req.Messages})
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
 	}
+	f.calls = append(f.calls, FakeSLMCall{
+		Model:       req.Model,
+		Messages:    req.Messages,
+		Temperature: req.Temperature,
+		MaxTokens:   req.MaxTokens,
+	})
 
 	if len(f.responses) == 0 {
 		w.WriteHeader(http.StatusServiceUnavailable)
@@ -96,6 +107,21 @@ func (f *FakeSLMServer) Calls() []FakeSLMCall {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	out := make([]FakeSLMCall, len(f.calls))
-	copy(out, f.calls)
+	for i, c := range f.calls {
+		msgs := make([]json.RawMessage, len(c.Messages))
+		for j, m := range c.Messages {
+			if m != nil {
+				b := make([]byte, len(m))
+				copy(b, m)
+				msgs[j] = json.RawMessage(b)
+			}
+		}
+		out[i] = FakeSLMCall{
+			Model:       c.Model,
+			Messages:    msgs,
+			Temperature: c.Temperature,
+			MaxTokens:   c.MaxTokens,
+		}
+	}
 	return out
 }

@@ -68,6 +68,12 @@ func TestChatCompletion_WithOptions(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, "result", resp)
+
+	calls := srv.Calls()
+	require.Len(t, calls, 1)
+	require.NotNil(t, calls[0].Temperature)
+	assert.InDelta(t, 0.1, *calls[0].Temperature, 0.001)
+	assert.Equal(t, 50, calls[0].MaxTokens)
 }
 
 func TestChatCompletion_CyclesResponses(t *testing.T) {

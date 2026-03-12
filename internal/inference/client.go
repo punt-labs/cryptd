@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -45,7 +46,7 @@ type Client struct {
 // The base URL should not include a trailing slash (e.g. "http://localhost:8080").
 func NewClient(baseURL, model string, timeout time.Duration) *Client {
 	return &Client{
-		baseURL: baseURL,
+		baseURL: strings.TrimRight(baseURL, "/"),
 		model:   model,
 		httpClient: &http.Client{
 			Timeout: timeout,
