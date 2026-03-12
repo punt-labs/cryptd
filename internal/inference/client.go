@@ -101,9 +101,12 @@ func (c *Client) ChatCompletion(ctx context.Context, messages []Message, opts *O
 	defer resp.Body.Close()
 
 	const maxResponseSize = 1 << 20 // 1 MiB
-	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseSize))
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseSize+1))
 	if err != nil {
 		return "", fmt.Errorf("inference: read response: %w", err)
+	}
+	if len(respBody) > maxResponseSize {
+		return "", fmt.Errorf("inference: response too large (%d bytes exceeds %d byte limit)", len(respBody), maxResponseSize)
 	}
 
 	if resp.StatusCode != http.StatusOK {
