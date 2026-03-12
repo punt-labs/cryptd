@@ -2,6 +2,7 @@ package narrator
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/punt-labs/cryptd/internal/inference"
@@ -37,7 +38,7 @@ Rules:
 - Be concise but evocative. Focus on sensory details.
 - Do not invent game mechanics, items, or exits not mentioned in the input.
 - Do not use markdown, code fences, or any formatting. Plain prose only.
-- After the description, include exits and visible items if provided.`
+- Do NOT include exits or visible items — those are appended automatically.`
 
 // Narrate produces narration for the given event. Room events (moved, looked)
 // are sent to the SLM for atmospheric expansion. All other events use the
@@ -75,7 +76,23 @@ func (s *SLM) Narrate(ctx context.Context, event model.EngineEvent, state model.
 		return s.fallback.Narrate(ctx, event, state)
 	}
 
-	return trimmed, nil
+	return trimmed + roomSuffix(event.Details), nil
+}
+
+// roomSuffix deterministically appends exits and visible items so gameplay
+// affordances are never lost even if the SLM omits them.
+func roomSuffix(details map[string]any) string {
+	var parts []string
+	if exits, ok := details["exits"].([]string); ok && len(exits) > 0 {
+		parts = append(parts, fmt.Sprintf("Exits: %s.", strings.Join(exits, ", ")))
+	}
+	if items, ok := details["items"].([]string); ok && len(items) > 0 {
+		parts = append(parts, fmt.Sprintf("You see: %s.", strings.Join(items, ", ")))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return " " + strings.Join(parts, " ")
 }
 
 // buildRoomPrompt constructs the user message from event details.

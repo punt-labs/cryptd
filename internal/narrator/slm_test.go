@@ -36,6 +36,7 @@ func TestSLMNarrator_MovedEvent(t *testing.T) {
 	result, err := slm.Narrate(context.Background(), event, model.GameState{})
 	require.NoError(t, err)
 	assert.Contains(t, result, "damp stone chamber")
+	assert.Contains(t, result, "Exits: north, south.")
 }
 
 func TestSLMNarrator_LookedEvent(t *testing.T) {
@@ -55,6 +56,8 @@ func TestSLMNarrator_LookedEvent(t *testing.T) {
 	result, err := slm.Narrate(context.Background(), event, model.GameState{})
 	require.NoError(t, err)
 	assert.Contains(t, result, "shadows dancing")
+	assert.Contains(t, result, "Exits: east, west.")
+	assert.Contains(t, result, "You see: rusty key.")
 }
 
 func TestSLMNarrator_NonRoomEventDelegates(t *testing.T) {
