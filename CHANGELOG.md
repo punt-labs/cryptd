@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- `narrator.SLM`: expands room `description` into 2-4 atmospheric sentences via local SLM; non-room events and empty descriptions delegate to fallback `Narrator`
 - `interpreter.SLM`: sends free-text player input to a local SLM via `inference.Client`, parses JSON response into `EngineAction`, falls back to `interpreter.Rules` on failure
 - DES-024: Inference client — generic text interface (returns raw text, callers own JSON parsing)
 - `internal/inference`: OpenAI-compatible HTTP client for `/v1/chat/completions` (works with llama.cpp and ollama)

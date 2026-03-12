@@ -168,13 +168,40 @@ func roomNarration(header string, details map[string]any) string {
 		parts = append(parts, desc)
 	}
 
-	if exits, ok := details["exits"].([]string); ok && len(exits) > 0 {
-		parts = append(parts, fmt.Sprintf("Exits: %s.", strings.Join(exits, ", ")))
-	}
-
-	if items, ok := details["items"].([]string); ok && len(items) > 0 {
-		parts = append(parts, fmt.Sprintf("You see: %s.", strings.Join(items, ", ")))
-	}
+	parts = append(parts, exitsAndItems(details)...)
 
 	return strings.Join(parts, " ")
+}
+
+// exitsAndItems returns formatted "Exits: ..." and "You see: ..." strings
+// from event details. Handles both []string (from Go code) and []any
+// (from JSON unmarshalling).
+func exitsAndItems(details map[string]any) []string {
+	var parts []string
+	if exits := toStringSlice(details["exits"]); len(exits) > 0 {
+		parts = append(parts, fmt.Sprintf("Exits: %s.", strings.Join(exits, ", ")))
+	}
+	if items := toStringSlice(details["items"]); len(items) > 0 {
+		parts = append(parts, fmt.Sprintf("You see: %s.", strings.Join(items, ", ")))
+	}
+	return parts
+}
+
+// toStringSlice coerces a value to []string. Supports []string directly
+// and []any with string elements (as produced by JSON unmarshalling).
+func toStringSlice(v any) []string {
+	switch s := v.(type) {
+	case []string:
+		return s
+	case []any:
+		out := make([]string, 0, len(s))
+		for _, elem := range s {
+			if str, ok := elem.(string); ok {
+				out = append(out, str)
+			}
+		}
+		return out
+	default:
+		return nil
+	}
 }
