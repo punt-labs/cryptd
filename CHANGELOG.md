@@ -14,8 +14,11 @@ All notable changes to this project will be documented in this file.
 - Rules interpreter: article stripping (the, a, an) from multi-word item targets; `look at <item>` parsed as examine
 - Eval harness: rules-first routing mirroring runtime behavior; realistic game state for context injection; accuracy improved from 63.5% to 98.4%
 - `docs/slm-improvement.md`: strategy document for SLM accuracy improvement (context injection, prompt engineering, fine-tuning, model scaling)
+- Rules interpreter autocorrect: typos within edit distance 1 of known verbs are corrected deterministically (e.g. `attacl` → `attack`, `tke` → `take`); only verbs 3+ characters, zero latency, no SLM call needed
 
 ### Changed
+
+- Makefile: `GIN_MODE=release` on `ollama serve` suppresses verbose HTTP request logs during gameplay
 
 - `LuxUpdate.Log`: recent adventure log entries included in incremental updates, enabling the frontend to render a scrolling narration panel without waiting for a full scene rebuild; truncated to last 5 entries (same as `LuxScene.Log`)
 - `LuxScene.Exits` and `LuxScene.Actions` / `LuxUpdate.Actions`: navigation exits and context-sensitive action buttons in Lux payloads — exploration mode shows directional exits + look/inventory; combat mode shows attack/defend/flee/cast; game loop populates exits via `enrichForDisplay()` transient field on `DungeonState`

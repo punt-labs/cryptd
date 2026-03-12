@@ -272,3 +272,57 @@ func TestRulesInterpreter_MultiWordItemNormalized(t *testing.T) {
 	assert.Equal(t, "drop", a.Type)
 	assert.Equal(t, "short_sword", a.ItemID)
 }
+
+func TestRulesInterpreter_Autocorrect(t *testing.T) {
+	tests := []struct {
+		input    string
+		wantType string
+		desc     string
+	}{
+		{"attacl", "attack", "transposition"},
+		{"atack", "attack", "missing letter"},
+		{"loook", "look", "extra letter"},
+		{"defnd", "defend", "missing letter"},
+		{"grb", "unknown", "too short to correct reliably"},
+		{"fle", "flee", "distance 1 from flee"},
+		{"hep", "help", "missing letter"},
+		{"quiy", "quit", "adjacent key"},
+		{"examin", "look", "examine with no args → look"},
+		{"savee", "save", "extra letter"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			a := interpret(t, tt.input)
+			assert.Equal(t, tt.wantType, a.Type, tt.desc)
+		})
+	}
+}
+
+func TestRulesInterpreter_AutocorrectDoesNotOvercorrect(t *testing.T) {
+	// Inputs that are far from any known verb should remain unknown.
+	tests := []string{
+		"xyzzy",
+		"dance",
+		"sing",
+		"jump",
+		"ab",
+		"z",
+	}
+	for _, input := range tests {
+		t.Run(input, func(t *testing.T) {
+			a := interpret(t, input)
+			assert.Equal(t, "unknown", a.Type, "should not autocorrect %q", input)
+		})
+	}
+}
+
+func TestRulesInterpreter_AutocorrectWithArgs(t *testing.T) {
+	// Typo in verb, args should still work.
+	a := interpret(t, "tke sword")
+	assert.Equal(t, "take", a.Type)
+	assert.Equal(t, "sword", a.ItemID)
+
+	a = interpret(t, "drp rusty key")
+	assert.Equal(t, "drop", a.Type)
+	assert.Equal(t, "rusty_key", a.ItemID)
+}

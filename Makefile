@@ -86,7 +86,7 @@ ollama-install:                            ## Install ollama via Homebrew
 
 ollama-start: ollama-install               ## Start ollama server (background)
 	@if pgrep -x ollama > /dev/null 2>&1; then echo "ollama already running"; else \
-		ollama serve > /dev/null 2>&1 & \
+		GIN_MODE=release ollama serve > /dev/null 2>&1 & \
 		printf "waiting for ollama"; \
 		for i in 1 2 3 4 5 6 7 8 9 10; do \
 			if ollama list > /dev/null 2>&1; then echo " ready"; break; fi; \
