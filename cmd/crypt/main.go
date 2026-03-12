@@ -134,10 +134,23 @@ func resolveRuntime(serverURL, modelName string) (string, string) {
 		return serverURL, modelName
 	}
 
-	rt := inference.Probe(context.Background(), inference.DefaultEndpoints(), time.Second)
+	// Build probe endpoints: if the user specified a server, probe that
+	// server (trying both ollama and OpenAI model endpoints) instead of
+	// the default well-known ports.
+	var endpoints []inference.Endpoint
+	if serverURL != "" {
+		endpoints = []inference.Endpoint{
+			{Name: "user-server", BaseURL: serverURL, HealthPath: "/api/tags", ModelExtractor: inference.OllamaModels},
+			{Name: "user-server", BaseURL: serverURL, HealthPath: "/v1/models", ModelExtractor: inference.OpenAIModels},
+		}
+	} else {
+		endpoints = inference.DefaultEndpoints()
+	}
+
+	rt := inference.Probe(context.Background(), endpoints, time.Second)
 	if rt == nil {
 		if serverURL != "" {
-			fmt.Fprintf(os.Stderr, "warning: ignoring --server %q — no model could be determined\n", serverURL)
+			fmt.Fprintf(os.Stderr, "warning: --server %q is not responding — no model could be determined\n", serverURL)
 		}
 		if modelName != "" {
 			fmt.Fprintf(os.Stderr, "warning: ignoring --model %q — no inference server found\n", modelName)
