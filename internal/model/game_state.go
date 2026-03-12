@@ -66,7 +66,7 @@ type Character struct {
 	MaxHP      int         `json:"max_hp"`
 	MaxMP      int         `json:"max_mp"`
 	XP         int         `json:"xp"`
-	NextLevelXP int        `json:"next_level_xp,omitempty"` // set by game loop for display
+	NextLevelXP int        `json:"-"` // transient; set by game loop for display
 	Gold       int         `json:"gold"`
 	Stats      Stats       `json:"stats"`
 	Inventory  []Item      `json:"inventory"`
