@@ -155,14 +155,17 @@ func (s *Server) handleToolCall(req Request) Response {
 
 	result, rpcErr := s.dispatch(params.Name, params.Arguments)
 	if rpcErr != nil {
-		// MCP convention: tool errors are returned as isError content, not
-		// JSON-RPC errors, so the client can distinguish protocol errors from
-		// game errors. However, we also return the JSON-RPC error for clients
-		// that check the error field.
+		// MCP convention: tool execution errors are returned as ToolResult
+		// with isError=true (not JSON-RPC errors). This lets MCP clients
+		// distinguish protocol failures from game-logic errors.
+		// JSON-RPC error is reserved for protocol-level issues (handled above).
 		return Response{
 			JSONRPC: "2.0",
 			ID:      req.ID,
-			Error:   rpcErr,
+			Result: ToolResult{
+				IsError: true,
+				Content: []ToolContent{{Type: "text", Text: rpcErr.Message}},
+			},
 		}
 	}
 

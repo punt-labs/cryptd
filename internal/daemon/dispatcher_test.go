@@ -138,12 +138,25 @@ func TestNewGame(t *testing.T) {
 	assert.Equal(t, "fighter", hero["class"])
 }
 
+// extractToolError extracts the error text from a ToolResult with isError=true.
+func extractToolError(t *testing.T, resp Response) string {
+	t.Helper()
+	require.Nil(t, resp.Error, "expected no JSON-RPC error, got: %+v", resp.Error)
+	data, err := json.Marshal(resp.Result)
+	require.NoError(t, err)
+	var tr ToolResult
+	require.NoError(t, json.Unmarshal(data, &tr))
+	require.True(t, tr.IsError, "expected isError=true in ToolResult")
+	require.Len(t, tr.Content, 1)
+	return tr.Content[0].Text
+}
+
 func TestNoActiveGame(t *testing.T) {
 	srv := testServer(t)
 	resp := roundTrip(t, srv, toolCall(1, "look", nil))
 
-	require.NotNil(t, resp.Error)
-	assert.Equal(t, CodeNoActiveGame, resp.Error.Code)
+	errText := extractToolError(t, resp)
+	assert.Contains(t, errText, "no active game")
 }
 
 func TestLook(t *testing.T) {
@@ -194,8 +207,8 @@ func TestMoveNoExit(t *testing.T) {
 	resps := multiRoundTrip(t, srv, reqs)
 	require.Len(t, resps, 2)
 
-	require.NotNil(t, resps[1].Error)
-	assert.Equal(t, CodeInvalidParams, resps[1].Error.Code)
+	errText := extractToolError(t, resps[1])
+	assert.Contains(t, errText, "no exit")
 }
 
 func TestPickUpAndDrop(t *testing.T) {
@@ -329,8 +342,8 @@ func TestCombatBlockedActions(t *testing.T) {
 			args = map[string]any{"slot": "weapon"}
 		}
 		resp := roundTrip(t, srv, toolCall(10, tool, args))
-		require.NotNil(t, resp.Error, "expected %s to be blocked during combat", tool)
-		assert.Equal(t, CodeStateBlocked, resp.Error.Code, "tool %s: wrong error code", tool)
+		errText := extractToolError(t, resp)
+		assert.NotEmpty(t, errText, "expected %s to be blocked during combat", tool)
 	}
 }
 
@@ -356,9 +369,14 @@ func TestDefend(t *testing.T) {
 	srv.mu.Unlock()
 
 	resp := roundTrip(t, srv, toolCall(3, "defend", nil))
-	if resp.Error != nil {
+	// Tool errors now come as ToolResult with isError.
+	data, err := json.Marshal(resp.Result)
+	require.NoError(t, err)
+	var tr ToolResult
+	require.NoError(t, json.Unmarshal(data, &tr))
+	if tr.IsError {
 		// Hero might be dead from enemy turns — that's a valid game over.
-		assert.Equal(t, CodeGameOver, resp.Error.Code)
+		assert.Contains(t, tr.Content[0].Text, "dead")
 	} else {
 		result := extractResult(t, resp)
 		assert.Equal(t, true, result["defending"])
@@ -376,8 +394,8 @@ func TestUnknownTool(t *testing.T) {
 	}
 	resps := multiRoundTrip(t, srv, reqs)
 	require.Len(t, resps, 2)
-	require.NotNil(t, resps[1].Error)
-	assert.Equal(t, CodeInvalidParams, resps[1].Error.Code)
+	errText := extractToolError(t, resps[1])
+	assert.Contains(t, errText, "unknown tool")
 }
 
 func TestInvalidJSONRPC(t *testing.T) {

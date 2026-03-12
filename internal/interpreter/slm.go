@@ -59,7 +59,7 @@ func BuildContext(state model.GameState) string {
 			b.WriteString(strings.Join(ids, ", "))
 			b.WriteByte('\n')
 		}
-		if hero.Equipped.Weapon != "" || hero.Equipped.Armor != "" {
+		if hero.Equipped.Weapon != "" || hero.Equipped.Armor != "" || hero.Equipped.Ring != "" || hero.Equipped.Amulet != "" {
 			var slots []string
 			if hero.Equipped.Weapon != "" {
 				slots = append(slots, "weapon="+hero.Equipped.Weapon)
@@ -201,6 +201,12 @@ func (s *SLM) Interpret(ctx context.Context, input string, state model.GameState
 	// the SLM might resolve better. Send to SLM with game state context.
 	slmAction, err := s.callSLM(ctx, input, state)
 	if err != nil {
+		// Propagate context cancellation/deadline — the caller needs to know
+		// the request was abandoned, not silently treat it as a valid parse.
+		if ctx.Err() != nil {
+			return model.EngineAction{}, ctx.Err()
+		}
+		// For non-context SLM failures (network, parse), fall back to rules.
 		return rulesAction, nil
 	}
 
