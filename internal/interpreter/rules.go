@@ -25,6 +25,72 @@ var longDirs = map[string]bool{
 	"west": true, "up": true, "down": true,
 }
 
+// knownVerbs is the set of verbs the rules interpreter recognizes.
+// Used for edit-distance autocorrection of typos.
+var knownVerbs = []string{
+	"go", "look", "examine", "take", "get", "grab", "pick", "drop",
+	"equip", "wear", "wield", "unequip", "remove",
+	"attack", "hit", "strike", "kill", "defend", "block", "guard",
+	"cast", "flee", "run", "escape", "inventory", "save", "load",
+	"help", "quit", "exit",
+}
+
+// autocorrect returns the closest known verb if the input is within
+// edit distance 1, or the original input if no close match is found.
+// Only considers verbs 3+ characters long to avoid false positives
+// on single-character aliases.
+func autocorrect(verb string) string {
+	if len(verb) < 3 {
+		return verb
+	}
+	best := ""
+	bestDist := 2 // threshold: must be strictly less than 2 (i.e., distance 1)
+	for _, known := range knownVerbs {
+		d := levenshtein(verb, known)
+		if d < bestDist {
+			bestDist = d
+			best = known
+		}
+	}
+	if best != "" {
+		return best
+	}
+	return verb
+}
+
+// levenshtein computes the edit distance between two strings.
+func levenshtein(a, b string) int {
+	if len(a) == 0 {
+		return len(b)
+	}
+	if len(b) == 0 {
+		return len(a)
+	}
+
+	// Single-row DP: prev[j] holds distance for (i-1, j).
+	prev := make([]int, len(b)+1)
+	for j := range prev {
+		prev[j] = j
+	}
+
+	for i := 1; i <= len(a); i++ {
+		curr := make([]int, len(b)+1)
+		curr[0] = i
+		for j := 1; j <= len(b); j++ {
+			cost := 1
+			if a[i-1] == b[j-1] {
+				cost = 0
+			}
+			ins := curr[j-1] + 1
+			del := prev[j] + 1
+			sub := prev[j-1] + cost
+			curr[j] = min(ins, min(del, sub))
+		}
+		prev = curr
+	}
+	return prev[len(b)]
+}
+
 // Interpret parses input and returns the corresponding EngineAction.
 // It never returns an error; unrecognised input yields Type="unknown".
 func (r *Rules) Interpret(_ context.Context, input string, _ model.GameState) (model.EngineAction, error) {
@@ -45,11 +111,27 @@ func (r *Rules) Interpret(_ context.Context, input string, _ model.GameState) (m
 		return model.EngineAction{Type: "move", Direction: verb}, nil
 	}
 
+	// Directional synonyms.
+	if verb == "descend" && len(fields) == 1 {
+		return model.EngineAction{Type: "move", Direction: "down"}, nil
+	}
+	if verb == "ascend" && len(fields) == 1 {
+		return model.EngineAction{Type: "move", Direction: "up"}, nil
+	}
+
+	// Autocorrect typos (e.g. "attacl" → "attack") before dispatching.
+	verb = autocorrect(verb)
+
 	// Join remaining fields for multi-word targets, using underscores to
 	// match scenario item IDs (e.g. "short sword" → "short_sword").
+	// Strip leading articles (the, a, an) before joining.
 	rest := ""
 	if len(fields) >= 2 {
-		rest = strings.Join(fields[1:], "_")
+		args := fields[1:]
+		if len(args) > 1 && (args[0] == "the" || args[0] == "a" || args[0] == "an") {
+			args = args[1:]
+		}
+		rest = strings.Join(args, "_")
 	}
 
 	switch verb {
@@ -63,6 +145,14 @@ func (r *Rules) Interpret(_ context.Context, input string, _ model.GameState) (m
 		}
 
 	case "look", "l":
+		// "look at <item>" → examine; plain "look" → look.
+		if len(fields) >= 3 && fields[1] == "at" {
+			target := fields[2:]
+			if len(target) > 1 && (target[0] == "the" || target[0] == "a" || target[0] == "an") {
+				target = target[1:]
+			}
+			return model.EngineAction{Type: "examine", ItemID: strings.Join(target, "_")}, nil
+		}
 		return model.EngineAction{Type: "look"}, nil
 
 	case "examine", "x":
@@ -79,8 +169,11 @@ func (r *Rules) Interpret(_ context.Context, input string, _ model.GameState) (m
 	case "pick":
 		// "pick up <item>"
 		if len(fields) >= 3 && fields[1] == "up" {
-			target := strings.Join(fields[2:], "_")
-			return model.EngineAction{Type: "take", ItemID: target}, nil
+			args := fields[2:]
+			if len(args) > 1 && (args[0] == "the" || args[0] == "a" || args[0] == "an") {
+				args = args[1:]
+			}
+			return model.EngineAction{Type: "take", ItemID: strings.Join(args, "_")}, nil
 		}
 
 	case "drop":

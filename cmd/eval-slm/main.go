@@ -139,14 +139,61 @@ func main() {
 	client := inference.NewClient(base, mdl, *timeout)
 	ctx := context.Background()
 
+	// Realistic game state for context injection — includes combat, enemies,
+	// inventory, and exits so the SLM can resolve all ID types.
+	evalState := model.GameState{
+		Party: []model.Character{{
+			ID: "hero", Name: "Adventurer", Class: "fighter",
+			Level: 1, HP: 20, MaxHP: 20,
+			Inventory: []model.Item{
+				{ID: "short_sword", Name: "Short Sword", Type: "weapon"},
+			},
+		}},
+		Dungeon: model.DungeonState{
+			CurrentRoom: "entrance",
+			RoomState: map[string]model.RoomState{
+				"entrance": {Items: []string{"short_sword", "rusty_key"}},
+			},
+			Exits: []string{"south", "west"},
+			Combat: model.CombatState{
+				Active: true,
+				Enemies: []model.EnemyInstance{
+					{ID: "goblin_0", Name: "Goblin", HP: 8, MaxHP: 8},
+				},
+			},
+		},
+	}
+
+	gameCtx := interpreter.BuildContext(evalState)
+
 	var passed, failed, errors int
 	var failures []string
 
 	for i, tc := range verbTable {
+		// Rules-first: if rules can parse it, skip the SLM call entirely
+		// (matches runtime behavior of SLM interpreter).
+		rulesAction, _ := interpreter.NewRules().Interpret(ctx, tc.Input, evalState)
+		if rulesAction.Type != "unknown" {
+			if matchAction(rulesAction, tc.Expected) {
+				passed++
+				if *verbose {
+					fmt.Printf("[%3d] RULES  %q → %s\n", i+1, tc.Input, actionString(rulesAction))
+				}
+			} else {
+				failed++
+				if *verbose {
+					fmt.Printf("[%3d] FAIL   %q → rules got %s, want %s\n", i+1, tc.Input, actionString(rulesAction), actionString(tc.Expected))
+				}
+				failures = append(failures, fmt.Sprintf("  FAIL   %q → rules got %s, want %s", tc.Input, actionString(rulesAction), actionString(tc.Expected)))
+			}
+			continue
+		}
+
+		userMsg := gameCtx + "\nPlayer input: " + tc.Input
 		temp := 0.0
 		resp, err := client.ChatCompletion(ctx, []inference.Message{
 			{Role: inference.RoleSystem, Content: interpreter.SystemPrompt},
-			{Role: inference.RoleUser, Content: tc.Input},
+			{Role: inference.RoleUser, Content: userMsg},
 		}, &inference.Options{Temperature: &temp, MaxTokens: 100})
 
 		if err != nil {

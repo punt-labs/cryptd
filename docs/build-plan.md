@@ -29,9 +29,9 @@
 
 ```text
         ┌──────────────────────────────────────────────┐
-        │             CLI / Commands                    │  crypt solo
-        │         (crypt headless, dm, serve)         │  crypt headless
-        └───────────────┬──────────────────────────────┘  crypt serve
+        │             CLI / Commands                    │  cryptd serve
+        │   (cryptd serve, crypt solo/headless/connect)│  crypt solo
+        └───────────────┬──────────────────────────────┘  crypt connect
                         │ wires together
         ┌───────────────▼──────────────────────────────┐
         │          Play Mode Composition                │
@@ -342,30 +342,33 @@ flag allows explicit model selection.
 
 ---
 
-## Milestone 8 — Daemon Thin Slice
+## Milestone 8 — Server Thin Slice
 
-**Goal:** `cryptd serve` starts and handles a single MCP client connection.
-The full daemon topology (Section 4.2 of architecture spec) is exercised for
-the first time, even though session routing is not yet implemented.
+**Goal:** `cryptd serve` starts and handles a single client connection over
+Unix socket or TCP. The server exposes 15 MCP tools as JSON-RPC 2.0 over NDJSON.
+This is the game server — it does not know or care what client connects (CLI,
+Claude Code plugin, future web client). See DES-025 for design rationale.
 
 **What gets built:**
 
-- `cmd/crypt/serve.go` — `cryptd serve` subcommand:
-  - Starts daemon, listens on Unix socket
-  - Accepts one MCP client connection
-  - Dispatches all MCP tools to embedded engine
-  - Responds with same JSON as embedded mode
-- Auto-start: if socket is not present, `cryptd dm` starts the daemon
+- `internal/daemon/` — server package:
+  - `protocol.go` — JSON-RPC 2.0 types, MCP types, error codes
+  - `dispatcher.go` — maps 15 tool names → engine methods, combat orchestration
+  - `handler.go` — JSON-RPC routing (initialize, tools/list, tools/call), NDJSON framing
+  - `daemon.go` — Server struct, Unix socket lifecycle, signal handling
+- `cmd/crypt/serve.go` — `cryptd serve [--socket path] [--listen addr]`
+- TCP support alongside Unix sockets for remote play
 
 **Tests written:**
 
-- Integration (in-process): spawn daemon, connect one fake MCP client,
-  call `new_game` + `move` + `save_game`, verify JSON responses
-- E2E: spawn `cryptd serve` subprocess, connect minimal MCP client over
-  stdio, call each tool once, assert valid JSON, no stderr
+- Unit (17 tests): all 15 tools dispatched correctly, protocol errors, combat-blocked
+  actions, save/load, error code mapping
+- Integration (5 tests): socket-level initialize, multi-tool session, cross-connection
+  state persistence, TCP initialize, TCP game session
+- E2E: spawn `cryptd serve` subprocess, connect over socket, run 6-step game session
 
-**Done when:** MCP wire smoke tests pass. Daemon can handle a complete game
-session from a single client.
+**Done when:** Server handles a complete game session from a single client. All tests
+pass with `-race`. The `crypt` client binary is not yet built (future milestone).
 
 ---
 
@@ -473,7 +476,7 @@ M5  Full Lux HUD    Four-panel HUD; nav buttons; combat panel
 M6  Small Tier      SLMInterpreter + SLMNarrator (llama.cpp sidecar + SmolLM2-135M);
                     movement only; four-tier failover tested (DES-023)
 M7  Full SLM+Med    All verbs; solo mode complete; ollama medium tier; --model flag
-M8  Daemon Slice    crypt serve; single-session; MCP wire tests
+M8  Server Slice    cryptd serve; single-session; TCP + Unix socket; MCP wire tests
 M9  DM Thin Slice   LLM in the loop; crypt dm; SKILL.md rewrite
                     ← FIRST FULL DM MODE VALIDATION →
 M10 Daemon Routing  Multi-session; privilege gating; push notifications
