@@ -65,6 +65,9 @@ func TestSLMLoop_FallbackOnServerDown(t *testing.T) {
 		`{"type":"look"}`,
 		"You see a dimly lit chamber.",
 	})
+	// httptest.Server.Close is idempotent — safe to call even if the
+	// goroutine below already closed it.
+	t.Cleanup(func() { srv.Close() })
 
 	eng := engine.New(loadScenario(t))
 	state := newState(t, eng)
@@ -79,16 +82,21 @@ func TestSLMLoop_FallbackOnServerDown(t *testing.T) {
 	}
 
 	// Shut down the SLM server after the first response is consumed.
-	// The FakeSLMServer cycles through responses, so after "look" + narration,
-	// close the server to force fallback on subsequent calls.
 	go func() {
-		// Wait for at least one call, then close.
+		timeout := time.After(5 * time.Second)
+		ticker := time.NewTicker(10 * time.Millisecond)
+		defer ticker.Stop()
+
 		for {
-			if len(srv.Calls()) >= 1 {
-				srv.Close()
+			select {
+			case <-timeout:
 				return
+			case <-ticker.C:
+				if len(srv.Calls()) >= 1 {
+					srv.Close()
+					return
+				}
 			}
-			time.Sleep(10 * time.Millisecond)
 		}
 	}()
 

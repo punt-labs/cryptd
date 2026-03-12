@@ -58,9 +58,11 @@ func (f *FakeSLMServer) handleChatCompletions(w http.ResponseWriter, r *http.Req
 	f.mu.Unlock()
 
 	if delay > 0 {
+		timer := time.NewTimer(delay)
 		select {
-		case <-time.After(delay):
+		case <-timer.C:
 		case <-r.Context().Done():
+			timer.Stop()
 			return
 		}
 	}
