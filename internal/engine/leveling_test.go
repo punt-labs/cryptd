@@ -1,6 +1,7 @@
 package engine_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/punt-labs/cryptd/internal/engine"
@@ -134,6 +135,27 @@ func TestCheckLevelUp_PriestGainsMP(t *testing.T) {
 	assert.Equal(t, 3, result.MPGain)
 	assert.Equal(t, 1, result.StatGain["WIS"])
 	assert.Equal(t, 1, result.StatGain["CHA"])
+}
+
+func TestNextLevelXP(t *testing.T) {
+	tests := []struct {
+		class string
+		level int
+		want  int
+	}{
+		{"fighter", 1, 20},
+		{"fighter", 9, 6400},
+		{"fighter", 10, 0}, // max level
+		{"mage", 1, 30},
+		{"bard", 1, 0},      // unknown class
+		{"fighter", 0, 0},   // level 0 invalid
+		{"fighter", -1, 0},  // negative level
+	}
+	for _, tt := range tests {
+		t.Run(tt.class+fmt.Sprintf("_L%d", tt.level), func(t *testing.T) {
+			assert.Equal(t, tt.want, engine.NextLevelXP(tt.class, tt.level))
+		})
+	}
 }
 
 func TestCheckLevelUp_ThiefStatGains(t *testing.T) {

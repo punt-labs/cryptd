@@ -79,6 +79,13 @@ func NewLoop(eng *engine.Engine, interp model.CommandInterpreter, narr model.Nar
 	return &Loop{eng: eng, interp: interp, narr: narr, rend: rend}
 }
 
+// enrichForDisplay populates transient display fields on the state before rendering.
+func (l *Loop) enrichForDisplay(state *model.GameState) {
+	for i := range state.Party {
+		state.Party[i].NextLevelXP = engine.NextLevelXP(state.Party[i].Class, state.Party[i].Level)
+	}
+}
+
 // Run drives the game loop until the player quits or the context is cancelled.
 func (l *Loop) Run(ctx context.Context, state *model.GameState) error {
 	ctx, cancel := context.WithCancel(ctx)
@@ -89,6 +96,7 @@ func (l *Loop) Run(ctx context.Context, state *model.GameState) error {
 	if err != nil {
 		return err
 	}
+	l.enrichForDisplay(state)
 	if err := l.rend.Render(ctx, *state, narration); err != nil {
 		return err
 	}
@@ -122,6 +130,7 @@ func (l *Loop) Run(ctx context.Context, state *model.GameState) error {
 				return err
 			}
 
+			l.enrichForDisplay(state)
 			if err := l.rend.Render(ctx, *state, narration); err != nil {
 				return err
 			}
