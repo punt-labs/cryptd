@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **Two-binary split (DES-025):** `cryptd` (server) and `crypt` (client) are now separate binaries. `cryptd serve` runs the game server; `crypt connect/solo/headless/autoplay` are client commands. `crypt connect` auto-starts `cryptd serve` when the socket is not present.
+- `crypt connect [--socket <path> | --addr <host:port>]` — interactive CLI client connecting to a running `cryptd serve` over JSON-RPC 2.0. Maps text commands (go north, take sword, attack) to MCP tool calls and formats structured responses for human-readable display. Auto-starts the server on local Unix sockets if not already running.
+- `internal/scenariodir` package — canonical scenario ID resolution with path-traversal protection, eliminating duplication between CLI and daemon
+- `internal/daemon.DefaultSocketPath()` — shared default socket path for both server and client binaries
 - `cryptd serve [--socket <path> | --listen <addr>]` — daemon serving 15 MCP tools as JSON-RPC 2.0 over NDJSON; Unix socket (default `~/.crypt/daemon.sock`) or TCP transport; single-connection, signal-handled shutdown, stale socket cleanup
 - `internal/daemon` package: protocol types, dispatcher (maps tool names → engine methods with combat auto-processing and level-up checks), JSON-RPC handler (initialize, tools/list, tools/call), and server with Unix socket lifecycle
 - Daemon error mapping: engine typed errors → JSON-RPC error codes (-32602 invalid params, -32001 state blocked, -32002 game over, -32003 no active game)

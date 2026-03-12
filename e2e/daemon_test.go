@@ -17,7 +17,7 @@ import (
 )
 
 func TestDaemon_ServeAndCallTools(t *testing.T) {
-	bin := binary(t)
+	bin := serverBinary(t)
 	root := repoRoot(t)
 
 	// Use a short socket path (macOS 104-byte limit).

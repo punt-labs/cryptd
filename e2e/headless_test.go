@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -14,27 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// binary returns the path to the compiled cryptd binary, building it if needed.
-func binary(t *testing.T) string {
-	t.Helper()
-	bin := filepath.Join(t.TempDir(), "cryptd")
-	cmd := exec.Command("go", "build", "-o", bin, "./cmd/crypt")
-	cmd.Dir = repoRoot(t)
-	out, err := cmd.CombinedOutput()
-	require.NoError(t, err, "build failed: %s", out)
-	return bin
-}
-
-func repoRoot(t *testing.T) string {
-	t.Helper()
-	// Navigate up from e2e/ to repo root.
-	wd, err := os.Getwd()
-	require.NoError(t, err)
-	return filepath.Dir(wd)
-}
-
 func TestHeadless_MinimalRunCommands(t *testing.T) {
-	bin := binary(t)
+	bin := clientBinary(t)
 	root := repoRoot(t)
 
 	// Provide headless commands via stdin.
@@ -51,7 +31,7 @@ func TestHeadless_MinimalRunCommands(t *testing.T) {
 	cmd.Stderr = &stderr
 
 	err := cmd.Run()
-	require.NoError(t, err, "cryptd headless exited non-zero; stderr: %s", stderr.String())
+	require.NoError(t, err, "crypt headless exited non-zero; stderr: %s", stderr.String())
 
 	out := stdout.String()
 	assert.Contains(t, out, "goblin_lair", "expected goblin_lair in output after moving south")

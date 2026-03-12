@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/punt-labs/cryptd/internal/daemon"
+	"github.com/punt-labs/cryptd/internal/scenariodir"
 )
 
 func runServe(args []string) {
@@ -28,11 +29,7 @@ func runServe(args []string) {
 		os.Exit(1)
 	}
 
-	scenarioDir := os.Getenv("CRYPT_SCENARIO_DIR")
-	if scenarioDir == "" {
-		scenarioDir = "scenarios"
-	}
-	absScenarioDir, err := filepath.Abs(scenarioDir)
+	absScenarioDir, err := filepath.Abs(scenariodir.Dir())
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
@@ -44,7 +41,12 @@ func runServe(args []string) {
 	} else {
 		sock := *socketPath
 		if sock == "" {
-			sock = defaultSocketPath()
+			var err error
+			sock, err = daemon.DefaultSocketPath()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: cannot determine home directory: %v\nUse --socket or --listen to specify an address explicitly.\n", err)
+				os.Exit(1)
+			}
 		}
 		srv = daemon.NewServer(sock, absScenarioDir)
 	}
@@ -54,13 +56,3 @@ func runServe(args []string) {
 	}
 }
 
-// defaultSocketPath returns ~/.crypt/daemon.sock.
-// Only called when --listen is not set, so $HOME must be available.
-func defaultSocketPath() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: cannot determine home directory: %v\nUse --socket or --listen to specify an address explicitly.\n", err)
-		os.Exit(1)
-	}
-	return filepath.Join(home, ".crypt", "daemon.sock")
-}

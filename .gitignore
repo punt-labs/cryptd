@@ -1,5 +1,6 @@
-# Build output
-cryptd
+# Build output (root-only, not cmd/ subdirs)
+/cryptd
+/crypt
 dist/
 
 # Go

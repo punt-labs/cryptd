@@ -1,6 +1,6 @@
 # cryptd
 
-Game engine and server for [crypt](https://github.com/punt-labs/crypt), a text adventure game playable via Claude Code, CLI, or (future) web client.
+Game engine and server for [crypt](https://github.com/punt-labs/crypt), a text adventure game playable via Claude Code, CLI, or (future) web client. Produces two binaries: `cryptd` (server) and `crypt` (client).
 
 ## Principal Engineer Mindset
 
@@ -8,7 +8,7 @@ There is no such thing as a "pre-existing" issue. If you see a problem — in co
 
 ## Project State
 
-**M0 (foundation) and M1 (data contracts) are complete. M2 (thin E2E slice) is substantially complete on `feat/m2-thin-e2e`. M8 (server thin slice) in progress.**
+**M0 (foundation) and M1 (data contracts) are complete. M2 (thin E2E slice) is substantially complete. M8 (server thin slice) is complete.**
 
 Two binaries (DES-025): `cryptd` (server) and `crypt` (client). Current subcommands: `cryptd serve`, `cryptd headless`, `cryptd solo`, `cryptd autoplay`, `cryptd validate`. The `crypt` client binary will be split out in a future milestone.
 
@@ -61,7 +61,7 @@ type Renderer interface {
 Dependencies flow strictly downward. This is a build-order red line:
 
 ```text
-CLI / Commands  (cmd/crypt/)
+CLI / Commands  (cmd/cryptd/, cmd/crypt/)
     └── Game Loop  (internal/game/)  — wires Interpreter + Narrator + Renderer
             ├── Interpreters  (internal/interpreter/)
             ├── Narrators     (internal/narrator/)
@@ -76,7 +76,8 @@ The engine knows nothing about interpreters. Interpreters know nothing about nar
 
 | Package | What It Does |
 |---------|-------------|
-| `cmd/crypt` | CLI entry point; wires play modes and server |
+| `cmd/cryptd` | Server binary entry point; `cryptd serve`, `cryptd validate` |
+| `cmd/crypt` | Client binary entry point; `crypt connect`, `crypt solo`, `crypt headless`, `crypt autoplay` |
 | `cmd/dump-mcp-schema` | Generates MCP schema JSON for CI contract check |
 | `internal/daemon` | Game server: JSON-RPC 2.0 handler, tool dispatcher, Unix socket/TCP listener |
 | `internal/engine` | Deterministic game rules: `NewGame`, `Move`, `Look` |
@@ -87,6 +88,7 @@ The engine knows nothing about interpreters. Interpreters know nothing about nar
 | `internal/renderer` | `CLIRenderer` — stdout/stdin text interface |
 | `internal/model` | All data types: `GameState`, `Character`, `EngineAction`, `EngineEvent`, interfaces |
 | `internal/scenario` | YAML scenario parser and validator |
+| `internal/scenariodir` | Scenario ID resolution with path-traversal protection |
 | `internal/save` | JSON save/load with `schema_version` and forward compat |
 | `internal/dice` | Dice notation parser: `NdS`, `NdS+M`, `NdS-M` |
 | `internal/testutil` | Test doubles: `FakeLLMInterpreter`, `FakeLLMNarrator`, `FakeSLMServer`, `FakeLuxServer`, `ScriptRunner` |
@@ -129,7 +131,7 @@ go test -race -count=1 ./...
 go test -race -tags integration -count=1 ./...
 go test -cover -coverprofile=coverage.out ./internal/engine/...
 go tool cover -func=coverage.out   # engine must be >= 90%
-go build -o cryptd ./cmd/crypt && go test -tags e2e ./e2e/...
+make build && go test -tags e2e ./e2e/...
 staticcheck ./...
 npx markdownlint-cli2 "**/*.md" "#node_modules"
 ```
