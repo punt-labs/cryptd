@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -59,7 +60,7 @@ func probeEndpoint(ctx context.Context, ep Endpoint, timeout time.Duration) *Run
 	if err != nil {
 		return nil
 	}
-	base.Path = base.Path + ep.HealthPath
+	base.Path = strings.TrimRight(base.Path, "/") + ep.HealthPath
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base.String(), nil)
 	if err != nil {

@@ -147,6 +147,30 @@ func TestProbe_ServerError(t *testing.T) {
 	assert.Nil(t, r)
 }
 
+func TestProbe_TrailingSlashInBaseURL(t *testing.T) {
+	// Use a strict handler that only responds to the exact path /api/tags.
+	// http.ServeMux auto-redirects //api/tags → /api/tags, which would mask
+	// the bug. This handler rejects any path that isn't exactly /api/tags.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/tags" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"models":[{"name":"smollm2:135m"}]}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	// Trailing slash on BaseURL should not produce //api/tags.
+	endpoints := []inference.Endpoint{
+		{Name: "ollama", BaseURL: srv.URL + "/", HealthPath: "/api/tags", ModelExtractor: inference.OllamaModels},
+	}
+
+	r := inference.Probe(context.Background(), endpoints, time.Second)
+	require.NotNil(t, r, "trailing slash must not break probe")
+	assert.Equal(t, "smollm2:135m", r.Model)
+}
+
 func TestDefaultEndpoints_ReturnsCopy(t *testing.T) {
 	a := inference.DefaultEndpoints()
 	b := inference.DefaultEndpoints()
