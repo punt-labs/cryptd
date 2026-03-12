@@ -313,6 +313,74 @@ func TestLux_RenderReturnsTransportError(t *testing.T) {
 	assert.Contains(t, err.Error(), "write show")
 }
 
+func TestLux_ExitsInScene(t *testing.T) {
+	lux, fake := newLuxRenderer()
+
+	state := baseState("entrance")
+	state.Dungeon.Exits = []string{"north", "south"}
+	require.NoError(t, lux.Render(context.Background(), state, "You arrive."))
+
+	scene := fake.Calls()[0].Payload.(renderer.LuxScene)
+	assert.Equal(t, []string{"north", "south"}, scene.Exits)
+}
+
+func TestLux_ExplorationActionsInScene(t *testing.T) {
+	lux, fake := newLuxRenderer()
+
+	state := baseState("entrance")
+	state.Dungeon.Exits = []string{"north", "east"}
+	require.NoError(t, lux.Render(context.Background(), state, "You arrive."))
+
+	scene := fake.Calls()[0].Payload.(renderer.LuxScene)
+	assert.Equal(t, []string{"north", "east", "look", "inventory"}, scene.Actions)
+}
+
+func TestLux_CombatActionsInScene(t *testing.T) {
+	lux, fake := newLuxRenderer()
+
+	state := baseState("goblin_lair")
+	state.Dungeon.Exits = []string{"north"}
+	state.Dungeon.Combat = model.CombatState{
+		Active: true,
+		Enemies: []model.EnemyInstance{
+			{Name: "Goblin", HP: 8, MaxHP: 8},
+		},
+	}
+	require.NoError(t, lux.Render(context.Background(), state, "A goblin attacks!"))
+
+	scene := fake.Calls()[0].Payload.(renderer.LuxScene)
+	assert.Equal(t, []string{"attack", "defend", "flee", "cast"}, scene.Actions)
+	assert.Equal(t, []string{"north"}, scene.Exits, "exits should still be present even in combat")
+}
+
+func TestLux_ActionsInUpdate(t *testing.T) {
+	lux, fake := newLuxRenderer()
+
+	state := baseState("entrance")
+	state.Dungeon.Exits = []string{"south"}
+	require.NoError(t, lux.Render(context.Background(), state, "Initial."))
+
+	// Second render in same room → update.
+	require.NoError(t, lux.Render(context.Background(), state, "You look around."))
+
+	calls := fake.Calls()
+	require.Len(t, calls, 2)
+	update := calls[1].Payload.(renderer.LuxUpdate)
+	assert.Equal(t, []string{"south", "look", "inventory"}, update.Actions)
+}
+
+func TestLux_NoExitsEmptySlice(t *testing.T) {
+	lux, fake := newLuxRenderer()
+
+	state := baseState("dead_end")
+	// No exits set.
+	require.NoError(t, lux.Render(context.Background(), state, "A dead end."))
+
+	scene := fake.Calls()[0].Payload.(renderer.LuxScene)
+	assert.Empty(t, scene.Exits)
+	assert.Equal(t, []string{"look", "inventory"}, scene.Actions)
+}
+
 type failingWriter struct{}
 
 func (f *failingWriter) Write([]byte) (int, error) {

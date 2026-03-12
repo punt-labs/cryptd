@@ -27,6 +27,8 @@ type LuxScene struct {
 	Narration string       `json:"narration"`
 	InCombat  bool         `json:"in_combat"`
 	Log       []string     `json:"log,omitempty"`
+	Exits     []string     `json:"exits,omitempty"`
+	Actions   []string     `json:"actions,omitempty"`
 }
 
 // LuxHero is the party member display state (Wizardry I showed name, class,
@@ -53,10 +55,11 @@ type LuxEnemy struct {
 // LuxUpdate is an incremental patch sent via Update for non-scene-changing
 // events (damage ticks, log appends, HP changes).
 type LuxUpdate struct {
-	Type    string `json:"type"`              // "narration" (only variant for now)
-	Content string `json:"content,omitempty"` // narration text or log line
-	Hero    *LuxHero  `json:"hero,omitempty"`
+	Type    string     `json:"type"`              // "narration" (only variant for now)
+	Content string     `json:"content,omitempty"` // narration text or log line
+	Hero    *LuxHero   `json:"hero,omitempty"`
 	Enemies []LuxEnemy `json:"enemies,omitempty"`
+	Actions []string   `json:"actions,omitempty"`
 }
 
 // Lux renders to the Lux ImGui display surface via MCP tool calls.
@@ -120,6 +123,21 @@ func titleCase(s string) string {
 	return strings.ToUpper(s[:1]) + s[1:]
 }
 
+// availableActions returns the action labels the frontend should present
+// as buttons. In combat: attack/defend/flee/cast. Outside combat: movement
+// directions plus look/inventory.
+func availableActions(state model.GameState) []string {
+	if state.Dungeon.Combat.Active {
+		return []string{"attack", "defend", "flee", "cast"}
+	}
+	actions := make([]string, 0, len(state.Dungeon.Exits)+2)
+	for _, dir := range state.Dungeon.Exits {
+		actions = append(actions, dir)
+	}
+	actions = append(actions, "look", "inventory")
+	return actions
+}
+
 // buildScene constructs the full LuxScene for a show() call.
 func buildScene(state model.GameState, narration string) LuxScene {
 	scene := LuxScene{
@@ -164,6 +182,9 @@ func buildScene(state model.GameState, narration string) LuxScene {
 		scene.Log = append(scene.Log, entry.Text)
 	}
 
+	scene.Exits = state.Dungeon.Exits
+	scene.Actions = availableActions(state)
+
 	return scene
 }
 
@@ -201,6 +222,8 @@ func buildUpdate(state model.GameState, narration string) LuxUpdate {
 			}
 		}
 	}
+
+	update.Actions = availableActions(state)
 
 	return update
 }

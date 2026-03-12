@@ -18,6 +18,7 @@ type DungeonState struct {
 	VisitedRooms []string             `json:"visited_rooms"`
 	RoomState    map[string]RoomState `json:"room_state"`
 	Combat       CombatState          `json:"combat"`
+	Exits        []string             `json:"-"` // transient; set by game loop for display
 }
 
 // EnemyInstance is a mutable enemy in active combat (cloned from scenario template).
