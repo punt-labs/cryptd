@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- DES-024: Inference client — generic text interface (returns raw text, callers own JSON parsing)
+- `internal/inference`: OpenAI-compatible HTTP client for `/v1/chat/completions` (works with llama.cpp and ollama)
+- `FakeSLMServer` upgraded to OpenAI-compatible API with call recording and `/v1/models` endpoint
 - DES-023: Four-tier inference architecture (tiny/small/medium/large) with graceful failover chain
 - Room descriptions: `description_seed` wired through event system, displayed on move/look with exits and visible items
 - `unix-catacombs.yaml` scenario: 9-room UNIX-themed dungeon with 3 enemies, 7 items

@@ -77,6 +77,7 @@ The engine knows nothing about interpreters. Interpreters know nothing about nar
 | `cmd/crypt` | CLI entry point; wires play modes |
 | `cmd/dump-mcp-schema` | Generates MCP schema JSON for CI contract check |
 | `internal/engine` | Deterministic game rules: `NewGame`, `Move`, `Look` |
+| `internal/inference` | OpenAI-compatible HTTP client for `/v1/chat/completions` (DES-024) |
 | `internal/game` | Game loop: drives engine + interpreter + narrator + renderer |
 | `internal/interpreter` | `RulesInterpreter` — keyword/regex command parsing |
 | `internal/narrator` | `TemplateNarrator` — fixed-template narration |
