@@ -174,8 +174,33 @@ func TestProbe_TrailingSlashInBaseURL(t *testing.T) {
 func TestDefaultEndpoints_ReturnsCopy(t *testing.T) {
 	a := inference.DefaultEndpoints()
 	b := inference.DefaultEndpoints()
+
+	require.NotEmpty(t, a, "default endpoints must contain at least one endpoint")
+	require.NotEmpty(t, a[0].Preferred, "default endpoint must have at least one preferred model")
+
+	// Mutating scalar field must not leak between copies.
 	a[0].Name = "mutated"
-	assert.Equal(t, "ollama", b[0].Name, "mutation of one copy must not affect another")
+	assert.Equal(t, "ollama", b[0].Name, "mutation of one copy must not affect another (Name)")
+
+	// Mutating slice element must also not leak between copies.
+	originalPreferred := b[0].Preferred[0]
+	a[0].Preferred[0] = "mutated-model"
+	assert.Equal(t, originalPreferred, b[0].Preferred[0], "mutation of one copy must not affect another (Preferred)")
+}
+
+func TestProbe_NilModelListerSkipsEndpoint(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"models":[{"name":"smollm2:135m"}]}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	endpoints := []inference.Endpoint{
+		{Name: "no-lister", BaseURL: srv.URL, HealthPath: "/api/tags"},
+	}
+
+	r := inference.Probe(context.Background(), endpoints, time.Second)
+	assert.Nil(t, r, "nil ModelLister should be treated as unavailable")
 }
 
 func TestProbe_PrefersHigherPriorityModel(t *testing.T) {

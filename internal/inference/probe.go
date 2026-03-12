@@ -34,10 +34,16 @@ var defaultEndpoints = []Endpoint{
 }
 
 // DefaultEndpoints returns the well-known local endpoints for inference
-// runtimes, in priority order (ollama first, then llama.cpp).
+// runtimes, in priority order (ollama first, then llama.cpp). Each call
+// returns a deep copy safe to mutate.
 func DefaultEndpoints() []Endpoint {
 	eps := make([]Endpoint, len(defaultEndpoints))
 	copy(eps, defaultEndpoints)
+	for i := range eps {
+		if len(eps[i].Preferred) > 0 {
+			eps[i].Preferred = append([]string(nil), eps[i].Preferred...)
+		}
+	}
 	return eps
 }
 
@@ -89,6 +95,10 @@ func probeEndpoint(ctx context.Context, ep Endpoint, timeout time.Duration) *Run
 	const maxBody = 1 << 20 // 1 MiB
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBody))
 	if err != nil {
+		return nil
+	}
+
+	if ep.ModelLister == nil {
 		return nil
 	}
 
