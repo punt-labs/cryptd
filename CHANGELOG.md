@@ -15,6 +15,8 @@ All notable changes to this project will be documented in this file.
 - Eval harness: rules-first routing mirroring runtime behavior; realistic game state for context injection; accuracy improved from 63.5% to 98.4%
 - `docs/slm-improvement.md`: strategy document for SLM accuracy improvement (context injection, prompt engineering, fine-tuning, model scaling)
 - Rules interpreter autocorrect: typos within edit distance 1 of known verbs are corrected deterministically (e.g. `attacl` → `attack`, `tke` → `take`); only verbs 3+ characters, zero latency, no SLM call needed
+- Rules interpreter: `descend` → move down, `ascend` → move up (directional synonyms)
+- SLM system prompt: few-shot examples, stronger unknown guidance ("do not guess"), item ID resolution instructions referencing game state context; eval accuracy 98.4% → 100%
 
 ### Changed
 

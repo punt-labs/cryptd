@@ -111,6 +111,14 @@ func (r *Rules) Interpret(_ context.Context, input string, _ model.GameState) (m
 		return model.EngineAction{Type: "move", Direction: verb}, nil
 	}
 
+	// Directional synonyms.
+	if verb == "descend" && len(fields) == 1 {
+		return model.EngineAction{Type: "move", Direction: "down"}, nil
+	}
+	if verb == "ascend" && len(fields) == 1 {
+		return model.EngineAction{Type: "move", Direction: "up"}, nil
+	}
+
 	// Autocorrect typos (e.g. "attacl" → "attack") before dispatching.
 	verb = autocorrect(verb)
 
