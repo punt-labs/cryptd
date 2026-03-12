@@ -82,10 +82,11 @@ func runSolo(args []string) {
 	modelFlag := fs.String("model", "", "model name (auto-detected if omitted)")
 	serverURL := fs.String("server", "", "inference server URL (auto-detected if omitted)")
 	timeoutFlag := fs.Duration("timeout", 5*time.Second, "inference request timeout")
+	luxMode := fs.Bool("lux", false, "use Lux JSON-lines display protocol on stdout/stdin")
 	_ = fs.Parse(args)
 
 	if *scenarioID == "" {
-		fmt.Fprintln(os.Stderr, "usage: cryptd solo --scenario <id> [--model <name>] [--server <url>] [--timeout <duration>]")
+		fmt.Fprintln(os.Stderr, "usage: cryptd solo --scenario <id> [--lux] [--model <name>] [--server <url>] [--timeout <duration>]")
 		os.Exit(1)
 	}
 
@@ -120,7 +121,15 @@ func runSolo(args []string) {
 		fmt.Fprintln(os.Stderr, "No inference server found — using rules+templates")
 	}
 
-	loop := game.NewLoop(eng, interp, narr, renderer.NewCLI(os.Stdout, os.Stdin))
+	var rend model.Renderer
+	if *luxMode {
+		transport := renderer.NewJSONTransport(os.Stdout, os.Stdin)
+		rend = renderer.NewLux(transport)
+	} else {
+		rend = renderer.NewCLI(os.Stdout, os.Stdin)
+	}
+
+	loop := game.NewLoop(eng, interp, narr, rend)
 	if err := loop.Run(context.Background(), &state); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
