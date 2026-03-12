@@ -1219,3 +1219,44 @@ Each tier degrades silently with a one-time warning:
 
 The engine receives the same `EngineAction` structs regardless of which interpreter
 produced them. The game is always playable.
+
+---
+
+## DES-024: Inference Client — Generic Text Interface
+
+**Date:** 2026-03-11
+**Status:** SETTLED
+**Topic:** How the inference HTTP client exposes model responses to callers
+
+### Design
+
+`internal/inference.Client` provides a single method:
+
+```go
+func (c *Client) ChatCompletion(ctx context.Context, messages []Message, opts *Options) (string, error)
+```
+
+It returns raw text. Callers (SLMInterpreter, SLMNarrator) own their own JSON parsing,
+error recovery, and any retry logic around malformed output. The client handles HTTP
+transport, timeouts, and the OpenAI-compatible `/v1/chat/completions` wire format.
+
+### Alternatives Considered
+
+**Typed generic client** — `ChatCompletion[T any](ctx, messages, opts) (T, error)` would
+unmarshal the model's response directly into the caller's type. Rejected because:
+
+- Only two call sites (interpreter and narrator), so the boilerplate savings are minimal
+- Couples the inference package to Go generics patterns for little benefit
+- JSON parsing failures need caller-specific recovery (interpreter falls back to
+  `RulesInterpreter`; narrator falls back to `TemplateNarrator`) — embedding parsing
+  inside the generic method would obscure this
+
+**Per-caller clients** — separate `InterpreterClient` and `NarratorClient` types with
+baked-in response schemas. Rejected because it duplicates the HTTP transport logic and
+makes the inference package aware of game-layer types, violating dependency direction.
+
+### Outcome
+
+The inference package stays small and decoupled. It knows about HTTP and the OpenAI
+chat completions API. It knows nothing about game actions, events, or narration. Callers
+translate between raw text and their domain types.
