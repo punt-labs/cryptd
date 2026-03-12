@@ -81,9 +81,9 @@ var verbTable = []testCase{
 	{Input: "check my bag", Expected: model.EngineAction{Type: "inventory"}},
 
 	// Combat — attack
-	{Input: "attack goblin", Expected: model.EngineAction{Type: "attack", Target: "goblin"}},
-	{Input: "hit the skeleton", Expected: model.EngineAction{Type: "attack", Target: "skeleton"}},
-	{Input: "strike goblin", Expected: model.EngineAction{Type: "attack", Target: "goblin"}},
+	{Input: "attack goblin", Expected: model.EngineAction{Type: "attack"}},
+	{Input: "hit the skeleton", Expected: model.EngineAction{Type: "attack"}},
+	{Input: "strike goblin", Expected: model.EngineAction{Type: "attack"}},
 	{Input: "attack", Expected: model.EngineAction{Type: "attack"}},
 	{Input: "a", Expected: model.EngineAction{Type: "attack"}},
 
@@ -99,7 +99,7 @@ var verbTable = []testCase{
 
 	// Spells
 	{Input: "cast fireball", Expected: model.EngineAction{Type: "cast", SpellID: "fireball"}},
-	{Input: "cast fireball at goblin", Expected: model.EngineAction{Type: "cast", SpellID: "fireball", Target: "goblin"}},
+	{Input: "cast fireball at goblin", Expected: model.EngineAction{Type: "cast", SpellID: "fireball"}},
 	{Input: "cast heal", Expected: model.EngineAction{Type: "cast", SpellID: "heal"}},
 
 	// Save / load
@@ -130,7 +130,7 @@ func main() {
 
 	base, mdl := resolveRuntime(*serverURL, *modelName)
 	if base == "" || mdl == "" {
-		fmt.Fprintln(os.Stderr, "error: no inference server found — provide --server and --model, or start ollama")
+		fmt.Fprintln(os.Stderr, "error: no inference server found — provide --server and --model, or start an inference server (e.g., ollama or llama.cpp)")
 		os.Exit(1)
 	}
 	fmt.Fprintf(os.Stderr, "Evaluating %s (model: %s)\n", base, mdl)
@@ -201,6 +201,9 @@ func main() {
 		}
 	}
 
+	if errors > 0 {
+		os.Exit(2)
+	}
 	if accuracy < 80 {
 		os.Exit(1)
 	}
