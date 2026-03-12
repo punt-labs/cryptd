@@ -63,7 +63,7 @@ demo-save-load: build                      ## Save to slot, reload
 	CRYPT_SCENARIO_DIR=$(SCENARIO_DIR) ./crypt autoplay --scenario minimal --script $(DEMO_DIR)/save-and-reload.txt
 
 demo-unix-catacombs: build                 ## Full 9-room UNIX-themed dungeon crawl
-	CRYPT_SCENARIO_DIR=$(SCENARIO_DIR) ./crypt autoplay --scenario unix-catacombs --script $(DEMO_DIR)/unix-catacombs.txt
+	./crypt autoplay --scenario unix-catacombs --script $(DEMO_DIR)/unix-catacombs.txt
 
 ##@ Demos — Advanced
 demo-solo: ollama-setup build              ## Interactive solo mode with SLM narration
