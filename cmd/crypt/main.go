@@ -149,8 +149,8 @@ func resolveRuntime(serverURL, modelName string) (string, string) {
 	var endpoints []inference.Endpoint
 	if serverURL != "" {
 		endpoints = []inference.Endpoint{
-			{Name: "user-server", BaseURL: serverURL, HealthPath: "/api/tags", ModelExtractor: inference.OllamaModels},
-			{Name: "user-server", BaseURL: serverURL, HealthPath: "/v1/models", ModelExtractor: inference.OpenAIModels},
+			{Name: "user-server", BaseURL: serverURL, HealthPath: "/api/tags", ModelLister: inference.OllamaModels, Preferred: inference.PreferredModels},
+			{Name: "user-server", BaseURL: serverURL, HealthPath: "/v1/models", ModelLister: inference.OpenAIModels},
 		}
 	} else {
 		endpoints = inference.DefaultEndpoints()
