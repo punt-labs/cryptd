@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/punt-labs/cryptd/internal/inference"
@@ -41,6 +40,8 @@ Supported action types and their fields:
 - {"type":"defend"}
 - {"type":"flee"}
 - {"type":"cast","spell_id":"<spell>","target":"<enemy>"}
+- {"type":"save","target":"<slot_name>"}
+- {"type":"load","target":"<slot_name>"}
 - {"type":"help"}
 - {"type":"quit"}
 - {"type":"unknown"}
@@ -60,6 +61,12 @@ var validTypes = map[string]bool{
 	"unknown": true,
 }
 
+// validDirections is the set of recognized movement directions.
+var validDirections = map[string]bool{
+	"north": true, "south": true, "east": true, "west": true,
+	"up": true, "down": true,
+}
+
 // slmResponse is the JSON structure expected from the SLM.
 type slmResponse struct {
 	Type      string `json:"type"`
@@ -70,21 +77,27 @@ type slmResponse struct {
 }
 
 // Interpret sends the player's input to the SLM and parses the response
-// into an EngineAction. Falls back to the Rules interpreter on any failure.
+// into an EngineAction. Falls back to the Rules interpreter on any failure
+// except context cancellation, which is propagated to the caller.
 func (s *SLM) Interpret(ctx context.Context, input string, state model.GameState) (model.EngineAction, error) {
+	if err := ctx.Err(); err != nil {
+		return model.EngineAction{}, err
+	}
+
 	temp := 0.0
 	resp, err := s.client.ChatCompletion(ctx, []inference.Message{
 		{Role: inference.RoleSystem, Content: systemPrompt},
 		{Role: inference.RoleUser, Content: input},
 	}, &inference.Options{Temperature: &temp, MaxTokens: 100})
 	if err != nil {
-		log.Printf("slm interpreter: inference error, falling back to rules: %v", err)
+		if ctx.Err() != nil {
+			return model.EngineAction{}, ctx.Err()
+		}
 		return s.fallback.Interpret(ctx, input, state)
 	}
 
 	action, err := parseResponse(resp)
 	if err != nil {
-		log.Printf("slm interpreter: parse error, falling back to rules: %v", err)
 		return s.fallback.Interpret(ctx, input, state)
 	}
 
@@ -111,6 +124,10 @@ func parseResponse(resp string) (model.EngineAction, error) {
 		return model.EngineAction{}, fmt.Errorf("unknown action type from SLM: %q", parsed.Type)
 	}
 
+	if err := validateFields(parsed); err != nil {
+		return model.EngineAction{}, err
+	}
+
 	return model.EngineAction{
 		Type:      parsed.Type,
 		Direction: parsed.Direction,
@@ -118,4 +135,23 @@ func parseResponse(resp string) (model.EngineAction, error) {
 		Target:    parsed.Target,
 		SpellID:   parsed.SpellID,
 	}, nil
+}
+
+// validateFields checks that required fields are present for each action type.
+func validateFields(r slmResponse) error {
+	switch r.Type {
+	case "move":
+		if !validDirections[r.Direction] {
+			return fmt.Errorf("move requires valid direction, got %q", r.Direction)
+		}
+	case "take", "drop", "equip", "examine":
+		if r.ItemID == "" {
+			return fmt.Errorf("%s requires item_id", r.Type)
+		}
+	case "cast":
+		if r.SpellID == "" {
+			return fmt.Errorf("cast requires spell_id")
+		}
+	}
+	return nil
 }
