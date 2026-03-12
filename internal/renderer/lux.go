@@ -60,6 +60,7 @@ type LuxUpdate struct {
 	Hero    *LuxHero   `json:"hero,omitempty"`
 	Enemies []LuxEnemy `json:"enemies,omitempty"`
 	Actions []string   `json:"actions,omitempty"`
+	Log     []string   `json:"log,omitempty"` // recent log entries for narration panel
 }
 
 // Lux renders to the Lux ImGui display surface via MCP tool calls.
@@ -222,6 +223,16 @@ func buildUpdate(state model.GameState, narration string) LuxUpdate {
 	}
 
 	update.Actions = availableActions(state)
+
+	// Include recent log entries so the frontend can refresh its narration panel.
+	logLen := len(state.AdventureLog)
+	start := logLen - 5
+	if start < 0 {
+		start = 0
+	}
+	for _, entry := range state.AdventureLog[start:] {
+		update.Log = append(update.Log, entry.Text)
+	}
 
 	return update
 }

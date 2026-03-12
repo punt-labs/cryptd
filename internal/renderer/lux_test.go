@@ -277,6 +277,49 @@ func TestLux_LogTruncatedToFive(t *testing.T) {
 	assert.Equal(t, "xxxx", scene.Log[0]) // entries 4-8 (0-indexed 3-7)
 }
 
+func TestLux_LogEntriesInUpdate(t *testing.T) {
+	lux, fake := newLuxRenderer()
+
+	state := baseState("entrance")
+	state.AdventureLog = []model.LogEntry{
+		{Text: "Game started."},
+		{Text: "Moved to entrance."},
+	}
+	require.NoError(t, lux.Render(context.Background(), state, "You arrive."))
+
+	// Add a log entry and render again (same room → update).
+	state.AdventureLog = append(state.AdventureLog, model.LogEntry{Text: "Looked around."})
+	require.NoError(t, lux.Render(context.Background(), state, "You look around."))
+
+	calls := fake.Calls()
+	require.Len(t, calls, 2)
+	update := calls[1].Payload.(renderer.LuxUpdate)
+	require.Len(t, update.Log, 3)
+	assert.Equal(t, "Game started.", update.Log[0])
+	assert.Equal(t, "Looked around.", update.Log[2])
+}
+
+func TestLux_UpdateLogTruncatedToFive(t *testing.T) {
+	lux, fake := newLuxRenderer()
+
+	state := baseState("entrance")
+	require.NoError(t, lux.Render(context.Background(), state, "Initial."))
+
+	// Add 8 log entries and render (same room → update).
+	for i := range 8 {
+		state.AdventureLog = append(state.AdventureLog, model.LogEntry{
+			Text: strings.Repeat("y", i+1),
+		})
+	}
+	require.NoError(t, lux.Render(context.Background(), state, "Later."))
+
+	calls := fake.Calls()
+	require.Len(t, calls, 2)
+	update := calls[1].Payload.(renderer.LuxUpdate)
+	require.Len(t, update.Log, 5, "update log should be truncated to last 5 entries")
+	assert.Equal(t, "yyyy", update.Log[0])
+}
+
 // Performance red line: multiple renders in the same room without combat
 // changes must NEVER call show(). This test guards against regressions.
 func TestLux_PerformanceRedLine_NoShowForIncrementalUpdates(t *testing.T) {
