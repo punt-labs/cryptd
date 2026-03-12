@@ -6,6 +6,17 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Makefile: build, test, demo, and ollama management targets with `make help`; `CRYPT_SCENARIO_DIR` set centrally so demo commands work without env vars
+- SLM interpreter rules-first routing: aliases and exact verbs bypass SLM entirely (zero latency); SLM called only for natural language and item/enemy/spell ID resolution
+- SLM context injection: game state (room, items, exits, enemies, inventory, equipment) injected into SLM user message, grounding output in valid game objects
+- `interpreter.BuildContext` and `interpreter.ParseSLMResponse` exported for eval harness reuse
+- `needsIDResolution`: SLM resolves item IDs for take/drop/equip/examine, targets for attack/unequip, spell IDs for cast — fuzzy name matching handled by SLM, not engine
+- Rules interpreter: article stripping (the, a, an) from multi-word item targets; `look at <item>` parsed as examine
+- Eval harness: rules-first routing mirroring runtime behavior; realistic game state for context injection; accuracy improved from 63.5% to 98.4%
+- `docs/slm-improvement.md`: strategy document for SLM accuracy improvement (context injection, prompt engineering, fine-tuning, model scaling)
+
+### Changed
+
 - `LuxUpdate.Log`: recent adventure log entries included in incremental updates, enabling the frontend to render a scrolling narration panel without waiting for a full scene rebuild; truncated to last 5 entries (same as `LuxScene.Log`)
 - `LuxScene.Exits` and `LuxScene.Actions` / `LuxUpdate.Actions`: navigation exits and context-sensitive action buttons in Lux payloads — exploration mode shows directional exits + look/inventory; combat mode shows attack/defend/flee/cast; game loop populates exits via `enrichForDisplay()` transient field on `DungeonState`
 - `cryptd solo --lux` — Lux JSON-lines display mode; writes scene/update payloads as newline-delimited JSON to stdout, reads `InputEvent` JSON from stdin; falls back to CLI renderer when `--lux` is omitted

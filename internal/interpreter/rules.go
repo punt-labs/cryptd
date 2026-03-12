@@ -47,9 +47,14 @@ func (r *Rules) Interpret(_ context.Context, input string, _ model.GameState) (m
 
 	// Join remaining fields for multi-word targets, using underscores to
 	// match scenario item IDs (e.g. "short sword" → "short_sword").
+	// Strip leading articles (the, a, an) before joining.
 	rest := ""
 	if len(fields) >= 2 {
-		rest = strings.Join(fields[1:], "_")
+		args := fields[1:]
+		if len(args) > 1 && (args[0] == "the" || args[0] == "a" || args[0] == "an") {
+			args = args[1:]
+		}
+		rest = strings.Join(args, "_")
 	}
 
 	switch verb {
@@ -63,6 +68,14 @@ func (r *Rules) Interpret(_ context.Context, input string, _ model.GameState) (m
 		}
 
 	case "look", "l":
+		// "look at <item>" → examine; plain "look" → look.
+		if len(fields) >= 3 && fields[1] == "at" {
+			target := fields[2:]
+			if len(target) > 1 && (target[0] == "the" || target[0] == "a" || target[0] == "an") {
+				target = target[1:]
+			}
+			return model.EngineAction{Type: "examine", ItemID: strings.Join(target, "_")}, nil
+		}
 		return model.EngineAction{Type: "look"}, nil
 
 	case "examine", "x":
@@ -79,8 +92,11 @@ func (r *Rules) Interpret(_ context.Context, input string, _ model.GameState) (m
 	case "pick":
 		// "pick up <item>"
 		if len(fields) >= 3 && fields[1] == "up" {
-			target := strings.Join(fields[2:], "_")
-			return model.EngineAction{Type: "take", ItemID: target}, nil
+			args := fields[2:]
+			if len(args) > 1 && (args[0] == "the" || args[0] == "a" || args[0] == "an") {
+				args = args[1:]
+			}
+			return model.EngineAction{Type: "take", ItemID: strings.Join(args, "_")}, nil
 		}
 
 	case "drop":
