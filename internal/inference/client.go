@@ -100,7 +100,8 @@ func (c *Client) ChatCompletion(ctx context.Context, messages []Message, opts *O
 	}
 	defer resp.Body.Close()
 
-	respBody, err := io.ReadAll(resp.Body)
+	const maxResponseSize = 1 << 20 // 1 MiB
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseSize))
 	if err != nil {
 		return "", fmt.Errorf("inference: read response: %w", err)
 	}

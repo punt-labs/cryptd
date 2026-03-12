@@ -38,6 +38,11 @@ func NewFakeSLMServer(responses []string) *FakeSLMServer {
 }
 
 func (f *FakeSLMServer) handleChatCompletions(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -116,10 +121,15 @@ func (f *FakeSLMServer) Calls() []FakeSLMCall {
 				msgs[j] = json.RawMessage(b)
 			}
 		}
+		var tempCopy *float64
+		if c.Temperature != nil {
+			v := *c.Temperature
+			tempCopy = &v
+		}
 		out[i] = FakeSLMCall{
 			Model:       c.Model,
 			Messages:    msgs,
-			Temperature: c.Temperature,
+			Temperature: tempCopy,
 			MaxTokens:   c.MaxTokens,
 		}
 	}
