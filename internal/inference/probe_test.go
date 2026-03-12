@@ -147,6 +147,19 @@ func TestProbe_ServerError(t *testing.T) {
 	assert.Nil(t, r)
 }
 
+func TestProbe_TrailingSlashInBaseURL(t *testing.T) {
+	ollama := fakeOllamaServer(t, []string{"smollm2:135m"})
+
+	// Trailing slash on BaseURL should not produce //api/tags.
+	endpoints := []inference.Endpoint{
+		{Name: "ollama", BaseURL: ollama.URL + "/", HealthPath: "/api/tags", ModelExtractor: inference.OllamaModels},
+	}
+
+	r := inference.Probe(context.Background(), endpoints, time.Second)
+	require.NotNil(t, r, "trailing slash must not break probe")
+	assert.Equal(t, "smollm2:135m", r.Model)
+}
+
 func TestDefaultEndpoints_ReturnsCopy(t *testing.T) {
 	a := inference.DefaultEndpoints()
 	b := inference.DefaultEndpoints()
