@@ -119,23 +119,25 @@ func TestSLM_FallbackOnUnknownActionType(t *testing.T) {
 
 func TestSLM_FallbackOnMissingRequiredFields(t *testing.T) {
 	for _, tt := range []struct {
-		name     string
-		response string
-		input    string
+		name       string
+		response   string
+		input      string
+		wantType   string
+		wantDetail string // Direction, ItemID, or SpellID depending on type
 	}{
-		{"move without direction", `{"type":"move"}`, "go north"},
-		{"move with invalid direction", `{"type":"move","direction":"sideways"}`, "go north"},
-		{"take without item_id", `{"type":"take"}`, "take sword"},
-		{"cast without spell_id", `{"type":"cast","target":"goblin_0"}`, "cast fireball"},
+		{"move without direction", `{"type":"move"}`, "go north", "move", "north"},
+		{"move with invalid direction", `{"type":"move","direction":"sideways"}`, "go north", "move", "north"},
+		{"take without item_id", `{"type":"take"}`, "take sword", "take", "sword"},
+		{"cast without spell_id", `{"type":"cast","target":"goblin_0"}`, "cast fireball", "cast", "fireball"},
+		{"unequip without target", `{"type":"unequip"}`, "unequip weapon", "unequip", "weapon"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			slm, srv := newSLM([]string{tt.response})
 			defer srv.Close()
 
-			// Should fall back to RulesInterpreter.
 			action, err := slm.Interpret(context.Background(), tt.input, model.GameState{})
 			require.NoError(t, err)
-			assert.NotEqual(t, "", action.Type)
+			assert.Equal(t, tt.wantType, action.Type)
 		})
 	}
 }

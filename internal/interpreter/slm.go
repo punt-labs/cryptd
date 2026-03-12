@@ -15,12 +15,12 @@ import (
 // action type), it falls back to the Rules interpreter.
 type SLM struct {
 	client   *inference.Client
-	fallback *Rules
+	fallback model.CommandInterpreter
 }
 
 // NewSLM creates an SLM interpreter that sends player input to the given
-// inference client and falls back to the Rules interpreter on failure.
-func NewSLM(client *inference.Client, fallback *Rules) *SLM {
+// inference client and falls back to the provided interpreter on failure.
+func NewSLM(client *inference.Client, fallback model.CommandInterpreter) *SLM {
 	return &SLM{client: client, fallback: fallback}
 }
 
@@ -98,6 +98,9 @@ func (s *SLM) Interpret(ctx context.Context, input string, state model.GameState
 
 	action, err := parseResponse(resp)
 	if err != nil {
+		if ctx.Err() != nil {
+			return model.EngineAction{}, ctx.Err()
+		}
 		return s.fallback.Interpret(ctx, input, state)
 	}
 
@@ -151,6 +154,10 @@ func validateFields(r slmResponse) error {
 	case "cast":
 		if r.SpellID == "" {
 			return fmt.Errorf("cast requires spell_id")
+		}
+	case "unequip":
+		if r.Target == "" {
+			return fmt.Errorf("unequip requires target")
 		}
 	}
 	return nil
