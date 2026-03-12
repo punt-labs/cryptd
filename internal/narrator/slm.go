@@ -29,7 +29,7 @@ var roomEventTypes = map[string]bool{
 	"looked": true,
 }
 
-// systemPrompt instructs the SLM to produce atmospheric room descriptions.
+// narratorSystemPrompt instructs the SLM to produce atmospheric room descriptions.
 const narratorSystemPrompt = `You are a narrator for a text adventure game. Given a room description seed and context, write 2-4 atmospheric sentences describing what the player sees.
 
 Rules:
@@ -70,7 +70,12 @@ func (s *SLM) Narrate(ctx context.Context, event model.EngineEvent, state model.
 		return s.fallback.Narrate(ctx, event, state)
 	}
 
-	return strings.TrimSpace(resp), nil
+	trimmed := strings.TrimSpace(resp)
+	if trimmed == "" {
+		return s.fallback.Narrate(ctx, event, state)
+	}
+
+	return trimmed, nil
 }
 
 // buildRoomPrompt constructs the user message from event details.

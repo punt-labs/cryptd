@@ -90,6 +90,23 @@ func TestSLMNarrator_EmptyDescriptionFallback(t *testing.T) {
 	assert.Empty(t, srv.Calls())
 }
 
+func TestSLMNarrator_EmptyResponseFallback(t *testing.T) {
+	slm, srv := newSLMNarrator([]string{"   "})
+	defer srv.Close()
+
+	event := model.EngineEvent{
+		Type: "moved",
+		Room: "entrance",
+		Details: map[string]any{
+			"description": "dark room",
+		},
+	}
+
+	result, err := slm.Narrate(context.Background(), event, model.GameState{})
+	require.NoError(t, err)
+	assert.Contains(t, result, "You enter entrance")
+}
+
 func TestSLMNarrator_FallbackOnInferenceError(t *testing.T) {
 	// Empty responses causes 503.
 	slm, srv := newSLMNarrator(nil)
@@ -167,4 +184,7 @@ func TestSLMNarrator_SendsCorrectPrompt(t *testing.T) {
 	// Temperature should be 0.7 for creative narration.
 	require.NotNil(t, calls[0].Temperature)
 	assert.InDelta(t, 0.7, *calls[0].Temperature, 0.001)
+
+	// MaxTokens should be 200 for concise narration.
+	assert.Equal(t, 200, calls[0].MaxTokens)
 }
