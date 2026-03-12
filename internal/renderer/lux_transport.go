@@ -22,9 +22,9 @@ type luxMessage struct {
 // newline-delimited JSON to the writer; input events are read as
 // newline-delimited JSON from the reader.
 type JSONTransport struct {
-	mu      sync.Mutex
-	w       io.Writer
-	events  chan model.InputEvent
+	mu       sync.Mutex
+	w        io.Writer
+	events   chan model.InputEvent
 	writeErr error // first write/marshal error
 }
 
@@ -55,7 +55,10 @@ func (t *JSONTransport) Events() <-chan model.InputEvent {
 	return t.events
 }
 
-// WriteErr returns the first write or marshal error, if any.
+// WriteErr returns the first write or marshal error, if any. Callers should
+// check this after each Render call to detect transport failures (broken pipe,
+// marshal errors). Errors are not emitted as InputEvents from writes because
+// the events channel is owned by the reader goroutine.
 func (t *JSONTransport) WriteErr() error {
 	t.mu.Lock()
 	defer t.mu.Unlock()

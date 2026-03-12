@@ -6,11 +6,25 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/punt-labs/cryptd/internal/model"
 	"github.com/punt-labs/cryptd/internal/renderer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// recvEvent receives from a channel with a 2-second timeout to prevent hangs.
+func recvEvent(t *testing.T, ch <-chan model.InputEvent) (model.InputEvent, bool) {
+	t.Helper()
+	select {
+	case ev, ok := <-ch:
+		return ev, ok
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for event")
+		return model.InputEvent{}, false
+	}
+}
 
 func TestJSONTransport_ShowWritesJSON(t *testing.T) {
 	var buf bytes.Buffer
@@ -27,7 +41,7 @@ func TestJSONTransport_ShowWritesJSON(t *testing.T) {
 	require.NotEmpty(t, line)
 
 	var msg struct {
-		Method  string           `json:"method"`
+		Method  string            `json:"method"`
 		Payload renderer.LuxScene `json:"payload"`
 	}
 	require.NoError(t, json.Unmarshal([]byte(line), &msg))
@@ -52,7 +66,7 @@ func TestJSONTransport_UpdateWritesJSON(t *testing.T) {
 
 	line := strings.TrimSpace(buf.String())
 	var msg struct {
-		Method  string             `json:"method"`
+		Method  string              `json:"method"`
 		Payload renderer.LuxUpdate `json:"payload"`
 	}
 	require.NoError(t, json.Unmarshal([]byte(line), &msg))
@@ -67,18 +81,20 @@ func TestJSONTransport_ReadsInputEvents(t *testing.T) {
 	input := `{"type":"input","payload":"go north"}` + "\n" + `{"type":"quit"}` + "\n"
 	tr := renderer.NewJSONTransport(io.Discard, strings.NewReader(input))
 
-	ev1 := <-tr.Events()
+	ev1, ok := recvEvent(t, tr.Events())
+	require.True(t, ok)
 	assert.Equal(t, "input", ev1.Type)
 	assert.Equal(t, "go north", ev1.Payload)
 
-	ev2 := <-tr.Events()
+	ev2, ok := recvEvent(t, tr.Events())
+	require.True(t, ok)
 	assert.Equal(t, "quit", ev2.Type)
 }
 
 func TestJSONTransport_ChannelClosesOnEOF(t *testing.T) {
 	tr := renderer.NewJSONTransport(io.Discard, strings.NewReader(""))
 
-	_, ok := <-tr.Events()
+	_, ok := recvEvent(t, tr.Events())
 	assert.False(t, ok, "channel should be closed after reader EOF")
 }
 
@@ -86,7 +102,8 @@ func TestJSONTransport_SkipsMalformedInput(t *testing.T) {
 	input := "not json\n" + `{"type":"quit"}` + "\n"
 	tr := renderer.NewJSONTransport(io.Discard, strings.NewReader(input))
 
-	ev := <-tr.Events()
+	ev, ok := recvEvent(t, tr.Events())
+	require.True(t, ok)
 	assert.Equal(t, "quit", ev.Type, "malformed line should be skipped")
 }
 
