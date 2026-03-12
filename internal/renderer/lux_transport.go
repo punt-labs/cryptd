@@ -22,9 +22,10 @@ type luxMessage struct {
 // newline-delimited JSON to the writer; input events are read as
 // newline-delimited JSON from the reader.
 type JSONTransport struct {
-	mu     sync.Mutex
-	w      io.Writer
-	events chan model.InputEvent
+	mu      sync.Mutex
+	w       io.Writer
+	events  chan model.InputEvent
+	writeErr error // first write/marshal error
 }
 
 // NewJSONTransport creates a LuxDisplay that writes scene/update payloads as
@@ -54,24 +55,45 @@ func (t *JSONTransport) Events() <-chan model.InputEvent {
 	return t.events
 }
 
+// WriteErr returns the first write or marshal error, if any.
+func (t *JSONTransport) WriteErr() error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.writeErr
+}
+
 func (t *JSONTransport) writeMessage(method string, payload any) {
 	data, err := json.Marshal(luxMessage{Method: method, Payload: payload})
 	if err != nil {
+		t.mu.Lock()
+		if t.writeErr == nil {
+			t.writeErr = fmt.Errorf("marshal %s: %w", method, err)
+		}
+		t.mu.Unlock()
 		return
 	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	fmt.Fprintf(t.w, "%s\n", data)
+	if _, err := fmt.Fprintf(t.w, "%s\n", data); err != nil && t.writeErr == nil {
+		t.writeErr = fmt.Errorf("write %s: %w", method, err)
+	}
 }
 
 func (t *JSONTransport) readEvents(r io.Reader) {
 	defer close(t.events)
 	scanner := bufio.NewScanner(r)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	for scanner.Scan() {
 		var ev model.InputEvent
 		if err := json.Unmarshal(scanner.Bytes(), &ev); err != nil {
 			continue
 		}
 		t.events <- ev
+	}
+	if err := scanner.Err(); err != nil {
+		t.events <- model.InputEvent{
+			Type:    "error",
+			Payload: err.Error(),
+		}
 	}
 }

@@ -90,6 +90,23 @@ func TestJSONTransport_SkipsMalformedInput(t *testing.T) {
 	assert.Equal(t, "quit", ev.Type, "malformed line should be skipped")
 }
 
+func TestJSONTransport_WriteErrCaptured(t *testing.T) {
+	w := &failWriter{err: io.ErrClosedPipe}
+	tr := renderer.NewJSONTransport(w, strings.NewReader(""))
+
+	tr.RecordShow(renderer.LuxScene{Room: "entrance"})
+	require.Error(t, tr.WriteErr())
+	assert.Contains(t, tr.WriteErr().Error(), "write show")
+}
+
+type failWriter struct {
+	err error
+}
+
+func (f *failWriter) Write([]byte) (int, error) {
+	return 0, f.err
+}
+
 func TestJSONTransport_MultipleShowsWriteSeparateLines(t *testing.T) {
 	var buf bytes.Buffer
 	tr := renderer.NewJSONTransport(&buf, strings.NewReader(""))
