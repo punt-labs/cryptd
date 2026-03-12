@@ -188,6 +188,37 @@ func TestLux_MPShownForCasters(t *testing.T) {
 	assert.Equal(t, 10, scene.Party[0].MaxMP)
 }
 
+func TestLux_XPShownInScene(t *testing.T) {
+	lux, fake := newLuxRenderer()
+
+	state := baseState("entrance")
+	state.Party[0].XP = 42
+	state.Party[0].NextLevelXP = 100
+	require.NoError(t, lux.Render(context.Background(), state, "You arrive."))
+
+	scene := fake.Calls()[0].Payload.(renderer.LuxScene)
+	assert.Equal(t, 42, scene.Party[0].XP)
+	assert.Equal(t, 100, scene.Party[0].NextLevelXP)
+}
+
+func TestLux_XPShownInUpdate(t *testing.T) {
+	lux, fake := newLuxRenderer()
+
+	state := baseState("entrance")
+	require.NoError(t, lux.Render(context.Background(), state, "Initial."))
+
+	state.Party[0].XP = 15
+	state.Party[0].NextLevelXP = 20
+	require.NoError(t, lux.Render(context.Background(), state, "You defeated a goblin."))
+
+	calls := fake.Calls()
+	require.Len(t, calls, 2)
+	update := calls[1].Payload.(renderer.LuxUpdate)
+	require.NotNil(t, update.Hero)
+	assert.Equal(t, 15, update.Hero.XP)
+	assert.Equal(t, 20, update.Hero.NextLevelXP)
+}
+
 func TestLux_EmptyClassDoesNotPanic(t *testing.T) {
 	lux, fake := newLuxRenderer()
 

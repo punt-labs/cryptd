@@ -39,6 +39,8 @@ type LuxHero struct {
 	MaxHP int    `json:"max_hp"`
 	MP    int    `json:"mp"`
 	MaxMP int    `json:"max_mp"`
+	XP         int `json:"xp"`
+	NextLevelXP int `json:"next_level_xp"` // 0 at max level
 }
 
 // LuxEnemy is the enemy display state during combat.
@@ -128,13 +130,15 @@ func buildScene(state model.GameState, narration string) LuxScene {
 
 	for _, char := range state.Party {
 		scene.Party = append(scene.Party, LuxHero{
-			Name:  char.Name,
-			Class: titleCase(char.Class),
-			Level: char.Level,
-			HP:    char.HP,
-			MaxHP: char.MaxHP,
-			MP:    char.MP,
-			MaxMP: char.MaxMP,
+			Name:        char.Name,
+			Class:       titleCase(char.Class),
+			Level:       char.Level,
+			HP:          char.HP,
+			MaxHP:       char.MaxHP,
+			MP:          char.MP,
+			MaxMP:       char.MaxMP,
+			XP:          char.XP,
+			NextLevelXP: char.NextLevelXP,
 		})
 	}
 
@@ -173,13 +177,15 @@ func buildUpdate(state model.GameState, narration string) LuxUpdate {
 	if len(state.Party) > 0 {
 		char := state.Party[0]
 		hero := LuxHero{
-			Name:  char.Name,
-			Class: titleCase(char.Class),
-			Level: char.Level,
-			HP:    char.HP,
-			MaxHP: char.MaxHP,
-			MP:    char.MP,
-			MaxMP: char.MaxMP,
+			Name:        char.Name,
+			Class:       titleCase(char.Class),
+			Level:       char.Level,
+			HP:          char.HP,
+			MaxHP:       char.MaxHP,
+			MP:          char.MP,
+			MaxMP:       char.MaxMP,
+			XP:          char.XP,
+			NextLevelXP: char.NextLevelXP,
 		}
 		update.Hero = &hero
 	}

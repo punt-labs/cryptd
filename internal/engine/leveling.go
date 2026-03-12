@@ -48,6 +48,20 @@ var primaryStats = map[string][]string{
 // MaxLevel is the highest level a character can reach.
 const MaxLevel = 10
 
+// NextLevelXP returns the cumulative XP required for the next level of the
+// given class. Returns 0 if the class is unknown or the character is at max level.
+func NextLevelXP(class string, level int) int {
+	thresholds, ok := xpThresholds[class]
+	if !ok {
+		return 0
+	}
+	next := level + 1
+	if next >= len(thresholds) {
+		return 0
+	}
+	return thresholds[next]
+}
+
 // CheckLevelUp checks if the hero has enough XP to level up, and if so,
 // applies the level-up effects (HP, MP, stats). May apply multiple levels
 // if XP is sufficient.

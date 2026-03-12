@@ -184,4 +184,6 @@ func TestLux_SceneContainsCorrectPartyData(t *testing.T) {
 	assert.Equal(t, 1, scene.Party[0].Level)
 	assert.Equal(t, 100, scene.Party[0].HP)
 	assert.Equal(t, 100, scene.Party[0].MaxHP)
+	assert.Equal(t, 0, scene.Party[0].XP)
+	assert.Equal(t, 20, scene.Party[0].NextLevelXP, "fighter level 1 needs 20 XP for next level")
 }
