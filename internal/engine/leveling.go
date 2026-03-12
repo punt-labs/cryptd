@@ -51,6 +51,9 @@ const MaxLevel = 10
 // NextLevelXP returns the cumulative XP required for the next level of the
 // given class. Returns 0 if the class is unknown or the character is at max level.
 func NextLevelXP(class string, level int) int {
+	if level < 0 {
+		return 0
+	}
 	thresholds, ok := xpThresholds[class]
 	if !ok {
 		return 0

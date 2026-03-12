@@ -147,7 +147,8 @@ func TestNextLevelXP(t *testing.T) {
 		{"fighter", 9, 6400},
 		{"fighter", 10, 0}, // max level
 		{"mage", 1, 30},
-		{"bard", 1, 0}, // unknown class
+		{"bard", 1, 0},      // unknown class
+		{"fighter", -1, 0},  // negative level
 	}
 	for _, tt := range tests {
 		t.Run(tt.class+fmt.Sprintf("_L%d", tt.level), func(t *testing.T) {
