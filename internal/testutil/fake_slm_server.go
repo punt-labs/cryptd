@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"sync"
+	"time"
 )
 
 // FakeSLMServer is an httptest.Server that serves OpenAI-compatible
@@ -16,6 +17,7 @@ type FakeSLMServer struct {
 	pos       int
 	calls     []FakeSLMCall
 	server    *httptest.Server
+	delay     time.Duration // artificial delay before responding
 }
 
 // FakeSLMCall records a single request to the fake server.
@@ -37,10 +39,30 @@ func NewFakeSLMServer(responses []string) *FakeSLMServer {
 	return f
 }
 
+// SetDelay configures an artificial delay before each response. Use with
+// a short client timeout to test timeout→fallback behavior.
+func (f *FakeSLMServer) SetDelay(d time.Duration) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.delay = d
+}
+
 func (f *FakeSLMServer) handleChatCompletions(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
+	}
+
+	f.mu.Lock()
+	delay := f.delay
+	f.mu.Unlock()
+
+	if delay > 0 {
+		select {
+		case <-time.After(delay):
+		case <-r.Context().Done():
+			return
+		}
 	}
 
 	f.mu.Lock()
