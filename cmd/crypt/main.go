@@ -8,9 +8,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/punt-labs/cryptd/internal/engine"
 	"github.com/punt-labs/cryptd/internal/game"
+	"github.com/punt-labs/cryptd/internal/inference"
 	"github.com/punt-labs/cryptd/internal/interpreter"
 	"github.com/punt-labs/cryptd/internal/model"
 	"github.com/punt-labs/cryptd/internal/narrator"
@@ -21,11 +23,13 @@ import (
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprintln(os.Stderr, "usage: cryptd <command> [args]")
-		fmt.Fprintln(os.Stderr, "commands: headless, autoplay, validate")
+		fmt.Fprintln(os.Stderr, "commands: solo, headless, autoplay, validate")
 		os.Exit(1)
 	}
 
 	switch os.Args[1] {
+	case "solo":
+		runSolo(os.Args[2:])
 	case "headless":
 		runHeadless(os.Args[2:])
 	case "autoplay":
@@ -70,6 +74,97 @@ func defaultHero() model.Character {
 		Level: 1, HP: 20, MaxHP: 20,
 		Stats: model.Stats{STR: 14, DEX: 12, CON: 12, INT: 10, WIS: 10, CHA: 10},
 	}
+}
+
+func runSolo(args []string) {
+	fs := flag.NewFlagSet("solo", flag.ExitOnError)
+	scenarioID := fs.String("scenario", "", "scenario ID (filename without .yaml)")
+	modelFlag := fs.String("model", "", "model name (auto-detected if omitted)")
+	serverURL := fs.String("server", "", "inference server URL (auto-detected if omitted)")
+	timeoutFlag := fs.Duration("timeout", 5*time.Second, "inference request timeout")
+	_ = fs.Parse(args)
+
+	if *scenarioID == "" {
+		fmt.Fprintln(os.Stderr, "usage: cryptd solo --scenario <id> [--model <name>] [--server <url>] [--timeout <duration>]")
+		os.Exit(1)
+	}
+
+	s, err := loadScenario(*scenarioID)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
+
+	eng := engine.New(s)
+	state, err := eng.NewGame(defaultHero())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error starting game: %v\n", err)
+		os.Exit(1)
+	}
+	state.PlayMode = "solo"
+
+	var interp model.CommandInterpreter
+	var narr model.Narrator
+	rules := interpreter.NewRules()
+	tmpl := narrator.NewTemplate()
+
+	baseURL, modelName := resolveRuntime(*serverURL, *modelFlag)
+	if baseURL != "" && modelName != "" {
+		client := inference.NewClient(baseURL, modelName, *timeoutFlag)
+		interp = interpreter.NewSLM(client, rules)
+		narr = narrator.NewSLM(client, tmpl)
+		fmt.Fprintf(os.Stderr, "Using %s (model: %s)\n", baseURL, modelName)
+	} else {
+		interp = rules
+		narr = tmpl
+		fmt.Fprintln(os.Stderr, "No inference server found — using rules+templates")
+	}
+
+	loop := game.NewLoop(eng, interp, narr, renderer.NewCLI(os.Stdout, os.Stdin))
+	if err := loop.Run(context.Background(), &state); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+// resolveRuntime determines the inference server URL and model name from
+// explicit flags or auto-detection. Returns empty strings if no runtime found.
+func resolveRuntime(serverURL, modelName string) (string, string) {
+	if serverURL != "" && modelName != "" {
+		return serverURL, modelName
+	}
+
+	// Build probe endpoints: if the user specified a server, probe that
+	// server (trying both ollama and OpenAI model endpoints) instead of
+	// the default well-known ports.
+	var endpoints []inference.Endpoint
+	if serverURL != "" {
+		endpoints = []inference.Endpoint{
+			{Name: "user-server", BaseURL: serverURL, HealthPath: "/api/tags", ModelExtractor: inference.OllamaModels},
+			{Name: "user-server", BaseURL: serverURL, HealthPath: "/v1/models", ModelExtractor: inference.OpenAIModels},
+		}
+	} else {
+		endpoints = inference.DefaultEndpoints()
+	}
+
+	rt := inference.Probe(context.Background(), endpoints, time.Second)
+	if rt == nil {
+		if serverURL != "" {
+			fmt.Fprintf(os.Stderr, "warning: --server %q is not responding — no model could be determined\n", serverURL)
+		}
+		if modelName != "" {
+			fmt.Fprintf(os.Stderr, "warning: ignoring --model %q — no inference server found\n", modelName)
+		}
+		return "", ""
+	}
+
+	if serverURL == "" {
+		serverURL = rt.BaseURL
+	}
+	if modelName == "" {
+		modelName = rt.Model
+	}
+	return serverURL, modelName
 }
 
 func runHeadless(args []string) {
