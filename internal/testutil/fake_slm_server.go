@@ -53,7 +53,26 @@ func (f *FakeSLMServer) handleChatCompletions(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// Decode and record the request before any delay, so timeout calls
+	// are still visible in Calls().
+	var req struct {
+		Model       string            `json:"model"`
+		Messages    []json.RawMessage `json:"messages"`
+		Temperature *float64          `json:"temperature,omitempty"`
+		MaxTokens   int               `json:"max_tokens,omitempty"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
 	f.mu.Lock()
+	f.calls = append(f.calls, FakeSLMCall{
+		Model:       req.Model,
+		Messages:    req.Messages,
+		Temperature: req.Temperature,
+		MaxTokens:   req.MaxTokens,
+	})
 	delay := f.delay
 	f.mu.Unlock()
 
@@ -69,24 +88,6 @@ func (f *FakeSLMServer) handleChatCompletions(w http.ResponseWriter, r *http.Req
 
 	f.mu.Lock()
 	defer f.mu.Unlock()
-
-	// Record the call.
-	var req struct {
-		Model       string            `json:"model"`
-		Messages    []json.RawMessage `json:"messages"`
-		Temperature *float64          `json:"temperature,omitempty"`
-		MaxTokens   int               `json:"max_tokens,omitempty"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "bad request", http.StatusBadRequest)
-		return
-	}
-	f.calls = append(f.calls, FakeSLMCall{
-		Model:       req.Model,
-		Messages:    req.Messages,
-		Temperature: req.Temperature,
-		MaxTokens:   req.MaxTokens,
-	})
 
 	if len(f.responses) == 0 {
 		w.WriteHeader(http.StatusServiceUnavailable)
