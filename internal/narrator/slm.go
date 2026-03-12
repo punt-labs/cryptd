@@ -2,7 +2,6 @@ package narrator
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/punt-labs/cryptd/internal/inference"
@@ -82,13 +81,7 @@ func (s *SLM) Narrate(ctx context.Context, event model.EngineEvent, state model.
 // roomSuffix deterministically appends exits and visible items so gameplay
 // affordances are never lost even if the SLM omits them.
 func roomSuffix(details map[string]any) string {
-	var parts []string
-	if exits, ok := details["exits"].([]string); ok && len(exits) > 0 {
-		parts = append(parts, fmt.Sprintf("Exits: %s.", strings.Join(exits, ", ")))
-	}
-	if items, ok := details["items"].([]string); ok && len(items) > 0 {
-		parts = append(parts, fmt.Sprintf("You see: %s.", strings.Join(items, ", ")))
-	}
+	parts := exitsAndItems(details)
 	if len(parts) == 0 {
 		return ""
 	}
@@ -105,11 +98,11 @@ func buildRoomPrompt(event model.EngineEvent) string {
 		parts = append(parts, "Description seed: "+desc)
 	}
 
-	if exits, ok := event.Details["exits"].([]string); ok && len(exits) > 0 {
+	if exits := toStringSlice(event.Details["exits"]); len(exits) > 0 {
 		parts = append(parts, "Exits: "+strings.Join(exits, ", "))
 	}
 
-	if items, ok := event.Details["items"].([]string); ok && len(items) > 0 {
+	if items := toStringSlice(event.Details["items"]); len(items) > 0 {
 		parts = append(parts, "Visible items: "+strings.Join(items, ", "))
 	}
 

@@ -110,6 +110,28 @@ func TestSLMNarrator_EmptyResponseFallback(t *testing.T) {
 	assert.Contains(t, result, "You enter entrance")
 }
 
+func TestSLMNarrator_HandlesAnySliceDetails(t *testing.T) {
+	slm, srv := newSLMNarrator([]string{"A dank corridor stretches before you."})
+	defer srv.Close()
+
+	// Details with []any (as produced by JSON unmarshalling) instead of []string.
+	event := model.EngineEvent{
+		Type: "moved",
+		Room: "corridor",
+		Details: map[string]any{
+			"description": "dank corridor",
+			"exits":       []any{"north", "south"},
+			"items":       []any{"torch"},
+		},
+	}
+
+	result, err := slm.Narrate(context.Background(), event, model.GameState{})
+	require.NoError(t, err)
+	assert.Contains(t, result, "dank corridor")
+	assert.Contains(t, result, "Exits: north, south.")
+	assert.Contains(t, result, "You see: torch.")
+}
+
 func TestSLMNarrator_FallbackOnInferenceError(t *testing.T) {
 	// Empty responses causes 503.
 	slm, srv := newSLMNarrator(nil)
