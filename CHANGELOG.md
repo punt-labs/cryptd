@@ -18,7 +18,7 @@ All notable changes to this project will be documented in this file.
 - DES-024: Inference client — generic text interface (returns raw text, callers own JSON parsing)
 - `internal/inference`: OpenAI-compatible HTTP client for `/v1/chat/completions` (works with llama.cpp and ollama)
 - `cryptd solo --scenario <id> [--model <name>] [--server <url>] [--timeout <dur>]` — plays with SLM interpreter + narrator when an inference server is available; auto-detects ollama/llama.cpp, falls back to rules+templates if none found
-- `inference.Probe`: runtime auto-detection of ollama and llama.cpp servers; probes well-known endpoints in priority order (ollama `/api/tags` → llama.cpp `/v1/models`) and returns first responding runtime with model name
+- `inference.Probe`: runtime auto-detection of ollama and llama.cpp servers; probes well-known endpoints in priority order (ollama `/api/tags` → llama.cpp `/v1/models`) and returns first responding runtime with model name; prefers medium-tier models (gemma3:1b → llama3.2:3b → smollm2:135m) when multiple models are available
 - `FakeSLMServer` upgraded to OpenAI-compatible API with call recording, `/v1/models` endpoint, and configurable response delay (`SetDelay`)
 - SLM fallback integration tests: game loop with SLM interpreter + narrator, timeout→fallback, partial failure (SLM degrades mid-session), server-down→fallback
 - DES-023: Four-tier inference architecture (tiny/small/medium/large) with graceful failover chain

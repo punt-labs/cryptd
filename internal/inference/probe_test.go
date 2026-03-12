@@ -69,8 +69,8 @@ func TestProbe_OllamaFirst(t *testing.T) {
 	llama := fakeLlamaCppServer(t, []string{"SmolLM2-135M-Q4"})
 
 	endpoints := []inference.Endpoint{
-		{Name: "ollama", BaseURL: ollama.URL, HealthPath: "/api/tags", ModelExtractor: inference.OllamaModels},
-		{Name: "llama.cpp", BaseURL: llama.URL, HealthPath: "/v1/models", ModelExtractor: inference.OpenAIModels},
+		{Name: "ollama", BaseURL: ollama.URL, HealthPath: "/api/tags", ModelLister: inference.OllamaModels},
+		{Name: "llama.cpp", BaseURL: llama.URL, HealthPath: "/v1/models", ModelLister: inference.OpenAIModels},
 	}
 
 	r := inference.Probe(context.Background(), endpoints, time.Second)
@@ -85,8 +85,8 @@ func TestProbe_FallsThrough(t *testing.T) {
 	llama := fakeLlamaCppServer(t, []string{"SmolLM2-135M-Q4"})
 
 	endpoints := []inference.Endpoint{
-		{Name: "ollama", BaseURL: downURL, HealthPath: "/api/tags", ModelExtractor: inference.OllamaModels},
-		{Name: "llama.cpp", BaseURL: llama.URL, HealthPath: "/v1/models", ModelExtractor: inference.OpenAIModels},
+		{Name: "ollama", BaseURL: downURL, HealthPath: "/api/tags", ModelLister: inference.OllamaModels},
+		{Name: "llama.cpp", BaseURL: llama.URL, HealthPath: "/v1/models", ModelLister: inference.OpenAIModels},
 	}
 
 	r := inference.Probe(context.Background(), endpoints, time.Second)
@@ -100,8 +100,8 @@ func TestProbe_NoneAvailable(t *testing.T) {
 	downURL2 := closedServerURL(t)
 
 	endpoints := []inference.Endpoint{
-		{Name: "ollama", BaseURL: downURL1, HealthPath: "/api/tags", ModelExtractor: inference.OllamaModels},
-		{Name: "llama.cpp", BaseURL: downURL2, HealthPath: "/v1/models", ModelExtractor: inference.OpenAIModels},
+		{Name: "ollama", BaseURL: downURL1, HealthPath: "/api/tags", ModelLister: inference.OllamaModels},
+		{Name: "llama.cpp", BaseURL: downURL2, HealthPath: "/v1/models", ModelLister: inference.OpenAIModels},
 	}
 
 	r := inference.Probe(context.Background(), endpoints, time.Second)
@@ -112,7 +112,7 @@ func TestProbe_EmptyModelList(t *testing.T) {
 	ollama := fakeOllamaServer(t, []string{})
 
 	endpoints := []inference.Endpoint{
-		{Name: "ollama", BaseURL: ollama.URL, HealthPath: "/api/tags", ModelExtractor: inference.OllamaModels},
+		{Name: "ollama", BaseURL: ollama.URL, HealthPath: "/api/tags", ModelLister: inference.OllamaModels},
 	}
 
 	r := inference.Probe(context.Background(), endpoints, time.Second)
@@ -123,7 +123,7 @@ func TestProbe_ContextCancelled(t *testing.T) {
 	ollama := fakeOllamaServer(t, []string{"smollm2:135m"})
 
 	endpoints := []inference.Endpoint{
-		{Name: "ollama", BaseURL: ollama.URL, HealthPath: "/api/tags", ModelExtractor: inference.OllamaModels},
+		{Name: "ollama", BaseURL: ollama.URL, HealthPath: "/api/tags", ModelLister: inference.OllamaModels},
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -140,7 +140,7 @@ func TestProbe_ServerError(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	endpoints := []inference.Endpoint{
-		{Name: "broken", BaseURL: srv.URL, HealthPath: "/api/tags", ModelExtractor: inference.OllamaModels},
+		{Name: "broken", BaseURL: srv.URL, HealthPath: "/api/tags", ModelLister: inference.OllamaModels},
 	}
 
 	r := inference.Probe(context.Background(), endpoints, time.Second)
@@ -163,7 +163,7 @@ func TestProbe_TrailingSlashInBaseURL(t *testing.T) {
 
 	// Trailing slash on BaseURL should not produce //api/tags.
 	endpoints := []inference.Endpoint{
-		{Name: "ollama", BaseURL: srv.URL + "/", HealthPath: "/api/tags", ModelExtractor: inference.OllamaModels},
+		{Name: "ollama", BaseURL: srv.URL + "/", HealthPath: "/api/tags", ModelLister: inference.OllamaModels},
 	}
 
 	r := inference.Probe(context.Background(), endpoints, time.Second)
@@ -174,6 +174,121 @@ func TestProbe_TrailingSlashInBaseURL(t *testing.T) {
 func TestDefaultEndpoints_ReturnsCopy(t *testing.T) {
 	a := inference.DefaultEndpoints()
 	b := inference.DefaultEndpoints()
+
+	require.NotEmpty(t, a, "default endpoints must contain at least one endpoint")
+	require.NotEmpty(t, a[0].Preferred, "default endpoint must have at least one preferred model")
+
+	// Mutating scalar field must not leak between copies.
 	a[0].Name = "mutated"
-	assert.Equal(t, "ollama", b[0].Name, "mutation of one copy must not affect another")
+	assert.Equal(t, "ollama", b[0].Name, "mutation of one copy must not affect another (Name)")
+
+	// Mutating slice element must also not leak between copies.
+	originalPreferred := b[0].Preferred[0]
+	a[0].Preferred[0] = "mutated-model"
+	assert.Equal(t, originalPreferred, b[0].Preferred[0], "mutation of one copy must not affect another (Preferred)")
+}
+
+func TestProbe_NilModelListerSkipsEndpoint(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"models":[{"name":"smollm2:135m"}]}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	endpoints := []inference.Endpoint{
+		{Name: "no-lister", BaseURL: srv.URL, HealthPath: "/api/tags"},
+	}
+
+	r := inference.Probe(context.Background(), endpoints, time.Second)
+	assert.Nil(t, r, "nil ModelLister should be treated as unavailable")
+}
+
+func TestProbe_PrefersHigherPriorityModel(t *testing.T) {
+	// Server has multiple models; gemma3:1b should be selected over smollm2:135m.
+	ollama := fakeOllamaServer(t, []string{"smollm2:135m", "gemma3:1b", "llama3.2:3b"})
+
+	endpoints := []inference.Endpoint{
+		{
+			Name:        "ollama",
+			BaseURL:     ollama.URL,
+			HealthPath:  "/api/tags",
+			ModelLister: inference.OllamaModels,
+			Preferred:   inference.PreferredModels,
+		},
+	}
+
+	r := inference.Probe(context.Background(), endpoints, time.Second)
+	require.NotNil(t, r)
+	assert.Equal(t, "gemma3:1b", r.Model, "should prefer gemma3:1b (highest priority)")
+}
+
+func TestProbe_FallsToSecondPreference(t *testing.T) {
+	// Server has llama3.2:3b but not gemma3:1b.
+	ollama := fakeOllamaServer(t, []string{"smollm2:135m", "llama3.2:3b"})
+
+	endpoints := []inference.Endpoint{
+		{
+			Name:        "ollama",
+			BaseURL:     ollama.URL,
+			HealthPath:  "/api/tags",
+			ModelLister: inference.OllamaModels,
+			Preferred:   inference.PreferredModels,
+		},
+	}
+
+	r := inference.Probe(context.Background(), endpoints, time.Second)
+	require.NotNil(t, r)
+	assert.Equal(t, "llama3.2:3b", r.Model, "should fall to second preference")
+}
+
+func TestProbe_NoPreferenceMatchUsesFirst(t *testing.T) {
+	// Server has models not in the preference list.
+	ollama := fakeOllamaServer(t, []string{"mistral:7b", "phi3:mini"})
+
+	endpoints := []inference.Endpoint{
+		{
+			Name:        "ollama",
+			BaseURL:     ollama.URL,
+			HealthPath:  "/api/tags",
+			ModelLister: inference.OllamaModels,
+			Preferred:   inference.PreferredModels,
+		},
+	}
+
+	r := inference.Probe(context.Background(), endpoints, time.Second)
+	require.NotNil(t, r)
+	assert.Equal(t, "mistral:7b", r.Model, "should fall back to first available model")
+}
+
+func TestProbe_NoPreferencesUsesFirst(t *testing.T) {
+	// Endpoint with no Preferred list — just picks first model.
+	ollama := fakeOllamaServer(t, []string{"phi3:mini", "gemma3:1b"})
+
+	endpoints := []inference.Endpoint{
+		{
+			Name:        "ollama",
+			BaseURL:     ollama.URL,
+			HealthPath:  "/api/tags",
+			ModelLister: inference.OllamaModels,
+			// No Preferred field
+		},
+	}
+
+	r := inference.Probe(context.Background(), endpoints, time.Second)
+	require.NotNil(t, r)
+	assert.Equal(t, "phi3:mini", r.Model, "with no preferences, should use first model")
+}
+
+func TestDefaultEndpoints_IncludesPreferences(t *testing.T) {
+	eps := inference.DefaultEndpoints()
+	require.Len(t, eps, 2)
+
+	// Ollama endpoint should have model preferences.
+	assert.Equal(t, "ollama", eps[0].Name)
+	assert.NotEmpty(t, eps[0].Preferred, "ollama endpoint should have preferred models")
+	assert.Equal(t, "gemma3:1b", eps[0].Preferred[0], "gemma3:1b should be top preference")
+
+	// llama.cpp endpoint should have no preferences (single model loaded).
+	assert.Equal(t, "llama.cpp", eps[1].Name)
+	assert.Empty(t, eps[1].Preferred, "llama.cpp endpoint should have no preferences")
 }
