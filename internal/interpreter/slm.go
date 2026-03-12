@@ -24,8 +24,9 @@ func NewSLM(client *inference.Client, fallback model.CommandInterpreter) *SLM {
 	return &SLM{client: client, fallback: fallback}
 }
 
-// systemPrompt instructs the SLM to produce structured JSON actions.
-const systemPrompt = `You are a text adventure command parser. Given a player's input, output ONLY a JSON object with the player's intended action.
+// SystemPrompt instructs the SLM to produce structured JSON actions.
+// Exported for use by the eval harness (cmd/eval-slm).
+const SystemPrompt = `You are a text adventure command parser. Given a player's input, output ONLY a JSON object with the player's intended action.
 
 Supported action types and their fields:
 - {"type":"move","direction":"<north|south|east|west|up|down>"}
@@ -86,7 +87,7 @@ func (s *SLM) Interpret(ctx context.Context, input string, state model.GameState
 
 	temp := 0.0
 	resp, err := s.client.ChatCompletion(ctx, []inference.Message{
-		{Role: inference.RoleSystem, Content: systemPrompt},
+		{Role: inference.RoleSystem, Content: SystemPrompt},
 		{Role: inference.RoleUser, Content: input},
 	}, &inference.Options{Temperature: &temp, MaxTokens: 100})
 	if err != nil {
@@ -96,7 +97,7 @@ func (s *SLM) Interpret(ctx context.Context, input string, state model.GameState
 		return s.fallback.Interpret(ctx, input, state)
 	}
 
-	action, err := parseResponse(resp)
+	action, err := ParseSLMResponse(resp)
 	if err != nil {
 		if ctx.Err() != nil {
 			return model.EngineAction{}, ctx.Err()
@@ -107,8 +108,9 @@ func (s *SLM) Interpret(ctx context.Context, input string, state model.GameState
 	return action, nil
 }
 
-// parseResponse extracts an EngineAction from the SLM's JSON response.
-func parseResponse(resp string) (model.EngineAction, error) {
+// ParseSLMResponse extracts an EngineAction from the SLM's JSON response.
+// Exported for use by the eval harness (cmd/eval-slm).
+func ParseSLMResponse(resp string) (model.EngineAction, error) {
 	// Strip markdown code fences if present (some models wrap JSON).
 	resp = strings.TrimSpace(resp)
 	if strings.HasPrefix(resp, "```") {
