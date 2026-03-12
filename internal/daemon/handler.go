@@ -136,7 +136,19 @@ func (s *Server) handleRequest(req Request) Response {
 		}
 
 	case "tools/call":
+		// In normal mode, route new_game through the play handler
+		// so it returns narrated text instead of structured JSON.
+		if !s.passthrough {
+			var params ToolCallParams
+			if json.Unmarshal(req.Params, &params) == nil && params.Name == "new_game" {
+				req.Params = params.Arguments
+				return s.handleNewGamePlay(req)
+			}
+		}
 		return s.handleToolCall(req)
+
+	case "play":
+		return s.handlePlay(req)
 
 	default:
 		return Response{

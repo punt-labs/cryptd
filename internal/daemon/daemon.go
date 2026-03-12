@@ -12,39 +12,76 @@ import (
 	"syscall"
 
 	"github.com/punt-labs/cryptd/internal/engine"
+	"github.com/punt-labs/cryptd/internal/game"
 	"github.com/punt-labs/cryptd/internal/model"
 )
 
 // Server is the game server that exposes MCP tools over a network connection.
 // It supports both Unix sockets and TCP (DES-025).
+//
+// Two modes (DES-025 revised):
+//   - Normal: interpreter → engine → narrator → display text (for crypt CLI)
+//   - Passthrough: raw MCP tool surface with structured JSON (for Claude Code)
 type Server struct {
 	eng         *engine.Engine
 	state       *model.GameState
+	loop        *game.Loop // non-nil in normal mode; used for Dispatch only (not Run)
+	interp      model.CommandInterpreter
+	narr        model.Narrator
+	passthrough bool   // true = structured JSON, false = interpreted + narrated text
 	network     string // "unix" or "tcp"
 	address     string // socket path or host:port
 	scenarioDir string
 	listener    net.Listener
-	mu          sync.Mutex // guards eng and state
+	mu          sync.Mutex // guards eng, state, and loop
+}
+
+// ServerOption configures a Server.
+type ServerOption func(*Server)
+
+// WithPassthrough enables passthrough mode: raw MCP tool surface with structured
+// JSON responses. When disabled (the default), the server interprets text input
+// and returns narrated display text.
+func WithPassthrough() ServerOption {
+	return func(s *Server) { s.passthrough = true }
+}
+
+// WithInterpreter sets the command interpreter for normal mode.
+func WithInterpreter(interp model.CommandInterpreter) ServerOption {
+	return func(s *Server) { s.interp = interp }
+}
+
+// WithNarrator sets the narrator for normal mode.
+func WithNarrator(narr model.Narrator) ServerOption {
+	return func(s *Server) { s.narr = narr }
 }
 
 // NewServer creates a Server that listens on a Unix socket at the given path.
 // scenarioDir is the directory to search for scenario YAML files.
-func NewServer(socketPath, scenarioDir string) *Server {
-	return &Server{
+func NewServer(socketPath, scenarioDir string, opts ...ServerOption) *Server {
+	s := &Server{
 		network:     "unix",
 		address:     socketPath,
 		scenarioDir: scenarioDir,
 	}
+	for _, o := range opts {
+		o(s)
+	}
+	return s
 }
 
 // NewTCPServer creates a Server that listens on a TCP address (e.g. ":9000").
 // scenarioDir is the directory to search for scenario YAML files.
-func NewTCPServer(listenAddr, scenarioDir string) *Server {
-	return &Server{
+func NewTCPServer(listenAddr, scenarioDir string, opts ...ServerOption) *Server {
+	s := &Server{
 		network:     "tcp",
 		address:     listenAddr,
 		scenarioDir: scenarioDir,
 	}
+	for _, o := range opts {
+		o(s)
+	}
+	return s
 }
 
 // ListenAndServe starts listening and blocks until interrupted by

@@ -14,7 +14,7 @@ import (
 )
 
 func TestHeadless_MinimalRunCommands(t *testing.T) {
-	bin := clientBinary(t)
+	bin := serverBinary(t)
 	root := repoRoot(t)
 
 	// Provide headless commands via stdin.
@@ -31,7 +31,7 @@ func TestHeadless_MinimalRunCommands(t *testing.T) {
 	cmd.Stderr = &stderr
 
 	err := cmd.Run()
-	require.NoError(t, err, "crypt headless exited non-zero; stderr: %s", stderr.String())
+	require.NoError(t, err, "cryptd headless exited non-zero; stderr: %s", stderr.String())
 
 	out := stdout.String()
 	assert.Contains(t, out, "goblin_lair", "expected goblin_lair in output after moving south")

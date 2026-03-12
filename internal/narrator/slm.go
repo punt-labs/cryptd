@@ -92,6 +92,10 @@ func (s *SLM) Narrate(ctx context.Context, event model.EngineEvent, state model.
 		return "", err
 	}
 
+	if s.client == nil {
+		return s.fallback.Narrate(ctx, event, state)
+	}
+
 	prompt := handler.prompt(event)
 
 	temp := 0.7

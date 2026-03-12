@@ -6,8 +6,24 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- **Two-binary split (DES-025):** `cryptd` (server) and `crypt` (client) are now separate binaries. `cryptd serve` runs the game server; `crypt connect/solo/headless/autoplay` are client commands. `crypt connect` auto-starts `cryptd serve` when the socket is not present.
-- `crypt connect [--socket <path> | --addr <host:port>]` — interactive CLI client connecting to a running `cryptd serve` over JSON-RPC 2.0. Maps text commands (go north, take sword, attack) to MCP tool calls and formats structured responses for human-readable display. Auto-starts the server on local Unix sockets if not already running.
+- **Thin client architecture (DES-025 revised):** `crypt` is now a thin client — connects to `cryptd serve`, sends natural language text via the `play` JSON-RPC method, displays narrated text. No engine, interpreter, or narrator in the client. Auto-starts `cryptd serve` if the socket is not present.
+- **Two daemon modes (DES-025):** `cryptd serve` runs in Normal mode (interpreter → engine → narrator → display text for CLI) or `--passthrough` mode (raw MCP tool surface with structured JSON for Claude Code). Normal mode auto-detects ollama for SLM inference, falls back to Rules + Template.
+- `internal/daemon/play.go` — `handlePlay()` processes text input through the full interpreter → engine → narrator pipeline; `handleNewGamePlay()` starts a game and narrates the initial room description.
+- `internal/daemon` ServerOption functional options: `WithPassthrough()`, `WithInterpreter()`, `WithNarrator()`.
+- `internal/game.Loop.Dispatch()` exported so the daemon can reuse the game loop's orchestration logic (combat, enemy turns, level-ups) without duplicating 300+ lines.
+- Nil client guards in `interpreter.SLM` and `narrator.SLM` — graceful fallback when no inference server is available.
+- `cryptd headless` and `cryptd autoplay` — testing tools moved from client to server binary (engine is server infrastructure).
+
+### Removed
+
+- `cmd/crypt/embedded.go` — deleted fat client that embedded the game engine. Engine access is always through the server.
+- `crypt solo`, `crypt headless`, `crypt autoplay`, `crypt connect` subcommands — replaced by plain `crypt` thin client.
+
+### Changed
+
+- `crypt` takes no subcommands. Flags: `--socket`, `--addr`, `--scenario`, `--name`, `--class`.
+- Existing daemon tests updated to use `WithPassthrough()` (they exercise the MCP tool surface, which is passthrough mode by definition).
+- E2E acceptance and headless tests now use `cryptd` binary for autoplay/headless commands.
 - `internal/scenariodir` package — canonical scenario ID resolution with path-traversal protection, eliminating duplication between CLI and daemon
 - `internal/daemon.DefaultSocketPath()` — shared default socket path for both server and client binaries
 - `cryptd serve [--socket <path> | --listen <addr>]` — daemon serving 15 MCP tools as JSON-RPC 2.0 over NDJSON; Unix socket (default `~/.crypt/daemon.sock`) or TCP transport; single-connection, signal-handled shutdown, stale socket cleanup

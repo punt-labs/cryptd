@@ -10,7 +10,7 @@ There is no such thing as a "pre-existing" issue. If you see a problem — in co
 
 **M0 (foundation) and M1 (data contracts) are complete. M2 (thin E2E slice) is substantially complete. M8 (server thin slice) is complete.**
 
-Two binaries (DES-025): `cryptd` (server) and `crypt` (client). Current subcommands: `cryptd serve`, `cryptd headless`, `cryptd solo`, `cryptd autoplay`, `cryptd validate`. The `crypt` client binary will be split out in a future milestone.
+Two binaries (DES-025): `cryptd` (server) and `crypt` (thin client). Server subcommands: `cryptd serve`, `cryptd headless`, `cryptd autoplay`, `cryptd validate`. The client (`crypt`) takes no subcommands — it connects to `cryptd serve`, auto-starts the server if needed, and sends natural language text via the `play` JSON-RPC method.
 
 Check `bd ready` for current unblocked work.
 
@@ -27,17 +27,18 @@ L1 — Go engine              State transitions, combat, inventory, fog-of-war, 
 L1 — Lux (ImGui)            Display surface (receives element trees via MCP)
 ```
 
-### Play Modes
+### Daemon Modes (DES-025)
 
-A play mode is a named combination of brain + UI. Engine access (embedded vs server) is orthogonal — any mode can run against either. All modes share the same engine, save format, and scenario YAML. Switching modes mid-adventure is valid.
+The engine always runs as a server (`cryptd serve`). Two modes:
 
-| Mode       | CommandInterpreter | Narrator         | Renderer    |
-|------------|-------------------|------------------|-------------|
-| `dm`       | LLMInterpreter    | LLMNarrator      | LuxRenderer |
-| `solo`     | SLMInterpreter    | SLMNarrator      | Lux or CLI  |
-| `headless` | RulesInterpreter  | TemplateNarrator | CLIRenderer |
+| Mode | Interpreter | Narrator | Response | Client |
+|------|-------------|----------|----------|--------|
+| **Normal** | SLM → Rules fallback | SLM → Template fallback | Display-ready text | `crypt` (CLI) |
+| **Passthrough** | None (MCP tool names) | None (structured JSON) | MCP ToolResult | Claude Code plugin |
 
-Engine access is a separate axis: embedded (in-process) or server (`cryptd serve` over Unix socket or TCP). See DES-025.
+Normal mode auto-detects ollama for SLM inference, falls back to deterministic Rules + Template when no inference server is available. `cryptd serve --passthrough` enables passthrough mode for MCP clients.
+
+`cryptd headless` and `cryptd autoplay` are testing/scripting tools that use Rules + Template directly (no server, in-process).
 
 ### The Three Interfaces
 
@@ -76,8 +77,8 @@ The engine knows nothing about interpreters. Interpreters know nothing about nar
 
 | Package | What It Does |
 |---------|-------------|
-| `cmd/cryptd` | Server binary entry point; `cryptd serve`, `cryptd validate` |
-| `cmd/crypt` | Client binary entry point; `crypt connect`, `crypt solo`, `crypt headless`, `crypt autoplay` |
+| `cmd/cryptd` | Server binary entry point; `cryptd serve`, `cryptd headless`, `cryptd autoplay`, `cryptd validate` |
+| `cmd/crypt` | Thin client binary; connects to `cryptd serve`, sends text, displays narrated responses |
 | `cmd/dump-mcp-schema` | Generates MCP schema JSON for CI contract check |
 | `internal/daemon` | Game server: JSON-RPC 2.0 handler, tool dispatcher, Unix socket/TCP listener |
 | `internal/engine` | Deterministic game rules: `NewGame`, `Move`, `Look` |

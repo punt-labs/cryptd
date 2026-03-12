@@ -22,17 +22,6 @@ func serverBinary(t *testing.T) string {
 	return bin
 }
 
-// clientBinary builds and returns the path to the crypt client binary.
-func clientBinary(t *testing.T) string {
-	t.Helper()
-	bin := filepath.Join(t.TempDir(), "crypt")
-	cmd := exec.Command("go", "build", "-o", bin, "./cmd/crypt")
-	cmd.Dir = repoRoot(t)
-	out, err := cmd.CombinedOutput()
-	require.NoError(t, err, "build crypt failed: %s", out)
-	return bin
-}
-
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	// Navigate up from e2e/ to repo root.

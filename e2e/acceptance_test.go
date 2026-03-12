@@ -42,7 +42,7 @@ func runAutoplay(t *testing.T, bin, root, script string) []renderer.TranscriptEn
 }
 
 func TestAcceptance_FullRun(t *testing.T) {
-	bin := clientBinary(t)
+	bin := serverBinary(t)
 	root := repoRoot(t)
 	entries := runAutoplay(t, bin, root, "full-run.txt")
 
@@ -70,7 +70,7 @@ func TestAcceptance_FullRun(t *testing.T) {
 }
 
 func TestAcceptance_CombatWalkthrough(t *testing.T) {
-	bin := clientBinary(t)
+	bin := serverBinary(t)
 	root := repoRoot(t)
 	entries := runAutoplay(t, bin, root, "combat-walkthrough.txt")
 
@@ -102,7 +102,7 @@ func TestAcceptance_CombatWalkthrough(t *testing.T) {
 }
 
 func TestAcceptance_PickUpItem(t *testing.T) {
-	bin := clientBinary(t)
+	bin := serverBinary(t)
 	root := repoRoot(t)
 	entries := runAutoplay(t, bin, root, "pick-up-item.txt")
 
@@ -132,7 +132,7 @@ func TestAcceptance_PickUpItem(t *testing.T) {
 }
 
 func TestAcceptance_Combat(t *testing.T) {
-	bin := clientBinary(t)
+	bin := serverBinary(t)
 	root := repoRoot(t)
 	entries := runAutoplay(t, bin, root, "combat.txt")
 
@@ -150,7 +150,7 @@ func TestAcceptance_Combat(t *testing.T) {
 }
 
 func TestAcceptance_SaveAndReload(t *testing.T) {
-	bin := clientBinary(t)
+	bin := serverBinary(t)
 	root := repoRoot(t)
 
 	// Run in a temp dir so saves don't pollute the repo.
