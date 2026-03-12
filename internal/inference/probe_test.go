@@ -56,6 +56,14 @@ func fakeLlamaCppServer(t *testing.T, models []string) *httptest.Server {
 	return srv
 }
 
+// closedServerURL returns a URL that is guaranteed to refuse connections.
+func closedServerURL(t *testing.T) string {
+	t.Helper()
+	srv := httptest.NewServer(http.NotFoundHandler())
+	srv.Close()
+	return srv.URL
+}
+
 func TestProbe_OllamaFirst(t *testing.T) {
 	ollama := fakeOllamaServer(t, []string{"smollm2:135m"})
 	llama := fakeLlamaCppServer(t, []string{"SmolLM2-135M-Q4"})
@@ -73,11 +81,11 @@ func TestProbe_OllamaFirst(t *testing.T) {
 }
 
 func TestProbe_FallsThrough(t *testing.T) {
-	// ollama is down, llama.cpp responds.
+	downURL := closedServerURL(t)
 	llama := fakeLlamaCppServer(t, []string{"SmolLM2-135M-Q4"})
 
 	endpoints := []inference.Endpoint{
-		{Name: "ollama", BaseURL: "http://127.0.0.1:1", HealthPath: "/api/tags", ModelExtractor: inference.OllamaModels},
+		{Name: "ollama", BaseURL: downURL, HealthPath: "/api/tags", ModelExtractor: inference.OllamaModels},
 		{Name: "llama.cpp", BaseURL: llama.URL, HealthPath: "/v1/models", ModelExtractor: inference.OpenAIModels},
 	}
 
@@ -88,12 +96,15 @@ func TestProbe_FallsThrough(t *testing.T) {
 }
 
 func TestProbe_NoneAvailable(t *testing.T) {
+	downURL1 := closedServerURL(t)
+	downURL2 := closedServerURL(t)
+
 	endpoints := []inference.Endpoint{
-		{Name: "ollama", BaseURL: "http://127.0.0.1:1", HealthPath: "/api/tags", ModelExtractor: inference.OllamaModels},
-		{Name: "llama.cpp", BaseURL: "http://127.0.0.1:2", HealthPath: "/v1/models", ModelExtractor: inference.OpenAIModels},
+		{Name: "ollama", BaseURL: downURL1, HealthPath: "/api/tags", ModelExtractor: inference.OllamaModels},
+		{Name: "llama.cpp", BaseURL: downURL2, HealthPath: "/v1/models", ModelExtractor: inference.OpenAIModels},
 	}
 
-	r := inference.Probe(context.Background(), endpoints, 100*time.Millisecond)
+	r := inference.Probe(context.Background(), endpoints, time.Second)
 	assert.Nil(t, r)
 }
 
@@ -134,4 +145,11 @@ func TestProbe_ServerError(t *testing.T) {
 
 	r := inference.Probe(context.Background(), endpoints, time.Second)
 	assert.Nil(t, r)
+}
+
+func TestDefaultEndpoints_ReturnsCopy(t *testing.T) {
+	a := inference.DefaultEndpoints()
+	b := inference.DefaultEndpoints()
+	a[0].Name = "mutated"
+	assert.Equal(t, "ollama", b[0].Name, "mutation of one copy must not affect another")
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -16,11 +17,19 @@ type Runtime struct {
 	Model   string // first available model ID
 }
 
-// DefaultEndpoints are the well-known local endpoints for inference runtimes,
+// defaultEndpoints are the well-known local endpoints for inference runtimes,
 // in priority order (ollama first, then llama.cpp).
-var DefaultEndpoints = []Endpoint{
+var defaultEndpoints = []Endpoint{
 	{Name: "ollama", BaseURL: "http://localhost:11434", HealthPath: "/api/tags", ModelExtractor: OllamaModels},
 	{Name: "llama.cpp", BaseURL: "http://localhost:8080", HealthPath: "/v1/models", ModelExtractor: OpenAIModels},
+}
+
+// DefaultEndpoints returns the well-known local endpoints for inference
+// runtimes, in priority order (ollama first, then llama.cpp).
+func DefaultEndpoints() []Endpoint {
+	eps := make([]Endpoint, len(defaultEndpoints))
+	copy(eps, defaultEndpoints)
+	return eps
 }
 
 // Endpoint describes how to probe a single inference runtime.
@@ -46,7 +55,13 @@ func probeEndpoint(ctx context.Context, ep Endpoint, timeout time.Duration) *Run
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, ep.BaseURL+ep.HealthPath, nil)
+	base, err := url.Parse(ep.BaseURL)
+	if err != nil {
+		return nil
+	}
+	base.Path = base.Path + ep.HealthPath
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base.String(), nil)
 	if err != nil {
 		return nil
 	}
