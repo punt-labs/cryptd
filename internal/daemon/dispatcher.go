@@ -80,6 +80,10 @@ func (s *Server) dispatchNewGame(raw json.RawMessage) (any, *RPCError) {
 	if a.ScenarioID == "" || a.CharacterName == "" || a.CharacterClass == "" {
 		return nil, &RPCError{Code: CodeInvalidParams, Message: "scenario_id, character_name, and character_class are required"}
 	}
+	validClasses := map[string]bool{"fighter": true, "mage": true, "priest": true, "thief": true}
+	if !validClasses[a.CharacterClass] {
+		return nil, &RPCError{Code: CodeInvalidParams, Message: "character_class must be one of: fighter, mage, priest, thief"}
+	}
 
 	sc, err := s.loadScenario(a.ScenarioID)
 	if err != nil {
@@ -160,7 +164,7 @@ func (s *Server) dispatchMove(raw json.RawMessage) (any, *RPCError) {
 	case combatErr == nil:
 		response["combat"] = combatSummary(combatResult, s.state)
 		// If enemies go first, process their turns.
-		if s.state.Dungeon.Combat.Active && !s.eng.IsHeroTurn(s.state) {
+		if s.state.Dungeon.Combat.Active && !isHeroTurn(s.state) {
 			response["enemy_turns"] = s.processEnemyTurns()
 		}
 	case errors.As(combatErr, new(*engine.NoEnemiesError)),
@@ -168,7 +172,7 @@ func (s *Server) dispatchMove(raw json.RawMessage) (any, *RPCError) {
 		// Expected — room has no enemies or combat already active.
 	default:
 		log.Printf("daemon: dispatchMove: StartCombat error: %v", combatErr)
-		response["warning"] = fmt.Sprintf("combat failed to start: %v", combatErr)
+		response["warning"] = "combat failed to start due to an internal error"
 	}
 
 	return response, nil
@@ -359,7 +363,7 @@ func (s *Server) dispatchAttack(raw json.RawMessage) (any, *RPCError) {
 	if result.CombatOver {
 		response["combat_over"] = true
 		response["level_up"] = s.checkLevelUp()
-	} else if s.state.Dungeon.Combat.Active && !s.eng.IsHeroTurn(s.state) {
+	} else if s.state.Dungeon.Combat.Active && !isHeroTurn(s.state) {
 		response["enemy_turns"] = s.processEnemyTurns()
 	}
 
@@ -381,7 +385,7 @@ func (s *Server) dispatchDefend() (any, *RPCError) {
 		"hero":      heroSummary(s.state),
 	}
 
-	if s.state.Dungeon.Combat.Active && !s.eng.IsHeroTurn(s.state) {
+	if s.state.Dungeon.Combat.Active && !isHeroTurn(s.state) {
 		response["enemy_turns"] = s.processEnemyTurns()
 	}
 
@@ -403,7 +407,7 @@ func (s *Server) dispatchFlee() (any, *RPCError) {
 		"hero":    heroSummary(s.state),
 	}
 
-	if !result.Success && s.state.Dungeon.Combat.Active && !s.eng.IsHeroTurn(s.state) {
+	if !result.Success && s.state.Dungeon.Combat.Active && !isHeroTurn(s.state) {
 		response["enemy_turns"] = s.processEnemyTurns()
 	}
 
@@ -447,7 +451,7 @@ func (s *Server) dispatchCastSpell(raw json.RawMessage) (any, *RPCError) {
 	}
 
 	// After any spell (damage or heal), check combat state and process enemy turns.
-	if s.state.Dungeon.Combat.Active && !s.eng.IsHeroTurn(s.state) {
+	if s.state.Dungeon.Combat.Active && !isHeroTurn(s.state) {
 		response["enemy_turns"] = s.processEnemyTurns()
 	} else if result.Effect == "damage" && !s.state.Dungeon.Combat.Active {
 		// Combat ended — spell killed last enemy.
@@ -512,7 +516,7 @@ func (s *Server) processEnemyTurns() []map[string]any {
 	if maxIter < 1 {
 		maxIter = 1
 	}
-	for i := 0; i < maxIter && s.state.Dungeon.Combat.Active && !s.eng.IsHeroTurn(s.state); i++ {
+	for i := 0; i < maxIter && s.state.Dungeon.Combat.Active && !isHeroTurn(s.state); i++ {
 		result, err := s.eng.ProcessEnemyTurn(s.state)
 		if err != nil {
 			log.Printf("daemon: processEnemyTurns: unexpected error: %v", err)
