@@ -39,7 +39,10 @@ func TestSLMLoop_HappyPath(t *testing.T) {
 	eng := engine.New(loadScenario(t))
 	state := newState(t, eng)
 
-	inputs := []string{"look around the room", "time to leave"}
+	// Inputs must be unrecognisable by the Rules interpreter so the SLM
+	// is actually invoked. Rules handles "look" directly — use natural-
+	// language phrases that only the SLM can parse.
+	inputs := []string{"survey my surroundings", "time to leave"}
 	fake := &fakeRenderer{events: make(chan model.InputEvent, len(inputs))}
 	for _, inp := range inputs {
 		fake.events <- model.InputEvent{Type: "input", Payload: inp}
@@ -48,7 +51,8 @@ func TestSLMLoop_HappyPath(t *testing.T) {
 	err := game.NewLoop(eng, interp, narr, fake).Run(context.Background(), &state)
 	require.NoError(t, err)
 
-	// Interpreter was called for both inputs.
+	// Interpreter was called for both inputs (Rules returned "unknown",
+	// so the SLM was consulted each time).
 	interpCalls := interpSrv.Calls()
 	assert.Equal(t, 2, len(interpCalls), "expected 2 interpreter SLM calls")
 

@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- `crypt` REPL now uses `ergochat/readline` for proper terminal line editing, history, and Ctrl-C handling (was broken with bare `bufio.Scanner`).
+- `TestSLMLoop_HappyPath` integration test no longer hangs — test inputs changed to phrases the Rules interpreter can't parse, so the SLM is actually invoked.
+
 ### Added
 
 - **Thin client architecture (DES-025 revised):** `crypt` is now a thin client — connects to `cryptd serve`, sends natural language text via the `play` JSON-RPC method, displays narrated text. No engine, interpreter, or narrator in the client. Auto-starts `cryptd serve` if the socket is not present.

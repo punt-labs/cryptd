@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ergochat/readline"
 	"github.com/punt-labs/cryptd/internal/daemon"
 )
 
@@ -66,8 +68,11 @@ func dialOrStart(socketPath string) (net.Conn, error) {
 
 	// Start in foreground mode so this process IS the server — kill and
 	// wait target the right PID (not a daemonize parent that already exited).
+	// Capture stderr in a buffer — server log output on the client terminal
+	// corrupts readline's raw-mode state, but we need diagnostics on failure.
+	var stderrBuf bytes.Buffer
 	cmd := exec.Command(cryptd, "serve", "-f", "--socket", socketPath)
-	cmd.Stderr = os.Stderr
+	cmd.Stderr = &stderrBuf
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start cryptd: %w", err)
 	}
@@ -81,6 +86,10 @@ func dialOrStart(socketPath string) (net.Conn, error) {
 		// Check if the server exited before the socket appeared.
 		select {
 		case err := <-waitCh:
+			msg := strings.TrimSpace(stderrBuf.String())
+			if msg != "" {
+				return nil, fmt.Errorf("cryptd exited before socket ready: %s", msg)
+			}
 			return nil, fmt.Errorf("cryptd exited before socket ready: %v", err)
 		default:
 		}
@@ -162,10 +171,95 @@ func session(conn net.Conn, in io.Reader, out, errOut io.Writer, scenario, charN
 		}
 	}
 
-	// Interactive REPL.
-	inputScanner := bufio.NewScanner(in)
+	// Interactive REPL with readline for line editing and history.
 	fmt.Fprintln(out, "Type 'help' for commands, 'quit' to exit.")
 
+	rl, rlErr := readline.NewFromConfig(&readline.Config{
+		Prompt:          "> ",
+		InterruptPrompt: "^C",
+		EOFPrompt:       "quit",
+		Stdin:           in,
+		Stdout:          out,
+		Stderr:          errOut,
+	})
+	if rlErr != nil {
+		// Readline failed (e.g. not a terminal) — fall back to plain scanner.
+		return replScanner(in, out, errOut, send)
+	}
+	defer rl.Close()
+
+	for {
+		line, err := rl.Readline()
+		if err != nil {
+			if errors.Is(err, readline.ErrInterrupt) || errors.Is(err, io.EOF) {
+				fmt.Fprintln(out, "Farewell, adventurer.")
+				return 0
+			}
+			// Terminal I/O failure — surface the error.
+			fmt.Fprintf(errOut, "input error: %v\n", err)
+			return 1
+		}
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		if code, done := handleLine(line, send, out, errOut); done {
+			return code
+		}
+	}
+}
+
+// handleLine processes a single REPL input line. Returns (exitCode, true) if
+// the session should end, or (0, false) to continue the loop.
+func handleLine(line string, send func(string, any) (json.RawMessage, error), out, errOut io.Writer) (int, bool) {
+	if line == "quit" || line == "exit" {
+		fmt.Fprintln(out, "Farewell, adventurer.")
+		return 0, true
+	}
+
+	if line == "help" || line == "?" {
+		fmt.Fprintln(out, helpText)
+		return 0, false
+	}
+
+	// "new <scenario> <name> <class>" is handled client-side.
+	if strings.HasPrefix(line, "new ") || strings.HasPrefix(line, "start ") {
+		parts := strings.Fields(line)
+		if len(parts) < 4 {
+			fmt.Fprintln(errOut, "usage: new <scenario_id> <character_name> <character_class>")
+			return 0, false
+		}
+		if err := startGame(send, out, errOut, parts[1], parts[2], parts[3]); err != nil {
+			if errors.Is(err, errConnLost) {
+				fmt.Fprintf(errOut, "Error: %v\n", err)
+				return 1, true
+			}
+			fmt.Fprintf(errOut, "Error: %v\n", err)
+		}
+		return 0, false
+	}
+
+	// Everything else: send to server as play text.
+	result, err := send("play", map[string]string{"text": line})
+	if err != nil {
+		if errors.Is(err, errConnLost) {
+			fmt.Fprintf(errOut, "Error: %v\n", err)
+			return 1, true
+		}
+		fmt.Fprintf(errOut, "Error: %v\n", err)
+		return 0, false
+	}
+
+	if displayResult(out, result) {
+		return 0, true
+	}
+	return 0, false
+}
+
+// replScanner is the fallback REPL for non-terminal input (pipes, tests).
+func replScanner(in io.Reader, out, errOut io.Writer, send func(string, any) (json.RawMessage, error)) int {
+	inputScanner := bufio.NewScanner(in)
 	for {
 		fmt.Fprint(out, "> ")
 		if !inputScanner.Scan() {
@@ -175,47 +269,8 @@ func session(conn net.Conn, in io.Reader, out, errOut io.Writer, scenario, charN
 		if line == "" {
 			continue
 		}
-
-		if line == "quit" || line == "exit" {
-			fmt.Fprintln(out, "Farewell, adventurer.")
-			return 0
-		}
-
-		if line == "help" || line == "?" {
-			fmt.Fprintln(out, helpText)
-			continue
-		}
-
-		// "new <scenario> <name> <class>" is handled client-side.
-		if strings.HasPrefix(line, "new ") || strings.HasPrefix(line, "start ") {
-			parts := strings.Fields(line)
-			if len(parts) < 4 {
-				fmt.Fprintln(errOut, "usage: new <scenario_id> <character_name> <character_class>")
-				continue
-			}
-			if err := startGame(send, out, errOut, parts[1], parts[2], parts[3]); err != nil {
-				if errors.Is(err, errConnLost) {
-					fmt.Fprintf(errOut, "Error: %v\n", err)
-					return 1
-				}
-				fmt.Fprintf(errOut, "Error: %v\n", err)
-			}
-			continue
-		}
-
-		// Everything else: send to server as play text.
-		result, err := send("play", map[string]string{"text": line})
-		if err != nil {
-			if errors.Is(err, errConnLost) {
-				fmt.Fprintf(errOut, "Error: %v\n", err)
-				return 1
-			}
-			fmt.Fprintf(errOut, "Error: %v\n", err)
-			continue
-		}
-
-		if displayResult(out, result) {
-			return 0
+		if code, done := handleLine(line, send, out, errOut); done {
+			return code
 		}
 	}
 	return 0
