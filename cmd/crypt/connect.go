@@ -328,7 +328,7 @@ func displayResult(out io.Writer, raw json.RawMessage) bool {
 // printHeroStatus prints a compact HP/MP bar.
 func printHeroStatus(out io.Writer, hero *model.Character) {
 	fmt.Fprintf(out, "[HP: %d/%d", hero.HP, hero.MaxHP)
-	if hero.MP > 0 {
+	if hero.MaxMP > 0 {
 		fmt.Fprintf(out, " MP: %d/%d", hero.MP, hero.MaxMP)
 	}
 	fmt.Fprintln(out, "]")
