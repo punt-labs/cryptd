@@ -27,7 +27,7 @@ func TestDaemon_ServeAndCallTools(t *testing.T) {
 	sockPath := filepath.Join(dir, "d.sock")
 
 	// Start daemon subprocess.
-	cmd := exec.Command(bin, "serve", "--socket", sockPath, "--passthrough")
+	cmd := exec.Command(bin, "serve", "-f", "--socket", sockPath, "--passthrough")
 	cmd.Dir = root
 	cmd.Env = append(os.Environ(), "CRYPT_SCENARIO_DIR=testdata/scenarios")
 	cmd.Stderr = os.Stderr
