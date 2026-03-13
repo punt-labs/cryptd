@@ -1,6 +1,6 @@
 # cryptd
 
-Game engine and server for [crypt](https://github.com/punt-labs/crypt), a text adventure game playable via Claude Code, CLI, or (future) web client.
+Game engine and server for [crypt](https://github.com/punt-labs/crypt), a text adventure game playable via Claude Code, CLI, or (future) web client. Produces two binaries: `cryptd` (server) and `crypt` (client).
 
 ## Principal Engineer Mindset
 
@@ -8,9 +8,9 @@ There is no such thing as a "pre-existing" issue. If you see a problem — in co
 
 ## Project State
 
-**M0 (foundation) and M1 (data contracts) are complete. M2 (thin E2E slice) is substantially complete on `feat/m2-thin-e2e`. M8 (server thin slice) in progress.**
+**M0 (foundation) and M1 (data contracts) are complete. M2 (thin E2E slice) is substantially complete. M8 (server thin slice) is complete.**
 
-Two binaries (DES-025): `cryptd` (server) and `crypt` (client). Current subcommands: `cryptd serve`, `cryptd headless`, `cryptd solo`, `cryptd autoplay`, `cryptd validate`. The `crypt` client binary will be split out in a future milestone.
+Two binaries (DES-025): `cryptd` (server/daemon) and `crypt` (thin client). Server subcommands: `cryptd serve`, `cryptd validate`. The client (`crypt`) takes no subcommands — it connects to `cryptd serve`, auto-starts the server if needed, and sends natural language text via the `play` JSON-RPC method. `cryptd serve` will daemonize by default (bead cryptd-ydf); `-f` for foreground, `-t` for testing on stdin/stdout.
 
 Check `bd ready` for current unblocked work.
 
@@ -27,17 +27,18 @@ L1 — Go engine              State transitions, combat, inventory, fog-of-war, 
 L1 — Lux (ImGui)            Display surface (receives element trees via MCP)
 ```
 
-### Play Modes
+### Daemon Modes (DES-025)
 
-A play mode is a named combination of brain + UI. Engine access (embedded vs server) is orthogonal — any mode can run against either. All modes share the same engine, save format, and scenario YAML. Switching modes mid-adventure is valid.
+The engine always runs as a server (`cryptd serve`). Two modes:
 
-| Mode       | CommandInterpreter | Narrator         | Renderer    |
-|------------|-------------------|------------------|-------------|
-| `dm`       | LLMInterpreter    | LLMNarrator      | LuxRenderer |
-| `solo`     | SLMInterpreter    | SLMNarrator      | Lux or CLI  |
-| `headless` | RulesInterpreter  | TemplateNarrator | CLIRenderer |
+| Mode | Interpreter | Narrator | Response | Client |
+|------|-------------|----------|----------|--------|
+| **Normal** | SLM → Rules fallback | SLM → Template fallback | Display-ready text | `crypt` (CLI) |
+| **Passthrough** | None (MCP tool names) | None (structured JSON) | MCP ToolResult | Claude Code plugin |
 
-Engine access is a separate axis: embedded (in-process) or server (`cryptd serve` over Unix socket or TCP). See DES-025.
+Normal mode auto-detects ollama for SLM inference, falls back to deterministic Rules + Template when no inference server is available. `cryptd serve --passthrough` enables passthrough mode for MCP clients.
+
+`cryptd serve -t` runs the engine on stdin/stdout for testing (no network, implies `-f`). `-f` keeps the daemon in the foreground without daemonizing.
 
 ### The Three Interfaces
 
@@ -61,7 +62,7 @@ type Renderer interface {
 Dependencies flow strictly downward. This is a build-order red line:
 
 ```text
-CLI / Commands  (cmd/crypt/)
+CLI / Commands  (cmd/cryptd/, cmd/crypt/)
     └── Game Loop  (internal/game/)  — wires Interpreter + Narrator + Renderer
             ├── Interpreters  (internal/interpreter/)
             ├── Narrators     (internal/narrator/)
@@ -76,7 +77,8 @@ The engine knows nothing about interpreters. Interpreters know nothing about nar
 
 | Package | What It Does |
 |---------|-------------|
-| `cmd/crypt` | CLI entry point; wires play modes and server |
+| `cmd/cryptd` | Server/daemon binary; `cryptd serve` (with `-f`, `-t`, `--passthrough`), `cryptd validate` |
+| `cmd/crypt` | Thin client binary; connects to `cryptd serve`, sends text, displays narrated responses |
 | `cmd/dump-mcp-schema` | Generates MCP schema JSON for CI contract check |
 | `internal/daemon` | Game server: JSON-RPC 2.0 handler, tool dispatcher, Unix socket/TCP listener |
 | `internal/engine` | Deterministic game rules: `NewGame`, `Move`, `Look` |
@@ -87,6 +89,7 @@ The engine knows nothing about interpreters. Interpreters know nothing about nar
 | `internal/renderer` | `CLIRenderer` — stdout/stdin text interface |
 | `internal/model` | All data types: `GameState`, `Character`, `EngineAction`, `EngineEvent`, interfaces |
 | `internal/scenario` | YAML scenario parser and validator |
+| `internal/scenariodir` | Scenario ID resolution with path-traversal protection |
 | `internal/save` | JSON save/load with `schema_version` and forward compat |
 | `internal/dice` | Dice notation parser: `NdS`, `NdS+M`, `NdS-M` |
 | `internal/testutil` | Test doubles: `FakeLLMInterpreter`, `FakeLLMNarrator`, `FakeSLMServer`, `FakeLuxServer`, `ScriptRunner` |
@@ -129,7 +132,7 @@ go test -race -count=1 ./...
 go test -race -tags integration -count=1 ./...
 go test -cover -coverprofile=coverage.out ./internal/engine/...
 go tool cover -func=coverage.out   # engine must be >= 90%
-go build -o cryptd ./cmd/crypt && go test -tags e2e ./e2e/...
+make build && go test -tags e2e ./e2e/...
 staticcheck ./...
 npx markdownlint-cli2 "**/*.md" "#node_modules"
 ```

@@ -17,7 +17,7 @@ func testServer(t *testing.T) *Server {
 	t.Helper()
 	// Find testdata relative to repo root.
 	scenarioDir := filepath.Join(repoRoot(t), "testdata", "scenarios")
-	return NewServer(filepath.Join(t.TempDir(), "test.sock"), scenarioDir)
+	return NewServer(filepath.Join(t.TempDir(), "test.sock"), scenarioDir, WithPassthrough())
 }
 
 func repoRoot(t *testing.T) string {

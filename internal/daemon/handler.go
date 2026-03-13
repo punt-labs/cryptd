@@ -136,7 +136,31 @@ func (s *Server) handleRequest(req Request) Response {
 		}
 
 	case "tools/call":
+		if !s.passthrough {
+			var params ToolCallParams
+			if err := json.Unmarshal(req.Params, &params); err != nil {
+				return Response{
+					JSONRPC: "2.0",
+					ID:      req.ID,
+					Error:   &RPCError{Code: CodeInvalidParams, Message: "invalid tool call params: " + err.Error()},
+				}
+			}
+			if params.Name == "new_game" {
+				req.Params = params.Arguments
+				return s.handleNewGamePlay(req)
+			}
+			// Normal mode: non-new_game tool calls are not supported.
+			// Clients should use the "play" method for text input.
+			return Response{
+				JSONRPC: "2.0",
+				ID:      req.ID,
+				Error:   &RPCError{Code: CodeMethodNotFound, Message: "tools/call is only available in passthrough mode — use the play method"},
+			}
+		}
 		return s.handleToolCall(req)
+
+	case "play":
+		return s.handlePlay(req)
 
 	default:
 		return Response{

@@ -6,14 +6,33 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **Thin client architecture (DES-025 revised):** `crypt` is now a thin client — connects to `cryptd serve`, sends natural language text via the `play` JSON-RPC method, displays narrated text. No engine, interpreter, or narrator in the client. Auto-starts `cryptd serve` if the socket is not present.
+- **Two daemon modes (DES-025):** `cryptd serve` runs in Normal mode (interpreter → engine → narrator → display text for CLI) or `--passthrough` mode (raw MCP tool surface with structured JSON for Claude Code). Normal mode auto-detects ollama for SLM inference, falls back to Rules + Template.
+- `internal/daemon/play.go` — `handlePlay()` processes text input through the full interpreter → engine → narrator pipeline; `handleNewGamePlay()` starts a game and narrates the initial room description.
+- `internal/daemon` ServerOption functional options: `WithPassthrough()`, `WithInterpreter()`, `WithNarrator()`.
+- `internal/game.Loop.Dispatch()` exported so the daemon can reuse the game loop's orchestration logic (combat, enemy turns, level-ups) without duplicating 300+ lines.
+- Nil client guards in `interpreter.SLM` and `narrator.SLM` — graceful fallback when no inference server is available.
+
+### Removed
+
+- `cmd/crypt/embedded.go` — deleted fat client that embedded the game engine. Engine access is always through the server.
+- `crypt solo`, `crypt headless`, `crypt autoplay`, `crypt connect` subcommands — replaced by plain `crypt` thin client.
+- `cryptd headless` and `cryptd autoplay` subcommands — replaced by `cryptd serve -t` (testing mode on stdin/stdout).
+- E2E acceptance and headless tests — replaced by `cryptd serve -t --script` demos.
+
+### Changed
+
+- `crypt` takes no subcommands. Flags: `--socket`, `--addr`, `--scenario`, `--name`, `--class`.
+- Existing daemon tests updated to use `WithPassthrough()` (they exercise the MCP tool surface, which is passthrough mode by definition).
+- `internal/scenariodir` package — canonical scenario ID resolution with path-traversal protection, eliminating duplication between CLI and daemon
+- `internal/daemon.DefaultSocketPath()` — shared default socket path for both server and client binaries
 - `cryptd serve [--socket <path> | --listen <addr>]` — daemon serving 15 MCP tools as JSON-RPC 2.0 over NDJSON; Unix socket (default `~/.crypt/daemon.sock`) or TCP transport; single-connection, signal-handled shutdown, stale socket cleanup
 - `internal/daemon` package: protocol types, dispatcher (maps tool names → engine methods with combat auto-processing and level-up checks), JSON-RPC handler (initialize, tools/list, tools/call), and server with Unix socket lifecycle
 - Daemon error mapping: engine typed errors → JSON-RPC error codes (-32602 invalid params, -32001 state blocked, -32002 game over, -32003 no active game)
 - Daemon unit tests (17 tests): all 15 tools, protocol errors, combat-blocked actions, save/load
 - Daemon integration tests (5 tests): socket-level initialize, multi-tool session, cross-connection state persistence, TCP initialize, TCP game session
 - Daemon E2E test: subprocess spawn, socket connect, full 6-step game session (initialize → tools/list → new_game → look → pick_up → move with combat)
-
-- Makefile: build, test, demo, and ollama management targets with `make help`; `CRYPT_SCENARIO_DIR` set centrally so demo commands work without env vars
+- Makefile: build, test, demo, and ollama management targets with `make help`; `CRYPT_SCENARIO_DIR` set centrally so demo commands work without env vars; `GIN_MODE=release` on `ollama serve` suppresses verbose HTTP request logs during gameplay
 - SLM interpreter rules-first routing: aliases and exact verbs bypass SLM entirely (zero latency); SLM called only for natural language and item/enemy/spell ID resolution
 - SLM context injection: game state (room, items, exits, enemies, inventory, equipment) injected into SLM user message, grounding output in valid game objects
 - `interpreter.BuildContext` and `interpreter.ParseSLMResponse` exported for eval harness reuse
@@ -24,10 +43,6 @@ All notable changes to this project will be documented in this file.
 - Rules interpreter autocorrect: typos within edit distance 1 of known verbs are corrected deterministically (e.g. `attacl` → `attack`, `tke` → `take`); only verbs 3+ characters, zero latency, no SLM call needed
 - Rules interpreter: `descend` → move down, `ascend` → move up (directional synonyms)
 - SLM system prompt: few-shot examples, stronger unknown guidance ("do not guess"), item ID resolution instructions referencing game state context; eval accuracy 98.4% → 100%
-
-### Changed
-
-- Makefile: `GIN_MODE=release` on `ollama serve` suppresses verbose HTTP request logs during gameplay
 
 - `LuxUpdate.Log`: recent adventure log entries included in incremental updates, enabling the frontend to render a scrolling narration panel without waiting for a full scene rebuild; truncated to last 5 entries (same as `LuxScene.Log`)
 - `LuxScene.Exits` and `LuxScene.Actions` / `LuxUpdate.Actions`: navigation exits and context-sensitive action buttons in Lux payloads — exploration mode shows directional exits + look/inventory; combat mode shows attack/defend/flee/cast; game loop populates exits via `enrichForDisplay()` transient field on `DungeonState`

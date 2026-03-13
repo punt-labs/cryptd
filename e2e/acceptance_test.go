@@ -15,12 +15,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// runAutoplay runs the autoplay command with the given script and returns
+// runScript runs cryptd serve -t with a script file and returns
 // the JSON transcript entries.
-func runAutoplay(t *testing.T, bin, root, script string) []renderer.TranscriptEntry {
+func runScript(t *testing.T, bin, root, script string) []renderer.TranscriptEntry {
 	t.Helper()
 	scriptPath := filepath.Join(root, "testdata", "demos", script)
-	cmd := exec.Command(bin, "autoplay",
+	cmd := exec.Command(bin, "serve", "-t",
 		"--scenario", "minimal",
 		"--script", scriptPath,
 		"--json",
@@ -31,9 +31,9 @@ func runAutoplay(t *testing.T, bin, root, script string) []renderer.TranscriptEn
 	out, err := cmd.Output()
 	if err != nil {
 		if ee, ok := err.(*exec.ExitError); ok {
-			t.Fatalf("autoplay exited %d; stderr: %s", ee.ExitCode(), ee.Stderr)
+			t.Fatalf("cryptd serve -t exited %d; stderr: %s", ee.ExitCode(), ee.Stderr)
 		}
-		t.Fatalf("autoplay failed: %v", err)
+		t.Fatalf("cryptd serve -t failed: %v", err)
 	}
 
 	var entries []renderer.TranscriptEntry
@@ -42,9 +42,9 @@ func runAutoplay(t *testing.T, bin, root, script string) []renderer.TranscriptEn
 }
 
 func TestAcceptance_FullRun(t *testing.T) {
-	bin := binary(t)
+	bin := serverBinary(t)
 	root := repoRoot(t)
-	entries := runAutoplay(t, bin, root, "full-run.txt")
+	entries := runScript(t, bin, root, "full-run.txt")
 
 	// Should have multiple transcript entries and end with quit.
 	require.True(t, len(entries) > 3, "expected >3 transcript entries, got %d", len(entries))
@@ -70,9 +70,9 @@ func TestAcceptance_FullRun(t *testing.T) {
 }
 
 func TestAcceptance_CombatWalkthrough(t *testing.T) {
-	bin := binary(t)
+	bin := serverBinary(t)
 	root := repoRoot(t)
-	entries := runAutoplay(t, bin, root, "combat-walkthrough.txt")
+	entries := runScript(t, bin, root, "combat-walkthrough.txt")
 
 	require.True(t, len(entries) > 5, "expected >5 transcript entries")
 
@@ -102,9 +102,9 @@ func TestAcceptance_CombatWalkthrough(t *testing.T) {
 }
 
 func TestAcceptance_PickUpItem(t *testing.T) {
-	bin := binary(t)
+	bin := serverBinary(t)
 	root := repoRoot(t)
-	entries := runAutoplay(t, bin, root, "pick-up-item.txt")
+	entries := runScript(t, bin, root, "pick-up-item.txt")
 
 	require.True(t, len(entries) > 3)
 
@@ -132,9 +132,9 @@ func TestAcceptance_PickUpItem(t *testing.T) {
 }
 
 func TestAcceptance_Combat(t *testing.T) {
-	bin := binary(t)
+	bin := serverBinary(t)
 	root := repoRoot(t)
-	entries := runAutoplay(t, bin, root, "combat.txt")
+	entries := runScript(t, bin, root, "combat.txt")
 
 	require.True(t, len(entries) > 5)
 
@@ -150,13 +150,13 @@ func TestAcceptance_Combat(t *testing.T) {
 }
 
 func TestAcceptance_SaveAndReload(t *testing.T) {
-	bin := binary(t)
+	bin := serverBinary(t)
 	root := repoRoot(t)
 
 	// Run in a temp dir so saves don't pollute the repo.
 	tmpDir := t.TempDir()
 	scriptPath := filepath.Join(root, "testdata", "demos", "save-and-reload.txt")
-	cmd := exec.Command(bin, "autoplay",
+	cmd := exec.Command(bin, "serve", "-t",
 		"--scenario", "minimal",
 		"--script", scriptPath,
 		"--json",
@@ -169,9 +169,9 @@ func TestAcceptance_SaveAndReload(t *testing.T) {
 	out, err := cmd.Output()
 	if err != nil {
 		if ee, ok := err.(*exec.ExitError); ok {
-			t.Fatalf("autoplay exited %d; stderr: %s", ee.ExitCode(), ee.Stderr)
+			t.Fatalf("cryptd serve -t exited %d; stderr: %s", ee.ExitCode(), ee.Stderr)
 		}
-		t.Fatalf("autoplay failed: %v", err)
+		t.Fatalf("cryptd serve -t failed: %v", err)
 	}
 
 	var entries []renderer.TranscriptEntry
@@ -200,4 +200,3 @@ func TestAcceptance_SaveAndReload(t *testing.T) {
 	}
 	assert.True(t, loaded, "expected load confirmation")
 }
-

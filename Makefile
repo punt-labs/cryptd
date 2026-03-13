@@ -1,7 +1,7 @@
 .PHONY: help vet test test-integration test-e2e lint markdownlint coverage \
-       check check-full build clean help \
+       check check-full build build-server build-client clean help \
        ollama-install ollama-start ollama-pull ollama-setup eval-slm \
-       demo demo-solo demo-lux demo-exploration demo-inventory \
+       demo demo-solo demo-exploration demo-inventory \
        demo-combat demo-save-load demo-unix-catacombs
 
 SCENARIO_DIR = testdata/scenarios
@@ -36,46 +36,38 @@ markdownlint:                              ## Lint markdown files
 	npx markdownlint-cli2 "**/*.md" "#node_modules"
 
 ##@ Build
-build:                                     ## Build the cryptd binary
-	go build -o cryptd ./cmd/crypt
+build: build-server build-client           ## Build both binaries
+
+build-server:                              ## Build the cryptd server binary
+	go build -o cryptd ./cmd/cryptd
+
+build-client:                              ## Build the crypt client binary
+	go build -o crypt ./cmd/crypt
 
 clean:                                     ## Remove build artifacts
-	rm -f cryptd coverage.out
+	rm -f cryptd crypt coverage.out
 
 ##@ Demos — Scripted Playthroughs
 demo: demo-exploration demo-inventory demo-combat demo-save-load demo-unix-catacombs  ## Run all CLI demos
 
-demo-exploration: build                    ## Explore, take items, navigate, help, quit
-	CRYPT_SCENARIO_DIR=$(SCENARIO_DIR) ./cryptd autoplay --scenario minimal --script $(DEMO_DIR)/full-run.txt
+demo-exploration: build-server              ## Explore, take items, navigate, help, quit
+	CRYPT_SCENARIO_DIR=$(SCENARIO_DIR) ./cryptd serve -t --scenario minimal --script $(DEMO_DIR)/full-run.txt
 
-demo-inventory: build                      ## Take, examine, equip, unequip, drop
-	CRYPT_SCENARIO_DIR=$(SCENARIO_DIR) ./cryptd autoplay --scenario minimal --script $(DEMO_DIR)/pick-up-item.txt
+demo-inventory: build-server               ## Take, examine, equip, unequip, drop
+	CRYPT_SCENARIO_DIR=$(SCENARIO_DIR) ./cryptd serve -t --scenario minimal --script $(DEMO_DIR)/pick-up-item.txt
 
-demo-combat: build                         ## Equip sword, fight goblin, gain XP
-	CRYPT_SCENARIO_DIR=$(SCENARIO_DIR) ./cryptd autoplay --scenario minimal --script $(DEMO_DIR)/combat-walkthrough.txt
+demo-combat: build-server                  ## Equip sword, fight goblin, gain XP
+	CRYPT_SCENARIO_DIR=$(SCENARIO_DIR) ./cryptd serve -t --scenario minimal --script $(DEMO_DIR)/combat-walkthrough.txt
 
-demo-save-load: build                      ## Save to slot, reload
-	CRYPT_SCENARIO_DIR=$(SCENARIO_DIR) ./cryptd autoplay --scenario minimal --script $(DEMO_DIR)/save-and-reload.txt
+demo-save-load: build-server               ## Save to slot, reload
+	CRYPT_SCENARIO_DIR=$(SCENARIO_DIR) ./cryptd serve -t --scenario minimal --script $(DEMO_DIR)/save-and-reload.txt
 
-demo-unix-catacombs: build                 ## Full 9-room UNIX-themed dungeon crawl
-	CRYPT_SCENARIO_DIR=$(SCENARIO_DIR) ./cryptd autoplay --scenario unix-catacombs --script $(DEMO_DIR)/unix-catacombs.txt
+demo-unix-catacombs: build-server          ## Full 9-room UNIX-themed dungeon crawl
+	CRYPT_SCENARIO_DIR=$(SCENARIO_DIR) ./cryptd serve -t --scenario unix-catacombs --script $(DEMO_DIR)/unix-catacombs.txt
 
 ##@ Demos — Advanced
-demo-solo: ollama-setup build              ## Interactive solo mode with SLM narration
-	CRYPT_SCENARIO_DIR=$(SCENARIO_DIR) ./cryptd solo --scenario minimal
-
-demo-lux: build                            ## Lux JSON-lines wire format (show/update protocol)
-	@echo '{"type":"input","payload":"look"}' > /tmp/cryptd-lux-input.jsonl
-	@echo '{"type":"input","payload":"take short sword"}' >> /tmp/cryptd-lux-input.jsonl
-	@echo '{"type":"input","payload":"equip short sword"}' >> /tmp/cryptd-lux-input.jsonl
-	@echo '{"type":"input","payload":"go south"}' >> /tmp/cryptd-lux-input.jsonl
-	@echo '{"type":"input","payload":"attack"}' >> /tmp/cryptd-lux-input.jsonl
-	@echo '{"type":"input","payload":"attack"}' >> /tmp/cryptd-lux-input.jsonl
-	@echo '{"type":"input","payload":"attack"}' >> /tmp/cryptd-lux-input.jsonl
-	@echo '{"type":"input","payload":"attack"}' >> /tmp/cryptd-lux-input.jsonl
-	@echo '{"type":"quit"}' >> /tmp/cryptd-lux-input.jsonl
-	CRYPT_SCENARIO_DIR=$(SCENARIO_DIR) ./cryptd solo --scenario minimal --lux < /tmp/cryptd-lux-input.jsonl 2>/dev/null
-	@rm -f /tmp/cryptd-lux-input.jsonl
+demo-solo: build-server                    ## Interactive solo mode (rules+templates, cryptd serve -t)
+	CRYPT_SCENARIO_DIR=$(SCENARIO_DIR) ./cryptd serve -t --scenario minimal
 
 ##@ Ollama
 SLM_MODEL = gemma3:1b

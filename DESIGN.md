@@ -658,37 +658,28 @@ JSON-RPC is an acceptable alternative if the SDK proves too heavy.
 
 ---
 
-## DES-013: Engine Deployment — Server vs. Embedded
+## DES-013: Engine Deployment — Always Server
 
 **Date:** 2026-03-10
-**Status:** SETTLED (updated 2026-03-12 per DES-025)
+**Status:** SETTLED (revised 2026-03-12 per DES-025: embedded mode removed)
 **Topic:** Whether the engine runs as a server or embedded in the client process
 
 ### Design
 
-Two deployment modes, orthogonal to play mode:
+The engine always runs as a server (`cryptd serve`). There is no embedded mode. The client
+(`crypt`) connects to the server over Unix socket or TCP. If the server is not running and
+the target is a local socket, the client forks `cryptd serve` automatically.
 
-- **Server mode** (`cryptd serve`): The engine runs as a persistent network service,
-  accepting connections over Unix sockets or TCP. Any client can connect — the CLI
-  (`crypt connect`), the Claude Code plugin, a future web client. The server does not
-  know or care what brain (LLM/SLM/templates) or UI the client uses.
+The server owns the engine, the interpreter (SLM → Rules fallback), and the narrator
+(SLM → Template fallback). The client is a dumb pipe — it sends text and displays text.
 
-- **Embedded mode** (`crypt solo`, `crypt headless`): The engine runs in-process as part
-  of the `crypt` client binary. No network, no IPC. The SLMInterpreter/SLMNarrator call
-  ollama over localhost HTTP, but the engine itself is in-process.
+### Why Always a Server
 
-The engine code is identical in both deployments. The server adds a connection handler and
-(future) session-aware push routing on top.
-
-### Why Not Always a Server
-
-The beads project (Go CLI, 92.9% Go) deleted their daemon in v0.51.0 after it accumulated
-~70K lines. Their lesson: "Keep it small." Running the engine embedded for solo/headless
-avoids all the complexity of server lifecycle management (auto-start, liveness, cleanup)
-for the common single-player case.
-
-The server is justified when its unique capabilities are needed: shared state across
-multiple connections (multi-player), remote play, and server push to specific sessions.
+The original design included an embedded mode to avoid server lifecycle complexity for
+single-player. In practice, this created two code paths for starting the engine, duplicated
+game logic in the client, and forced the client to manage the SLM/ollama connection.
+Auto-start (`crypt` forks `cryptd serve` if not running) eliminates the lifecycle concern
+while keeping a single code path.
 
 ### Server Transport: NDJSON over Unix Socket or TCP
 
@@ -701,10 +692,17 @@ and TCP (remote play, multiplayer). Chosen over WebSocket because:
 
 ### Server Scope
 
-The server does exactly two things:
+The server does three things:
 
-1. Game logic resolution (state transitions, combat, inventory)
-2. Session-aware push routing (future: `tools/list_changed` to DM when player acts)
+1. Input interpretation (text → engine action, via SLM or Rules)
+2. Game logic resolution (state transitions, combat, inventory)
+3. Output narration (engine event → display text, via SLM or Template)
+
+In passthrough mode (for Claude Code), the server skips interpretation and narration —
+it exposes raw MCP tools with structured JSON responses. Claude acts as both interpreter
+and narrator.
+
+Future: session-aware push routing (`tools/list_changed` to DM when player acts).
 
 No LLM calls. No SLM calls. No orchestration. No business logic beyond the game rules.
 The beads lesson is taken seriously.
@@ -1261,7 +1259,7 @@ translate between raw text and their domain types.
 ## DES-025: Two Binaries — cryptd (Server) and crypt (Client)
 
 **Date:** 2026-03-12
-**Status:** SETTLED
+**Status:** SETTLED (revised 2026-03-12: removed embedded engine, established two daemon modes)
 **Topic:** Binary architecture, client-server separation, and the daemon's role
 
 ### Context
@@ -1270,34 +1268,50 @@ The initial M8 implementation coupled the daemon to DM mode — setting `PlayMod
 assuming the daemon was only for LLM-driven play. In reality, the daemon is the engine as
 a network service, orthogonal to who or what connects to it.
 
+The client never embeds the engine. There is one way to run the game engine: `cryptd serve`.
+The client's job is to connect to the server and fork it if not running.
+
 ### Design
 
 The cryptd repo produces two binaries:
 
 ```text
-cryptd — the game server
-  cryptd serve [--listen :9000] [--socket /path]     TCP or Unix socket
+cryptd — the game server (daemon)
+  cryptd serve [--listen :9000] [--socket /path]     daemonize, listen for connections
+  cryptd serve -f                                     foreground (debugging, containers)
+  cryptd serve -t                                     testing (stdin/stdout, implies -f)
+  cryptd validate <scenario-file>                     validate scenario YAML
 
-crypt — the game client
-  crypt connect [--server host:9000]                 play via remote server
-  crypt solo [--scenario id]                         embedded engine, local SLM
-  crypt headless [--scenario id]                     embedded engine, templates
-  crypt autoplay [--scenario id --script file]       embedded engine, scripted
+crypt — the game client (telnet, but better)
+  crypt [--socket /path] [--addr host:9000]           connect and play
 ```
 
-The crypt plugin (Claude Code) is a separate repo that provides SKILL.md and plugin.json.
-It connects to `cryptd serve` the same way `crypt connect` does — same protocol, same tools.
+`cryptd serve` daemonizes by default (fork, detach, PID file) like sshd, nginx, and named.
+`-f` keeps it in the foreground, attached to the terminal. `-t` runs the engine on
+stdin/stdout with no network layer (implies `-f`) — this replaces the old `headless` and
+`autoplay` subcommands.
 
-### Three orthogonal axes
+`crypt` connects to `cryptd serve`. It sends text, displays text. If the server is not
+running and the target is a local Unix socket, it forks `cryptd serve` automatically.
 
-| Axis | Options |
-|------|---------|
-| **Engine access** | Embedded (in-process) or Server (network) |
-| **Brain** | LLM (Claude), SLM (ollama), Templates |
-| **UI** | CLI, Lux, Claude Code conversation |
+### Two daemon modes
 
-The daemon is only the engine access axis. It does not choose the brain or the UI. The
-client decides those.
+| Mode | Interpreter | Narrator | Response format | Client |
+|------|-------------|----------|-----------------|--------|
+| **Normal** | SLM → Rules fallback | SLM → Template fallback | Display-ready text | `crypt` (CLI) |
+| **Passthrough** | None (MCP tool names) | None (structured JSON) | MCP ToolResult | Claude Code plugin |
+
+**Normal mode** is the default. The server accepts free text from the player, interprets
+it through the SLM interpreter (falling back to Rules if ollama is not available), runs the
+engine action, narrates the result through the SLM narrator (falling back to Template), and
+returns display-ready text. The client is a dumb pipe.
+
+**Passthrough mode** (`--passthrough`) exposes the raw MCP tool surface with structured JSON
+responses. Claude Code acts as both interpreter (natural language → tool call) and narrator
+(tool result → prose). This is the mode the crypt plugin connects to.
+
+The SLM is server infrastructure. The server manages the ollama connection — no player
+needs to run ollama themselves.
 
 ### Transport
 
@@ -1320,13 +1334,24 @@ deployment model.
 useful for any mode that benefits from a persistent server: multiplayer, remote play,
 web clients. The daemon and the LLM are orthogonal.
 
+**Embedded engine in client** — early implementation had `crypt solo`, `crypt headless` etc.
+embedding the full engine, interpreter, narrator, and renderer in the client binary. Rejected
+because it creates two ways to start the engine, duplicates game logic, and forces the client
+to manage the SLM/ollama connection. The engine runs one way: `cryptd serve`.
+
+**Client-side mode selection** — `crypt solo`, `crypt headless`, `crypt connect` as separate
+subcommands with different client-side logic. Rejected because the mode (interpreter, narrator)
+is server configuration, not a client concern. The client is telnet — it sends text and
+displays text regardless of which brain the server is using.
+
 ### Outcome
 
-- `cryptd serve` is the game server. Transport-agnostic (Unix socket or TCP). Client-agnostic.
-- `crypt` is the player-facing binary. Can embed the engine (solo/headless) or connect to a server.
-- The crypt plugin is a Claude Code package that connects to `cryptd serve` and provides the
-  MCP tool surface + SKILL.md for DM mode.
-- `PlayMode` is not set by the server — it's a client-side concept.
+- `cryptd serve` is the game server. Daemonizes by default. Owns the engine, interpreter, narrator, and SLM connection.
+- `cryptd serve -f` runs in the foreground (debugging, containers, process supervisors).
+- `cryptd serve -t` runs the engine on stdin/stdout with no network (testing, implies `-f`).
+- `crypt` is a thin client. Connects, sends text, displays text. Forks the server if not running.
+- The crypt plugin (Claude Code) connects to `cryptd serve --passthrough` for raw MCP access.
+- The brain (SLM, templates, future LLM) is server configuration, invisible to the client.
 
 ### Impact on Biff
 

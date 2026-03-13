@@ -220,6 +220,10 @@ func (s *SLM) Interpret(ctx context.Context, input string, state model.GameState
 // callSLM sends the input to the SLM with game state context. Returns the
 // parsed action or an error. Context cancellation is propagated.
 func (s *SLM) callSLM(ctx context.Context, input string, state model.GameState) (model.EngineAction, error) {
+	if s.client == nil {
+		return model.EngineAction{Type: "unknown"}, fmt.Errorf("no inference client")
+	}
+
 	gameCtx := BuildContext(state)
 	userMsg := gameCtx + "\nPlayer input: " + input
 

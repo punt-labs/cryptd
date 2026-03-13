@@ -1,0 +1,295 @@
+package main
+
+import (
+	"bufio"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net"
+	"os"
+	"os/exec"
+	"strings"
+	"time"
+
+	"github.com/punt-labs/cryptd/internal/daemon"
+)
+
+// errConnLost signals that the server connection dropped.
+var errConnLost = errors.New("connection lost")
+
+// run connects to the server and starts the interactive session.
+// Returns an exit code (0 = clean, 1 = error).
+func run(socketPath, addr, scenario, charName, charClass string) int {
+	conn, err := dial(socketPath, addr)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
+	defer conn.Close()
+
+	return session(conn, os.Stdin, os.Stdout, os.Stderr, scenario, charName, charClass)
+}
+
+// dial connects to the server via TCP or Unix socket.
+func dial(socketPath, addr string) (net.Conn, error) {
+	if addr != "" {
+		conn, err := net.DialTimeout("tcp", addr, 5*time.Second)
+		if err != nil {
+			return nil, fmt.Errorf("cannot connect to %s: %w", addr, err)
+		}
+		return conn, nil
+	}
+
+	sock := socketPath
+	if sock == "" {
+		var err error
+		sock, err = daemon.DefaultSocketPath()
+		if err != nil {
+			return nil, fmt.Errorf("cannot determine home directory: %w", err)
+		}
+	}
+	return dialOrStart(sock)
+}
+
+// dialOrStart connects to the Unix socket, starting cryptd serve if needed.
+func dialOrStart(socketPath string) (net.Conn, error) {
+	conn, err := net.DialTimeout("unix", socketPath, time.Second)
+	if err == nil {
+		return conn, nil
+	}
+
+	cryptd, err := exec.LookPath("cryptd")
+	if err != nil {
+		return nil, fmt.Errorf("cryptd not found in PATH — install it or start the server manually")
+	}
+
+	// Start in foreground mode so this process IS the server — kill and
+	// wait target the right PID (not a daemonize parent that already exited).
+	cmd := exec.Command(cryptd, "serve", "-f", "--socket", socketPath)
+	cmd.Stderr = os.Stderr
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("failed to start cryptd: %w", err)
+	}
+
+	// Reap the child in the background to avoid zombies.
+	waitCh := make(chan error, 1)
+	go func() { waitCh <- cmd.Wait() }()
+
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		// Check if the server exited before the socket appeared.
+		select {
+		case err := <-waitCh:
+			return nil, fmt.Errorf("cryptd exited before socket ready: %v", err)
+		default:
+		}
+		conn, err = net.DialTimeout("unix", socketPath, 500*time.Millisecond)
+		if err == nil {
+			return conn, nil
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	// Socket never appeared — kill the server.
+	_ = cmd.Process.Kill()
+	<-waitCh
+	return nil, fmt.Errorf("cryptd started but socket %s not ready within 5s", socketPath)
+}
+
+// session runs the interactive REPL on an established connection.
+func session(conn net.Conn, in io.Reader, out, errOut io.Writer, scenario, charName, charClass string) int {
+	scanner := bufio.NewScanner(conn)
+	// Match the server's 1 MiB buffer to handle large narrated responses.
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	reqID := 0
+
+	send := func(method string, params any) (json.RawMessage, error) {
+		reqID++
+		req := map[string]any{
+			"jsonrpc": "2.0",
+			"id":      reqID,
+			"method":  method,
+		}
+		if params != nil {
+			p, err := json.Marshal(params)
+			if err != nil {
+				return nil, fmt.Errorf("marshal params: %w", err)
+			}
+			req["params"] = json.RawMessage(p)
+		}
+		data, err := json.Marshal(req)
+		if err != nil {
+			return nil, err
+		}
+		data = append(data, '\n')
+		if _, err := conn.Write(data); err != nil {
+			return nil, fmt.Errorf("%w: write: %w", errConnLost, err)
+		}
+		if !scanner.Scan() {
+			if err := scanner.Err(); err != nil {
+				return nil, fmt.Errorf("%w: read: %w", errConnLost, err)
+			}
+			return nil, errConnLost
+		}
+		var resp struct {
+			Result json.RawMessage  `json:"result"`
+			Error  *daemon.RPCError `json:"error"`
+		}
+		if err := json.Unmarshal(scanner.Bytes(), &resp); err != nil {
+			return nil, fmt.Errorf("parse response: %w", err)
+		}
+		if resp.Error != nil {
+			return nil, fmt.Errorf("server error: %s", resp.Error.Message)
+		}
+		return resp.Result, nil
+	}
+
+	// MCP initialize handshake.
+	if _, err := send("initialize", nil); err != nil {
+		fmt.Fprintf(errOut, "error: %v\n", err)
+		return 1
+	}
+
+	// Auto-start game if --scenario given.
+	if scenario != "" {
+		if err := startGame(send, out, errOut, scenario, charName, charClass); err != nil {
+			if errors.Is(err, errConnLost) {
+				fmt.Fprintf(errOut, "error: %v\n", err)
+				return 1
+			}
+			fmt.Fprintf(errOut, "error: %v\n", err)
+		}
+	}
+
+	// Interactive REPL.
+	inputScanner := bufio.NewScanner(in)
+	fmt.Fprintln(out, "Type 'help' for commands, 'quit' to exit.")
+
+	for {
+		fmt.Fprint(out, "> ")
+		if !inputScanner.Scan() {
+			break
+		}
+		line := strings.TrimSpace(inputScanner.Text())
+		if line == "" {
+			continue
+		}
+
+		if line == "quit" || line == "exit" {
+			fmt.Fprintln(out, "Farewell, adventurer.")
+			return 0
+		}
+
+		if line == "help" || line == "?" {
+			fmt.Fprintln(out, helpText)
+			continue
+		}
+
+		// "new <scenario> <name> <class>" is handled client-side.
+		if strings.HasPrefix(line, "new ") || strings.HasPrefix(line, "start ") {
+			parts := strings.Fields(line)
+			if len(parts) < 4 {
+				fmt.Fprintln(errOut, "usage: new <scenario_id> <character_name> <character_class>")
+				continue
+			}
+			if err := startGame(send, out, errOut, parts[1], parts[2], parts[3]); err != nil {
+				if errors.Is(err, errConnLost) {
+					fmt.Fprintf(errOut, "Error: %v\n", err)
+					return 1
+				}
+				fmt.Fprintf(errOut, "Error: %v\n", err)
+			}
+			continue
+		}
+
+		// Everything else: send to server as play text.
+		result, err := send("play", map[string]string{"text": line})
+		if err != nil {
+			if errors.Is(err, errConnLost) {
+				fmt.Fprintf(errOut, "Error: %v\n", err)
+				return 1
+			}
+			fmt.Fprintf(errOut, "Error: %v\n", err)
+			continue
+		}
+
+		if displayResult(out, result) {
+			return 0
+		}
+	}
+	return 0
+}
+
+// startGame sends a new_game tool call and displays the initial narration.
+func startGame(send func(string, any) (json.RawMessage, error), out, errOut io.Writer, scenario, name, class string) error {
+	argsJSON, err := json.Marshal(map[string]string{
+		"scenario_id":     scenario,
+		"character_name":  name,
+		"character_class": class,
+	})
+	if err != nil {
+		return err
+	}
+	params := map[string]any{
+		"name":      "new_game",
+		"arguments": json.RawMessage(argsJSON),
+	}
+	result, err := send("tools/call", params)
+	if err != nil {
+		return err
+	}
+
+	displayResult(out, result)
+	return nil
+}
+
+// displayResult prints the text and hero status from a server response.
+// Returns true if the server signaled quit.
+func displayResult(out io.Writer, raw json.RawMessage) bool {
+	var result struct {
+		Text string         `json:"text"`
+		Hero map[string]any `json:"hero"`
+		Dead bool           `json:"dead"`
+		Quit bool           `json:"quit"`
+	}
+	if err := json.Unmarshal(raw, &result); err != nil {
+		// Not a play response — print raw.
+		fmt.Fprintln(out, string(raw))
+		return false
+	}
+
+	if result.Text != "" {
+		fmt.Fprintln(out, result.Text)
+	}
+
+	if result.Hero != nil {
+		printHeroStatus(out, result.Hero)
+	}
+
+	if result.Dead {
+		fmt.Fprintln(out, "\nYou have been slain. Start a new game with 'new <scenario> <name> <class>'.")
+	}
+
+	return result.Quit
+}
+
+// printHeroStatus prints a compact HP/MP bar.
+func printHeroStatus(out io.Writer, hero map[string]any) {
+	hp, _ := hero["hp"].(float64)
+	maxHP, _ := hero["max_hp"].(float64)
+	fmt.Fprintf(out, "[HP: %.0f/%.0f", hp, maxHP)
+	if mp, ok := hero["mp"].(float64); ok && mp > 0 {
+		maxMP, _ := hero["max_mp"].(float64)
+		fmt.Fprintf(out, " MP: %.0f/%.0f", mp, maxMP)
+	}
+	fmt.Fprintln(out, "]")
+}
+
+const helpText = `commands:
+  new <scenario> <name> <class>   Start a new game
+  quit/exit                       Disconnect
+
+Everything else is sent to the server as natural language.
+The server interprets your commands — try "go north",
+"look around", "pick up the sword", "attack", etc.`

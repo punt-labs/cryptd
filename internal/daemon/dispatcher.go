@@ -5,13 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/punt-labs/cryptd/internal/engine"
 	"github.com/punt-labs/cryptd/internal/model"
-	"github.com/punt-labs/cryptd/internal/scenario"
+	"github.com/punt-labs/cryptd/internal/scenariodir"
 )
 
 // dispatch routes a tool call to the appropriate engine method and returns
@@ -85,7 +82,7 @@ func (s *Server) dispatchNewGame(raw json.RawMessage) (any, *RPCError) {
 		return nil, &RPCError{Code: CodeInvalidParams, Message: "character_class must be one of: fighter, mage, priest, thief"}
 	}
 
-	sc, err := s.loadScenario(a.ScenarioID)
+	sc, err := scenariodir.Load(s.scenarioDir, a.ScenarioID)
 	if err != nil {
 		return nil, &RPCError{Code: CodeInvalidParams, Message: err.Error()}
 	}
@@ -693,24 +690,3 @@ func engineError(err error) *RPCError {
 	}
 }
 
-// loadScenario is a helper that loads a scenario by ID, using the server's
-// scenario directory. This duplicates the logic from cmd/crypt/main.go's
-// loadScenario but operates on the server's configured scenarioDir.
-func (s *Server) loadScenario(id string) (*scenario.Scenario, error) {
-	if strings.ContainsAny(id, `/\`) || strings.Contains(id, "..") || filepath.VolumeName(id) != "" {
-		return nil, fmt.Errorf("invalid scenario ID")
-	}
-	absDir, err := filepath.Abs(s.scenarioDir)
-	if err != nil {
-		return nil, fmt.Errorf("resolving scenario directory: %w", err)
-	}
-	absPath, err := filepath.Abs(filepath.Join(s.scenarioDir, id+".yaml"))
-	if err != nil {
-		return nil, fmt.Errorf("resolving scenario path: %w", err)
-	}
-	rel, err := filepath.Rel(absDir, absPath)
-	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) || filepath.IsAbs(rel) {
-		return nil, fmt.Errorf("invalid scenario ID")
-	}
-	return scenario.Load(absPath)
-}
