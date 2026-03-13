@@ -11,16 +11,19 @@ import (
 // deepCopyState returns a deep copy of the game state via JSON round-trip.
 // This ensures no slice backing arrays are shared with the original, which
 // would be unsafe after the mutex is released.
+//
+// Panics on marshal/unmarshal failure — GameState is always valid JSON, so
+// a failure here indicates a programmer error (e.g. unexportable field added).
 func deepCopyState(state *model.GameState) *model.GameState {
 	data, err := json.Marshal(state)
 	if err != nil {
-		return nil
+		panic("deepCopyState: marshal: " + err.Error())
 	}
-	var copy model.GameState
-	if err := json.Unmarshal(data, &copy); err != nil {
-		return nil
+	var cp model.GameState
+	if err := json.Unmarshal(data, &cp); err != nil {
+		panic("deepCopyState: unmarshal: " + err.Error())
 	}
-	return &copy
+	return &cp
 }
 
 // handlePlay processes a "play" request: interpret text → engine → narrate → text.
