@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 )
 
@@ -29,7 +30,7 @@ func daemonize() {
 		os.Exit(1)
 	}
 
-	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: cannot open log %s: %v\n", logPath, err)
 		os.Exit(1)
@@ -71,7 +72,7 @@ func daemonPaths() (logPath, pidPath string, err error) {
 
 // writePIDFile writes the given PID to the file.
 func writePIDFile(path string, pid int) error {
-	return os.WriteFile(path, []byte(strconv.Itoa(pid)+"\n"), 0o644)
+	return os.WriteFile(path, []byte(strconv.Itoa(pid)+"\n"), 0o600)
 }
 
 // removePIDFile removes the PID file if it contains our PID.
@@ -84,7 +85,7 @@ func removePIDFile() {
 	if err != nil {
 		return
 	}
-	pid, err := strconv.Atoi(string(data[:len(data)-1])) // trim newline
+	pid, err := strconv.Atoi(strings.TrimSpace(string(data)))
 	if err != nil {
 		return
 	}

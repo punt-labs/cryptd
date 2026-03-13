@@ -122,6 +122,7 @@ func (s *Server) handleNewGamePlay(req Request) Response {
 	s.mu.Lock()
 	s.loop = game.NewLoop(s.eng, s.interp, s.narr, nil)
 	look := s.eng.Look(s.state)
+	stateCopy := *s.state
 	s.mu.Unlock()
 
 	ctx := context.Background()
@@ -134,7 +135,7 @@ func (s *Server) handleNewGamePlay(req Request) Response {
 			"items":       look.Items,
 		},
 	}
-	narration, err := s.narr.Narrate(ctx, event, *s.state)
+	narration, err := s.narr.Narrate(ctx, event, stateCopy)
 	if err != nil {
 		// Fall back to the structured result if narration fails.
 		data, _ := json.Marshal(result)
@@ -145,12 +146,16 @@ func (s *Server) handleNewGamePlay(req Request) Response {
 		}
 	}
 
+	s.mu.Lock()
+	hero := heroSummary(s.state)
+	s.mu.Unlock()
+
 	return Response{
 		JSONRPC: "2.0",
 		ID:      req.ID,
 		Result: map[string]any{
 			"text": narration,
-			"hero": heroSummary(s.state),
+			"hero": hero,
 		},
 	}
 }
