@@ -29,7 +29,7 @@ func testNormalServer(t *testing.T) *Server {
 }
 
 func playReq(id int, text string) Request {
-	params, _ := json.Marshal(playParams{Text: text})
+	params, _ := json.Marshal(PlayRequest{Text: text})
 	idJSON, _ := json.Marshal(id)
 	return Request{
 		JSONRPC: "2.0",
@@ -65,24 +65,24 @@ func TestPlayNewGameAndLook(t *testing.T) {
 	resp := roundTrip(t, srv, newGameReq)
 	require.Nil(t, resp.Error, "new_game error: %+v", resp.Error)
 
+	var result PlayResponse
 	data, err := json.Marshal(resp.Result)
 	require.NoError(t, err)
-	var result map[string]any
 	require.NoError(t, json.Unmarshal(data, &result))
 
-	// Normal mode returns {"text": ..., "hero": ...}
-	assert.NotEmpty(t, result["text"], "expected narrated text from new_game")
-	assert.NotNil(t, result["hero"], "expected hero summary from new_game")
+	// Normal mode returns narrated text and full game state.
+	assert.NotEmpty(t, result.Text, "expected narrated text from new_game")
+	assert.NotEmpty(t, result.State.Party, "expected party in game state from new_game")
 
 	// Now play "look"
 	lookResp := roundTrip(t, srv, playReq(2, "look"))
 	require.Nil(t, lookResp.Error, "play look error: %+v", lookResp.Error)
 
+	var lookResult PlayResponse
 	data, err = json.Marshal(lookResp.Result)
 	require.NoError(t, err)
-	var lookResult map[string]any
 	require.NoError(t, json.Unmarshal(data, &lookResult))
-	assert.NotEmpty(t, lookResult["text"], "expected narrated text from look")
+	assert.NotEmpty(t, lookResult.Text, "expected narrated text from look")
 }
 
 func TestPlayMove(t *testing.T) {
@@ -101,11 +101,11 @@ func TestPlayMove(t *testing.T) {
 	moveResp := roundTrip(t, srv, playReq(2, "go south"))
 	require.Nil(t, moveResp.Error, "play move error: %+v", moveResp.Error)
 
+	var result PlayResponse
 	data, err := json.Marshal(moveResp.Result)
 	require.NoError(t, err)
-	var result map[string]any
 	require.NoError(t, json.Unmarshal(data, &result))
-	assert.NotEmpty(t, result["text"], "expected narrated text from move")
+	assert.NotEmpty(t, result.Text, "expected narrated text from move")
 }
 
 func TestPlayPassthroughBlocked(t *testing.T) {
