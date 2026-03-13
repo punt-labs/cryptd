@@ -10,7 +10,7 @@ There is no such thing as a "pre-existing" issue. If you see a problem — in co
 
 **M0 (foundation) and M1 (data contracts) are complete. M2 (thin E2E slice) is substantially complete. M8 (server thin slice) is complete.**
 
-Two binaries (DES-025): `cryptd` (server) and `crypt` (thin client). Server subcommands: `cryptd serve`, `cryptd headless`, `cryptd autoplay`, `cryptd validate`. The client (`crypt`) takes no subcommands — it connects to `cryptd serve`, auto-starts the server if needed, and sends natural language text via the `play` JSON-RPC method.
+Two binaries (DES-025): `cryptd` (server/daemon) and `crypt` (thin client). Server subcommands: `cryptd serve`, `cryptd validate`. The client (`crypt`) takes no subcommands — it connects to `cryptd serve`, auto-starts the server if needed, and sends natural language text via the `play` JSON-RPC method. `cryptd serve` will daemonize by default (bead cryptd-ydf); `-f` for foreground, `-t` for testing on stdin/stdout.
 
 Check `bd ready` for current unblocked work.
 
@@ -38,7 +38,7 @@ The engine always runs as a server (`cryptd serve`). Two modes:
 
 Normal mode auto-detects ollama for SLM inference, falls back to deterministic Rules + Template when no inference server is available. `cryptd serve --passthrough` enables passthrough mode for MCP clients.
 
-`cryptd headless` and `cryptd autoplay` are testing/scripting tools that use Rules + Template directly (no server, in-process).
+`cryptd serve -t` runs the engine on stdin/stdout for testing (no network, implies `-f`). `-f` keeps the daemon in the foreground without daemonizing.
 
 ### The Three Interfaces
 
@@ -77,7 +77,7 @@ The engine knows nothing about interpreters. Interpreters know nothing about nar
 
 | Package | What It Does |
 |---------|-------------|
-| `cmd/cryptd` | Server binary entry point; `cryptd serve`, `cryptd headless`, `cryptd autoplay`, `cryptd validate` |
+| `cmd/cryptd` | Server/daemon binary; `cryptd serve` (with `-f`, `-t`, `--passthrough`), `cryptd validate` |
 | `cmd/crypt` | Thin client binary; connects to `cryptd serve`, sends text, displays narrated responses |
 | `cmd/dump-mcp-schema` | Generates MCP schema JSON for CI contract check |
 | `internal/daemon` | Game server: JSON-RPC 2.0 handler, tool dispatcher, Unix socket/TCP listener |

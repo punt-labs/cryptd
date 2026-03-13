@@ -10,17 +10,13 @@ import (
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprintln(os.Stderr, "usage: cryptd <command> [args]")
-		fmt.Fprintln(os.Stderr, "commands: serve, headless, autoplay, validate")
+		fmt.Fprintln(os.Stderr, "commands: serve, validate")
 		os.Exit(1)
 	}
 
 	switch os.Args[1] {
 	case "serve":
 		runServe(os.Args[2:])
-	case "headless":
-		runHeadless(os.Args[2:])
-	case "autoplay":
-		runAutoplay(os.Args[2:])
 	case "validate":
 		runValidate(os.Args[2:])
 	default:

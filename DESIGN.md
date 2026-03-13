@@ -1276,14 +1276,20 @@ The client's job is to connect to the server and fork it if not running.
 The cryptd repo produces two binaries:
 
 ```text
-cryptd — the game server
-  cryptd serve [--listen :9000] [--socket /path]     game server (normal or passthrough)
+cryptd — the game server (daemon)
+  cryptd serve [--listen :9000] [--socket /path]     daemonize, listen for connections
+  cryptd serve -f                                     foreground (debugging, containers)
+  cryptd serve -t                                     testing (stdin/stdout, implies -f)
   cryptd validate <scenario-file>                     validate scenario YAML
-  cryptd autoplay --scenario id --script file         test harness: scripted playthrough
 
 crypt — the game client (telnet, but better)
   crypt [--socket /path] [--addr host:9000]           connect and play
 ```
+
+`cryptd serve` daemonizes by default (fork, detach, PID file) like sshd, nginx, and named.
+`-f` keeps it in the foreground, attached to the terminal. `-t` runs the engine on
+stdin/stdout with no network layer (implies `-f`) — this replaces the old `headless` and
+`autoplay` subcommands.
 
 `crypt` connects to `cryptd serve`. It sends text, displays text. If the server is not
 running and the target is a local Unix socket, it forks `cryptd serve` automatically.
@@ -1340,9 +1346,10 @@ displays text regardless of which brain the server is using.
 
 ### Outcome
 
-- `cryptd serve` is the game server. Owns the engine, interpreter, narrator, and SLM connection.
+- `cryptd serve` is the game server. Daemonizes by default. Owns the engine, interpreter, narrator, and SLM connection.
+- `cryptd serve -f` runs in the foreground (debugging, containers, process supervisors).
+- `cryptd serve -t` runs the engine on stdin/stdout with no network (testing, implies `-f`).
 - `crypt` is a thin client. Connects, sends text, displays text. Forks the server if not running.
-- `cryptd autoplay` is a test harness that feeds a script through the server.
 - The crypt plugin (Claude Code) connects to `cryptd serve --passthrough` for raw MCP access.
 - The brain (SLM, templates, future LLM) is server configuration, invisible to the client.
 

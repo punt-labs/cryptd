@@ -12,18 +12,18 @@ All notable changes to this project will be documented in this file.
 - `internal/daemon` ServerOption functional options: `WithPassthrough()`, `WithInterpreter()`, `WithNarrator()`.
 - `internal/game.Loop.Dispatch()` exported so the daemon can reuse the game loop's orchestration logic (combat, enemy turns, level-ups) without duplicating 300+ lines.
 - Nil client guards in `interpreter.SLM` and `narrator.SLM` — graceful fallback when no inference server is available.
-- `cryptd headless` and `cryptd autoplay` — testing tools moved from client to server binary (engine is server infrastructure).
 
 ### Removed
 
 - `cmd/crypt/embedded.go` — deleted fat client that embedded the game engine. Engine access is always through the server.
 - `crypt solo`, `crypt headless`, `crypt autoplay`, `crypt connect` subcommands — replaced by plain `crypt` thin client.
+- `cryptd headless` and `cryptd autoplay` subcommands — will be replaced by `cryptd serve -t` (testing mode on stdin/stdout).
+- E2E acceptance and headless tests removed — will be replaced when `cryptd serve -t` is implemented.
 
 ### Changed
 
 - `crypt` takes no subcommands. Flags: `--socket`, `--addr`, `--scenario`, `--name`, `--class`.
 - Existing daemon tests updated to use `WithPassthrough()` (they exercise the MCP tool surface, which is passthrough mode by definition).
-- E2E acceptance and headless tests now use `cryptd` binary for autoplay/headless commands.
 - `internal/scenariodir` package — canonical scenario ID resolution with path-traversal protection, eliminating duplication between CLI and daemon
 - `internal/daemon.DefaultSocketPath()` — shared default socket path for both server and client binaries
 - `cryptd serve [--socket <path> | --listen <addr>]` — daemon serving 15 MCP tools as JSON-RPC 2.0 over NDJSON; Unix socket (default `~/.crypt/daemon.sock`) or TCP transport; single-connection, signal-handled shutdown, stale socket cleanup
