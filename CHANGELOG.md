@@ -32,8 +32,7 @@ All notable changes to this project will be documented in this file.
 - Daemon unit tests (17 tests): all 15 tools, protocol errors, combat-blocked actions, save/load
 - Daemon integration tests (5 tests): socket-level initialize, multi-tool session, cross-connection state persistence, TCP initialize, TCP game session
 - Daemon E2E test: subprocess spawn, socket connect, full 6-step game session (initialize → tools/list → new_game → look → pick_up → move with combat)
-
-- Makefile: build, test, demo, and ollama management targets with `make help`; `CRYPT_SCENARIO_DIR` set centrally so demo commands work without env vars
+- Makefile: build, test, demo, and ollama management targets with `make help`; `CRYPT_SCENARIO_DIR` set centrally so demo commands work without env vars; `GIN_MODE=release` on `ollama serve` suppresses verbose HTTP request logs during gameplay
 - SLM interpreter rules-first routing: aliases and exact verbs bypass SLM entirely (zero latency); SLM called only for natural language and item/enemy/spell ID resolution
 - SLM context injection: game state (room, items, exits, enemies, inventory, equipment) injected into SLM user message, grounding output in valid game objects
 - `interpreter.BuildContext` and `interpreter.ParseSLMResponse` exported for eval harness reuse
@@ -44,10 +43,6 @@ All notable changes to this project will be documented in this file.
 - Rules interpreter autocorrect: typos within edit distance 1 of known verbs are corrected deterministically (e.g. `attacl` → `attack`, `tke` → `take`); only verbs 3+ characters, zero latency, no SLM call needed
 - Rules interpreter: `descend` → move down, `ascend` → move up (directional synonyms)
 - SLM system prompt: few-shot examples, stronger unknown guidance ("do not guess"), item ID resolution instructions referencing game state context; eval accuracy 98.4% → 100%
-
-### Changed
-
-- Makefile: `GIN_MODE=release` on `ollama serve` suppresses verbose HTTP request logs during gameplay
 
 - `LuxUpdate.Log`: recent adventure log entries included in incremental updates, enabling the frontend to render a scrolling narration panel without waiting for a full scene rebuild; truncated to last 5 entries (same as `LuxScene.Log`)
 - `LuxScene.Exits` and `LuxScene.Actions` / `LuxUpdate.Actions`: navigation exits and context-sensitive action buttons in Lux payloads — exploration mode shows directional exits + look/inventory; combat mode shows attack/defend/flee/cast; game loop populates exits via `enrichForDisplay()` transient field on `DungeonState`
