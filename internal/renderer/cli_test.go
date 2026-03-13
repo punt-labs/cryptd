@@ -59,9 +59,9 @@ func TestCLIRenderer_EOFClosesEvents(t *testing.T) {
 
 	// With an empty reader the goroutine closes the channel on EOF.
 	select {
-	case ev, ok := <-r.Events():
+	case _, ok := <-r.Events():
 		if ok {
-			assert.Equal(t, "quit", ev.Type)
+			t.Fatal("expected channel close, not an event")
 		}
 		// ok==false means channel closed — that's the expected path.
 	case <-time.After(time.Second):
@@ -96,7 +96,7 @@ func TestCLIRenderer_ContextCancelStopsScanner(t *testing.T) {
 	}
 }
 
-func TestCLIRenderer_HUDShowsHPMP(t *testing.T) {
+func TestCLIRenderer_StatusShowsHPMP(t *testing.T) {
 	var out bytes.Buffer
 	in := strings.NewReader("")
 	r := renderer.NewCLI(&out, in)
@@ -111,13 +111,11 @@ func TestCLIRenderer_HUDShowsHPMP(t *testing.T) {
 	require.NoError(t, err)
 
 	output := out.String()
-	assert.Contains(t, output, "HP 15/20")
-	assert.Contains(t, output, "MP 3/5")
-	assert.Contains(t, output, "█")
-	assert.Contains(t, output, "░")
+	assert.Contains(t, output, "HP: 15/20")
+	assert.Contains(t, output, "MP: 3/5")
 }
 
-func TestCLIRenderer_HUDNoMPForFighter(t *testing.T) {
+func TestCLIRenderer_StatusNoMPForFighter(t *testing.T) {
 	var out bytes.Buffer
 	in := strings.NewReader("")
 	r := renderer.NewCLI(&out, in)
@@ -132,17 +130,17 @@ func TestCLIRenderer_HUDNoMPForFighter(t *testing.T) {
 	require.NoError(t, err)
 
 	output := out.String()
-	assert.Contains(t, output, "HP 20/20")
-	// Find the HUD line and verify it has no MP bar.
-	var hudLine string
+	assert.Contains(t, output, "HP: 20/20")
+	// Find the status line and verify it has no MP.
+	var statusLine string
 	for _, line := range strings.Split(output, "\n") {
-		if strings.Contains(line, "HP 20/20") {
-			hudLine = line
+		if strings.Contains(line, "HP: 20/20") {
+			statusLine = line
 			break
 		}
 	}
-	require.NotEmpty(t, hudLine, "HUD line with HP 20/20 not found")
-	assert.NotContains(t, hudLine, "MP ")
+	require.NotEmpty(t, statusLine, "status line with HP: 20/20 not found")
+	assert.NotContains(t, statusLine, "MP:")
 }
 
 func TestCLIRenderer_EnemyListDuringCombat(t *testing.T) {
@@ -168,7 +166,7 @@ func TestCLIRenderer_EnemyListDuringCombat(t *testing.T) {
 
 	output := out.String()
 	assert.Contains(t, output, "Goblin")
-	assert.Contains(t, output, "HP 5/8")
+	assert.Contains(t, output, "HP: 5/8")
 	assert.NotContains(t, output, "Rat") // dead enemies hidden
 }
 
