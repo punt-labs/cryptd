@@ -8,6 +8,21 @@ import (
 	"github.com/punt-labs/cryptd/internal/model"
 )
 
+// deepCopyState returns a deep copy of the game state via JSON round-trip.
+// This ensures no slice backing arrays are shared with the original, which
+// would be unsafe after the mutex is released.
+func deepCopyState(state *model.GameState) *model.GameState {
+	data, err := json.Marshal(state)
+	if err != nil {
+		return nil
+	}
+	var copy model.GameState
+	if err := json.Unmarshal(data, &copy); err != nil {
+		return nil
+	}
+	return &copy
+}
+
 // handlePlay processes a "play" request: interpret text → engine → narrate → text.
 // Only available in normal mode (not passthrough).
 func (s *Server) handlePlay(req Request) Response {
@@ -81,10 +96,10 @@ func (s *Server) handlePlay(req Request) Response {
 		}
 	}
 
-	stateCopy := *s.state
+	state := deepCopyState(s.state)
 	result := PlayResponse{
 		Text:  narration,
-		State: &stateCopy,
+		State: state,
 	}
 
 	// Check for terminal events.
@@ -143,7 +158,7 @@ func (s *Server) handleNewGamePlay(req Request) Response {
 	}
 
 	s.mu.Lock()
-	st := *s.state
+	state := deepCopyState(s.state)
 	s.mu.Unlock()
 
 	return Response{
@@ -151,7 +166,7 @@ func (s *Server) handleNewGamePlay(req Request) Response {
 		ID:      req.ID,
 		Result: PlayResponse{
 			Text:  narration,
-			State: &st,
+			State: state,
 		},
 	}
 }
