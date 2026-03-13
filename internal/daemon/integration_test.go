@@ -27,7 +27,7 @@ func startTestDaemon(t *testing.T) string {
 
 	sockPath := filepath.Join(dir, "d.sock")
 	scenarioDir := filepath.Join(repoRoot(t), "testdata", "scenarios")
-	srv := NewServer(sockPath, scenarioDir)
+	srv := NewServer(sockPath, scenarioDir, WithPassthrough())
 
 	errCh := make(chan error, 1)
 	go func() {
@@ -165,7 +165,7 @@ func TestIntegration_SocketGameSession(t *testing.T) {
 func startTestTCPDaemon(t *testing.T) string {
 	t.Helper()
 	scenarioDir := filepath.Join(repoRoot(t), "testdata", "scenarios")
-	srv := NewTCPServer(":0", scenarioDir)
+	srv := NewTCPServer(":0", scenarioDir, WithPassthrough())
 
 	ln, err := net.Listen("tcp", ":0")
 	require.NoError(t, err)
