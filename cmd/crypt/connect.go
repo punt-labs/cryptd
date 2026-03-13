@@ -79,6 +79,9 @@ func dialOrStart(socketPath string) (net.Conn, error) {
 		time.Sleep(100 * time.Millisecond)
 	}
 
+	// Socket never appeared — kill the orphaned child.
+	_ = cmd.Process.Kill()
+	_ = cmd.Wait()
 	return nil, fmt.Errorf("cryptd started but socket %s not ready within 5s", socketPath)
 }
 
@@ -197,7 +200,9 @@ func session(conn net.Conn, in io.Reader, out, errOut io.Writer, scenario, charN
 			continue
 		}
 
-		displayResult(out, result)
+		if displayResult(out, result) {
+			return 0
+		}
 	}
 	return 0
 }
@@ -226,7 +231,8 @@ func startGame(send func(string, any) (json.RawMessage, error), out, errOut io.W
 }
 
 // displayResult prints the text and hero status from a server response.
-func displayResult(out io.Writer, raw json.RawMessage) {
+// Returns true if the server signaled quit.
+func displayResult(out io.Writer, raw json.RawMessage) bool {
 	var result struct {
 		Text string         `json:"text"`
 		Hero map[string]any `json:"hero"`
@@ -236,7 +242,7 @@ func displayResult(out io.Writer, raw json.RawMessage) {
 	if err := json.Unmarshal(raw, &result); err != nil {
 		// Not a play response — print raw.
 		fmt.Fprintln(out, string(raw))
-		return
+		return false
 	}
 
 	if result.Text != "" {
@@ -250,6 +256,8 @@ func displayResult(out io.Writer, raw json.RawMessage) {
 	if result.Dead {
 		fmt.Fprintln(out, "\nYou have been slain. Start a new game with 'new <scenario> <name> <class>'.")
 	}
+
+	return result.Quit
 }
 
 // printHeroStatus prints a compact HP/MP bar.
