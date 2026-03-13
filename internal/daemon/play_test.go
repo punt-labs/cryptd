@@ -72,6 +72,7 @@ func TestPlayNewGameAndLook(t *testing.T) {
 
 	// Normal mode returns narrated text and full game state.
 	assert.NotEmpty(t, result.Text, "expected narrated text from new_game")
+	require.NotNil(t, result.State, "expected game state from new_game")
 	assert.NotEmpty(t, result.State.Party, "expected party in game state from new_game")
 
 	// Now play "look"

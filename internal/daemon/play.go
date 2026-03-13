@@ -81,9 +81,10 @@ func (s *Server) handlePlay(req Request) Response {
 		}
 	}
 
+	stateCopy := *s.state
 	result := PlayResponse{
 		Text:  narration,
-		State: *s.state,
+		State: &stateCopy,
 	}
 
 	// Check for terminal events.
@@ -142,7 +143,7 @@ func (s *Server) handleNewGamePlay(req Request) Response {
 	}
 
 	s.mu.Lock()
-	state := *s.state
+	st := *s.state
 	s.mu.Unlock()
 
 	return Response{
@@ -150,7 +151,7 @@ func (s *Server) handleNewGamePlay(req Request) Response {
 		ID:      req.ID,
 		Result: PlayResponse{
 			Text:  narration,
-			State: state,
+			State: &st,
 		},
 	}
 }

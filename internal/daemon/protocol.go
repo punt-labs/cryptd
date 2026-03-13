@@ -57,7 +57,7 @@ type PlayRequest struct {
 // PlayResponse is the JSON-RPC result for the "play" method.
 type PlayResponse struct {
 	Text  string          `json:"text"`
-	State model.GameState `json:"state,omitempty"`
+	State *model.GameState `json:"state,omitempty"`
 	Dead  bool            `json:"dead,omitempty"`
 	Quit  bool            `json:"quit,omitempty"`
 }

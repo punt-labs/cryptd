@@ -314,7 +314,7 @@ func displayResult(out io.Writer, raw json.RawMessage) bool {
 		fmt.Fprintln(out, result.Text)
 	}
 
-	if len(result.State.Party) > 0 {
+	if result.State != nil && len(result.State.Party) > 0 {
 		printHeroStatus(out, &result.State.Party[0])
 	}
 
