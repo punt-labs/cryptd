@@ -30,8 +30,8 @@
 ```text
         ┌──────────────────────────────────────────────┐
         │             CLI / Commands                    │  cryptd serve
-        │   (cryptd serve, crypt solo/headless/connect)│  crypt solo
-        └───────────────┬──────────────────────────────┘  crypt connect
+        │         (cryptd serve, crypt)                 │  crypt
+        └───────────────┬──────────────────────────────┘
                         │ wires together
         ┌───────────────▼──────────────────────────────┐
         │          Play Mode Composition                │
@@ -372,6 +372,48 @@ pass with `-race`. The `crypt` client binary is not yet built (future milestone)
 
 ---
 
+## Milestone 8b — Twin Renderer (DES-026)
+
+**Goal:** The `Renderer` interface spans the client-server boundary as a matched pair.
+The server's game loop uses an RPC Renderer that serializes state over JSON-RPC. The client
+uses an RPC Renderer that deserializes state and displays fancy ASCII. Typed data end-to-end,
+no `map[string]any`.
+
+**What gets built:**
+
+- **Server RPC Renderer** (implements `model.Renderer`):
+  - `Render()` → serialize `GameState` + narration as JSON-RPC response to connection
+  - `Events()` → deserialize JSON-RPC play requests from connection into `InputEvent` channel
+  - Replaces the ad-hoc play handler — the game loop drives the renderer directly
+- **Client RPC Renderer** (`cmd/crypt/`):
+  - Receive JSON-RPC response → deserialize into `model.GameState` + narration → display
+    with fancy ASCII (HP/MP bars, room headers, enemy status, readline)
+  - readline input → serialize as JSON-RPC play request → send to server
+- **Basic text renderer** for `cryptd serve -t` — plain text, no bars, no network
+- `cmd/crypt/` imports `internal/model` for typed data contracts
+- `heroSummary()`, `displayResult()`, `printHeroStatus()` eliminated
+- `Loop.Dispatch()` unexported — the RPC Renderer replaces direct dispatch calls
+
+**Refactoring:**
+
+- `internal/renderer/cli.go` stripped down to basic text renderer for `-t` mode
+- `internal/daemon/play.go` replaced by RPC Renderer wired into `Loop.Run()`
+- `formatBar`/`formatHUD` move to client renderer
+- Play response becomes typed struct with `model.GameState` (not `map[string]any`)
+
+**Tests written:**
+
+- Unit: Server RPC Renderer serializes correct JSON-RPC from `Render()` call
+- Unit: Server RPC Renderer deserializes JSON-RPC play request into `InputEvent`
+- Unit: Client renderer formats HP/MP bars from typed `model.Character`
+- Integration: full loop with RPC Renderer twins over in-process pipe
+- Existing daemon and integration tests updated to use typed responses
+
+**Done when:** `crypt` displays fancy HP bars from typed `model.Character`. The play
+handler is gone. `map[string]any` does not appear in play response paths. All tests green.
+
+---
+
 ## Milestone 9 — DM Thin Slice
 
 **Goal:** `cryptd dm` works. A Claude Code session can connect via MCP,
@@ -476,7 +518,9 @@ M5  Full Lux HUD    Four-panel HUD; nav buttons; combat panel
 M6  Small Tier      SLMInterpreter + SLMNarrator (llama.cpp sidecar + SmolLM2-135M);
                     movement only; four-tier failover tested (DES-023)
 M7  Full SLM+Med    All verbs; solo mode complete; ollama medium tier; --model flag
-M8  Server Slice    cryptd serve; single-session; TCP + Unix socket; MCP wire tests
+M8  Server Slice    cryptd serve; single-session; TCP + Unix socket; MCP wire tests ✓ DONE
+M8b Twin Renderer   Renderer interface across the wire (DES-026); typed data;
+                    fancy client display; map[string]any eliminated
 M9  DM Thin Slice   LLM in the loop; crypt dm; SKILL.md rewrite
                     ← FIRST FULL DM MODE VALIDATION →
 M10 Daemon Routing  Multi-session; privilege gating; push notifications

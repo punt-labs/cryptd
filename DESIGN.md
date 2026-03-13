@@ -1360,3 +1360,114 @@ Players connect to the same `cryptd serve` instance directly. However, Biff's ma
 presence, and broadcast capabilities (`/wall`, `/talk`) could still add value as a
 communication layer on top of the game — coordination between players rather than game
 state transport. This will be evaluated when multiplayer is implemented (M13).
+
+## DES-026: Twin Renderer Pattern — Renderer Interface Across the Wire
+
+**Date:** 2026-03-13
+**Status:** SETTLED
+**Topic:** How the `Renderer` interface spans the client-server boundary
+
+### Context
+
+The `Renderer` interface (`internal/model/interfaces.go`) defines two methods:
+
+```go
+type Renderer interface {
+    Render(ctx context.Context, state GameState, narration string) error
+    Events() <-chan InputEvent
+}
+```
+
+After DES-025 established the two-binary split, the client (`crypt`) became a "dumb pipe" —
+it serializes user input as JSON-RPC, receives ad-hoc `map[string]any` responses, and formats
+them with minimal display logic. Meanwhile the server's `internal/renderer/cli.go` has the
+fancy display code (HP bars, room headers, enemy status) that only runs in `-t` testing mode.
+
+This is inverted. The player-facing client has the worst display, and the developer-facing
+test mode has the best. More fundamentally, the play handler in the daemon manually calls
+`Loop.Dispatch()` and constructs responses with `map[string]any` — reimplementing what the
+game loop already does, without typed data.
+
+### Design
+
+The `Renderer` interface is implemented on **both sides** of the network boundary as a
+matched pair (twins). This is the same pattern as CORBA, Java RMI, and gRPC stubs: the
+interface is the contract, and serialization/deserialization boilerplate bridges the wire.
+
+```text
+┌─────────────────────────────┐         ┌──────────────────────────────┐
+│         cryptd serve        │         │           crypt              │
+│                             │         │                              │
+│  Game Loop                  │         │  ┌────────────────────────┐  │
+│    │                        │         │  │  Client RPC Renderer   │  │
+│    ├─ Render(state, narr) ──┤ ──JSON──┤──│  (deserialize + fancy  │  │
+│    │                        │   RPC   │  │   ASCII display)       │  │
+│    ├─ Events() ◄────────────┤ ◄─JSON──┤──│  readline → serialize  │  │
+│    │                        │   RPC   │  └────────────────────────┘  │
+│  ┌─▼──────────────────────┐ │         │                              │
+│  │ Server RPC Renderer    │ │         │  HP 15/20 [████████░░]       │
+│  │ (serialize state to    │ │         │  MP  3/5  [██████░░░░]       │
+│  │  JSON-RPC response,    │ │         │                              │
+│  │  deserialize events    │ │         │  > _                         │
+│  │  from JSON-RPC input)  │ │         │                              │
+│  └────────────────────────┘ │         └──────────────────────────────┘
+└─────────────────────────────┘
+```
+
+**Server RPC Renderer** (implements `model.Renderer`):
+- `Render(ctx, state, narration)` → serializes `GameState` + narration as JSON-RPC response,
+  writes to the connection
+- `Events()` → reads JSON-RPC play requests from the connection, returns `InputEvent` channel
+
+**Client RPC Renderer** (implements `model.Renderer`):
+- Receives JSON-RPC response → deserializes into typed `model.GameState` + narration →
+  displays with fancy ASCII formatting (HP/MP bars, room headers, enemy status)
+- Reads terminal input via readline → serializes as JSON-RPC play request → sends to server
+
+**Testing mode** (`cryptd serve -t`) uses a basic text renderer directly — no network, no
+serialization. Simple text output suitable for scripted tests and debugging.
+
+The game loop (`Loop.Run()`) does not change. In daemon mode it receives the Server RPC
+Renderer. In `-t` mode it receives the basic text renderer. Same loop, different renderer.
+The ad-hoc play handler and exported `Dispatch()` method go away — the RPC Renderer IS the
+bridge between the game loop and the network.
+
+### Key properties
+
+- **Typed data end-to-end.** Both sides use `model.GameState`, `model.Character`, etc.
+  No `map[string]any` anywhere. The wire format is just serialization boilerplate.
+- **Interface is the contract.** The `Renderer` interface is identical on both sides.
+  Adding a new renderer (web client, Lux) means implementing the same interface.
+- **Display logic lives in the client.** `formatBar`, `formatHUD`, room headers, enemy
+  status — all in the client renderer where the player sees them.
+- **Server renderer is pure I/O.** Serialize state out, deserialize events in. No display
+  formatting, no terminal handling.
+- **Request-response maps to render-then-wait.** Each `Render()` sends a JSON-RPC response.
+  Each `Events()` read blocks until the next JSON-RPC request. The synchronous ping-pong
+  matches the game loop's natural cadence.
+
+### Alternatives considered
+
+**Keep the ad-hoc play handler** — the daemon manually calls `Dispatch()`, constructs
+`map[string]any` responses, and the client deserializes into anonymous structs. Rejected
+because it duplicates the game loop's orchestration, loses type safety on the wire, and
+puts display logic in the wrong binary.
+
+**Move `formatBar` to a shared package** — both server and client import `internal/display`
+for formatting utilities. Rejected because it solves the symptom (client has bad display)
+without fixing the cause (the Renderer interface isn't used across the wire).
+
+**Client runs its own game loop** — the client embeds the engine and runs `Loop.Run()`
+locally. Rejected per DES-025: the engine runs one way (`cryptd serve`), the client never
+embeds it.
+
+### Outcome
+
+- The `Renderer` interface spans the wire as a twin pair
+- Server RPC Renderer: serialize/deserialize, no display logic
+- Client RPC Renderer: deserialize/serialize, fancy ASCII display
+- `-t` mode: basic text renderer, no network
+- `map[string]any` eliminated from both the play handler and the client
+- `heroSummary()`, `displayResult()`, and `printHeroStatus()` collapse into typed serialization
+- The play handler and exported `Loop.Dispatch()` are replaced by the Server RPC Renderer
+- `cmd/crypt/` imports `internal/model` for typed data contracts

@@ -7,58 +7,48 @@ adventure game playable via Claude Code, CLI, or (future) web client.
 
 | Binary | Role | Description |
 |--------|------|-------------|
-| `cryptd` | **Server** | Game engine as a network service |
-| `crypt` | **Client** | Player-facing CLI with embedded and network modes |
+| `cryptd` | **Server** | Game engine, interpreter, and narrator as a network service |
+| `crypt` | **Client** | Player-facing CLI — connects to the server, displays the game |
 
 ### cryptd (server)
 
 ```bash
-cryptd serve --listen :9000          # TCP (remote play, multiplayer)
-cryptd serve --socket ~/.crypt/d.sock  # Unix socket (local dev)
+cryptd serve                           # daemonize, default Unix socket
+cryptd serve -f --listen :9000         # foreground, TCP
+cryptd serve -t --scenario minimal     # testing mode (stdin/stdout, no network)
+cryptd validate scenario.yaml          # validate scenario YAML
 ```
 
-The server exposes 15 MCP tools as JSON-RPC 2.0 over NDJSON. It holds game
-state, resolves all game logic deterministically, and accepts connections from
-any client. It does not know or care what brain (LLM/SLM/templates) or UI
-(CLI/Lux/Claude Code) the client uses.
+The server owns the game engine, command interpreter (SLM with Rules fallback),
+and narrator (SLM with Template fallback). Normal mode accepts free text from
+the player and returns narrated display text. Passthrough mode (`--passthrough`)
+exposes the raw MCP tool surface for Claude Code.
 
 ### crypt (client)
 
 ```bash
-crypt connect --server host:9000     # play via remote server
-crypt solo --scenario minimal        # embedded engine, local SLM
-crypt headless --scenario minimal    # embedded engine, templates
-crypt autoplay --scenario minimal --script file  # scripted playback
+crypt                                  # connect to local server (auto-starts if needed)
+crypt --addr host:9000                 # connect to remote server
+crypt --scenario unix-catacombs        # auto-start with scenario
 ```
 
-Embedded modes (`solo`, `headless`, `autoplay`) run the engine in-process — no
-server required. `connect` mode speaks the same protocol as the server.
+The client connects to `cryptd serve`, sends natural language text, and renders
+the game with readline input and ASCII status display. If the server is not
+running on the local socket, the client forks it automatically.
 
 The [crypt plugin](https://github.com/punt-labs/crypt) for Claude Code connects
-to `cryptd serve` and provides the MCP tool surface + SKILL.md for DM mode.
-
-## Architecture
-
-Three orthogonal axes:
-
-| Axis | Options |
-|------|---------|
-| **Engine access** | Embedded (in-process) or Server (network) |
-| **Brain** | LLM (Claude), SLM (ollama), Templates |
-| **UI** | CLI, Lux (ImGui), Claude Code conversation |
-
-See [DES-025](DESIGN.md) for the full design rationale.
+to `cryptd serve --passthrough` for raw MCP tool access.
 
 ## Status
 
-M8 (daemon thin slice) in progress. See [docs/build-plan.md](docs/build-plan.md)
-for the implementation roadmap.
+M8 (server thin slice) is complete. See [docs/build-plan.md](docs/build-plan.md)
+for the roadmap.
 
 ## Documentation
 
 - [docs/architecture.pdf](docs/architecture.pdf) — Technical architecture specification
-- [docs/build-plan.md](docs/build-plan.md) — Development build plan (14 milestones)
+- [docs/build-plan.md](docs/build-plan.md) — Development build plan
 - [docs/testing.md](docs/testing.md) — Test and verification architecture
 - [docs/plan.md](docs/plan.md) — Architecture evolution plan
-- [DESIGN.md](DESIGN.md) — Architectural decision records (DES-001–025)
+- [DESIGN.md](DESIGN.md) — Architectural decision records (DES-001–026)
 - [docs/distribution.md](docs/distribution.md) — Binary distribution specification
