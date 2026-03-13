@@ -66,7 +66,7 @@ demo-unix-catacombs: build-server          ## Full 9-room UNIX-themed dungeon cr
 	CRYPT_SCENARIO_DIR=$(SCENARIO_DIR) ./cryptd serve -t --scenario unix-catacombs --script $(DEMO_DIR)/unix-catacombs.txt
 
 ##@ Demos — Advanced
-demo-solo: ollama-setup build-server        ## Interactive solo mode with SLM (cryptd serve -t)
+demo-solo: build-server                    ## Interactive solo mode (rules+templates, cryptd serve -t)
 	CRYPT_SCENARIO_DIR=$(SCENARIO_DIR) ./cryptd serve -t --scenario minimal
 
 ##@ Ollama

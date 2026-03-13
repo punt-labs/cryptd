@@ -17,8 +17,8 @@ All notable changes to this project will be documented in this file.
 
 - `cmd/crypt/embedded.go` — deleted fat client that embedded the game engine. Engine access is always through the server.
 - `crypt solo`, `crypt headless`, `crypt autoplay`, `crypt connect` subcommands — replaced by plain `crypt` thin client.
-- `cryptd headless` and `cryptd autoplay` subcommands — will be replaced by `cryptd serve -t` (testing mode on stdin/stdout).
-- E2E acceptance and headless tests removed — will be replaced when `cryptd serve -t` is implemented.
+- `cryptd headless` and `cryptd autoplay` subcommands — replaced by `cryptd serve -t` (testing mode on stdin/stdout).
+- E2E acceptance and headless tests — replaced by `cryptd serve -t --script` demos.
 
 ### Changed
 

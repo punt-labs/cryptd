@@ -64,14 +64,26 @@ func dialOrStart(socketPath string) (net.Conn, error) {
 		return nil, fmt.Errorf("cryptd not found in PATH — install it or start the server manually")
 	}
 
-	cmd := exec.Command(cryptd, "serve", "--socket", socketPath)
+	// Start in foreground mode so this process IS the server — kill and
+	// wait target the right PID (not a daemonize parent that already exited).
+	cmd := exec.Command(cryptd, "serve", "-f", "--socket", socketPath)
 	cmd.Stderr = os.Stderr
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start cryptd: %w", err)
 	}
 
+	// Reap the child in the background to avoid zombies.
+	waitCh := make(chan error, 1)
+	go func() { waitCh <- cmd.Wait() }()
+
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
+		// Check if the server exited before the socket appeared.
+		select {
+		case err := <-waitCh:
+			return nil, fmt.Errorf("cryptd exited before socket ready: %v", err)
+		default:
+		}
 		conn, err = net.DialTimeout("unix", socketPath, 500*time.Millisecond)
 		if err == nil {
 			return conn, nil
@@ -79,15 +91,17 @@ func dialOrStart(socketPath string) (net.Conn, error) {
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	// Socket never appeared — kill the orphaned child.
+	// Socket never appeared — kill the server.
 	_ = cmd.Process.Kill()
-	_ = cmd.Wait()
+	<-waitCh
 	return nil, fmt.Errorf("cryptd started but socket %s not ready within 5s", socketPath)
 }
 
 // session runs the interactive REPL on an established connection.
 func session(conn net.Conn, in io.Reader, out, errOut io.Writer, scenario, charName, charClass string) int {
 	scanner := bufio.NewScanner(conn)
+	// Match the server's 1 MiB buffer to handle large narrated responses.
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	reqID := 0
 
 	send := func(method string, params any) (json.RawMessage, error) {

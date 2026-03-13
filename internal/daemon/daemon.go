@@ -67,6 +67,7 @@ func NewServer(socketPath, scenarioDir string, opts ...ServerOption) *Server {
 	for _, o := range opts {
 		o(s)
 	}
+	s.defaultPassthrough()
 	return s
 }
 
@@ -81,7 +82,16 @@ func NewTCPServer(listenAddr, scenarioDir string, opts ...ServerOption) *Server 
 	for _, o := range opts {
 		o(s)
 	}
+	s.defaultPassthrough()
 	return s
+}
+
+// defaultPassthrough enables passthrough mode when neither interpreter nor narrator
+// is configured. Without this, normal mode would panic on nil interp/narr.
+func (s *Server) defaultPassthrough() {
+	if !s.passthrough && s.interp == nil && s.narr == nil {
+		s.passthrough = true
+	}
 }
 
 // ListenAndServe starts listening and blocks until interrupted by
