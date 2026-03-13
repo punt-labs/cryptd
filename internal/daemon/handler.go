@@ -138,7 +138,14 @@ func (s *Server) handleRequest(req Request) Response {
 	case "tools/call":
 		if !s.passthrough {
 			var params ToolCallParams
-			if json.Unmarshal(req.Params, &params) == nil && params.Name == "new_game" {
+			if err := json.Unmarshal(req.Params, &params); err != nil {
+				return Response{
+					JSONRPC: "2.0",
+					ID:      req.ID,
+					Error:   &RPCError{Code: CodeInvalidParams, Message: "invalid tool call params: " + err.Error()},
+				}
+			}
+			if params.Name == "new_game" {
 				req.Params = params.Arguments
 				return s.handleNewGamePlay(req)
 			}

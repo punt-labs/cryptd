@@ -89,7 +89,7 @@ func NewTCPServer(listenAddr, scenarioDir string, opts ...ServerOption) *Server 
 // defaultPassthrough enables passthrough mode when neither interpreter nor narrator
 // is configured. Without this, normal mode would panic on nil interp/narr.
 func (s *Server) defaultPassthrough() {
-	if !s.passthrough && s.interp == nil && s.narr == nil {
+	if !s.passthrough && (s.interp == nil || s.narr == nil) {
 		s.passthrough = true
 	}
 }
