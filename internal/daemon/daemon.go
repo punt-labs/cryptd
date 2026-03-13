@@ -161,6 +161,9 @@ func (s *Server) Serve(ln net.Listener) error {
 		if !ok {
 			return
 		}
+		// Print a newline so the shutdown message starts on a clean line
+		// after the terminal driver's ^C echo.
+		fmt.Fprintln(os.Stderr)
 		log.Printf("daemon: received %s, shutting down", sig)
 		ln.Close()
 	}()

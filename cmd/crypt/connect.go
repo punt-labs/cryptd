@@ -67,8 +67,9 @@ func dialOrStart(socketPath string) (net.Conn, error) {
 
 	// Start in foreground mode so this process IS the server — kill and
 	// wait target the right PID (not a daemonize parent that already exited).
+	// Do NOT inherit stderr — server log output in the client terminal
+	// corrupts readline's raw-mode terminal state.
 	cmd := exec.Command(cryptd, "serve", "-f", "--socket", socketPath)
-	cmd.Stderr = os.Stderr
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start cryptd: %w", err)
 	}
