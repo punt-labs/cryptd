@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -67,9 +68,11 @@ func dialOrStart(socketPath string) (net.Conn, error) {
 
 	// Start in foreground mode so this process IS the server — kill and
 	// wait target the right PID (not a daemonize parent that already exited).
-	// Do NOT inherit stderr — server log output in the client terminal
-	// corrupts readline's raw-mode terminal state.
+	// Capture stderr in a buffer — server log output on the client terminal
+	// corrupts readline's raw-mode state, but we need diagnostics on failure.
+	var stderrBuf bytes.Buffer
 	cmd := exec.Command(cryptd, "serve", "-f", "--socket", socketPath)
+	cmd.Stderr = &stderrBuf
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start cryptd: %w", err)
 	}
@@ -83,6 +86,10 @@ func dialOrStart(socketPath string) (net.Conn, error) {
 		// Check if the server exited before the socket appeared.
 		select {
 		case err := <-waitCh:
+			msg := strings.TrimSpace(stderrBuf.String())
+			if msg != "" {
+				return nil, fmt.Errorf("cryptd exited before socket ready: %s", msg)
+			}
 			return nil, fmt.Errorf("cryptd exited before socket ready: %v", err)
 		default:
 		}
@@ -184,9 +191,13 @@ func session(conn net.Conn, in io.Reader, out, errOut io.Writer, scenario, charN
 	for {
 		line, err := rl.Readline()
 		if err != nil {
-			// Ctrl-C or EOF — clean exit.
-			fmt.Fprintln(out, "Farewell, adventurer.")
-			return 0
+			if errors.Is(err, readline.ErrInterrupt) || errors.Is(err, io.EOF) {
+				fmt.Fprintln(out, "Farewell, adventurer.")
+				return 0
+			}
+			// Terminal I/O failure — surface the error.
+			fmt.Fprintf(errOut, "input error: %v\n", err)
+			return 1
 		}
 		line = strings.TrimSpace(line)
 		if line == "" {

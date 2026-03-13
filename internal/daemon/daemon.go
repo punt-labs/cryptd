@@ -14,6 +14,7 @@ import (
 	"github.com/punt-labs/cryptd/internal/engine"
 	"github.com/punt-labs/cryptd/internal/game"
 	"github.com/punt-labs/cryptd/internal/model"
+	"golang.org/x/term"
 )
 
 // Server is the game server that exposes MCP tools over a network connection.
@@ -161,9 +162,11 @@ func (s *Server) Serve(ln net.Listener) error {
 		if !ok {
 			return
 		}
-		// Print a newline so the shutdown message starts on a clean line
-		// after the terminal driver's ^C echo.
-		fmt.Fprintln(os.Stderr)
+		// When stderr is a terminal, print a newline so the shutdown
+		// message starts on a clean line after the terminal's ^C echo.
+		if term.IsTerminal(int(os.Stderr.Fd())) {
+			fmt.Fprintln(os.Stderr)
+		}
 		log.Printf("daemon: received %s, shutting down", sig)
 		ln.Close()
 	}()
