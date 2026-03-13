@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"github.com/ergochat/readline"
-	"github.com/punt-labs/cryptd/internal/daemon"
 	"github.com/punt-labs/cryptd/internal/model"
+	"github.com/punt-labs/cryptd/internal/protocol"
 )
 
 // errConnLost signals that the server connection dropped.
@@ -47,7 +47,7 @@ func dial(socketPath, addr string) (net.Conn, error) {
 	sock := socketPath
 	if sock == "" {
 		var err error
-		sock, err = daemon.DefaultSocketPath()
+		sock, err = protocol.DefaultSocketPath()
 		if err != nil {
 			return nil, fmt.Errorf("cannot determine home directory: %w", err)
 		}
@@ -144,7 +144,7 @@ func session(conn net.Conn, in io.Reader, out, errOut io.Writer, scenario, charN
 		}
 		var resp struct {
 			Result json.RawMessage  `json:"result"`
-			Error  *daemon.RPCError `json:"error"`
+			Error  *protocol.RPCError `json:"error"`
 		}
 		if err := json.Unmarshal(scanner.Bytes(), &resp); err != nil {
 			return nil, fmt.Errorf("parse response: %w", err)
@@ -303,7 +303,7 @@ func startGame(send func(string, any) (json.RawMessage, error), out, errOut io.W
 // displayResult prints the text and hero status from a server response.
 // Returns true if the server signaled quit.
 func displayResult(out io.Writer, raw json.RawMessage) bool {
-	var result daemon.PlayResponse
+	var result protocol.PlayResponse
 	if err := json.Unmarshal(raw, &result); err != nil {
 		// Not a play response — print raw.
 		fmt.Fprintln(out, string(raw))
