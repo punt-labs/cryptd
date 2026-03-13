@@ -2,7 +2,11 @@
 // exposing the game engine's 15 MCP tools as RPC methods.
 package daemon
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/punt-labs/cryptd/internal/model"
+)
 
 // JSON-RPC 2.0 wire types.
 
@@ -44,6 +48,19 @@ const (
 	CodeGameOver     = -32002 // hero is dead
 	CodeNoActiveGame = -32003 // tool called before new_game
 )
+
+// PlayRequest is the JSON-RPC params for the "play" method.
+type PlayRequest struct {
+	Text string `json:"text"`
+}
+
+// PlayResponse is the JSON-RPC result for the "play" method.
+type PlayResponse struct {
+	Text  string          `json:"text"`
+	State *model.GameState `json:"state,omitempty"`
+	Dead  bool            `json:"dead,omitempty"`
+	Quit  bool            `json:"quit,omitempty"`
+}
 
 // MCP tool call/result types (subset of MCP spec used by tools/call).
 

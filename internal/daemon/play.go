@@ -8,9 +8,22 @@ import (
 	"github.com/punt-labs/cryptd/internal/model"
 )
 
-// playParams is the JSON-RPC params for the "play" method.
-type playParams struct {
-	Text string `json:"text"`
+// deepCopyState returns a deep copy of the game state via JSON round-trip.
+// This ensures no slice backing arrays are shared with the original, which
+// would be unsafe after the mutex is released.
+//
+// Panics on marshal/unmarshal failure — GameState is always valid JSON, so
+// a failure here indicates a programmer error (e.g. unexportable field added).
+func deepCopyState(state *model.GameState) *model.GameState {
+	data, err := json.Marshal(state)
+	if err != nil {
+		panic("deepCopyState: marshal: " + err.Error())
+	}
+	var cp model.GameState
+	if err := json.Unmarshal(data, &cp); err != nil {
+		panic("deepCopyState: unmarshal: " + err.Error())
+	}
+	return &cp
 }
 
 // handlePlay processes a "play" request: interpret text → engine → narrate → text.
@@ -24,7 +37,7 @@ func (s *Server) handlePlay(req Request) Response {
 		}
 	}
 
-	var params playParams
+	var params PlayRequest
 	if err := json.Unmarshal(req.Params, &params); err != nil {
 		return Response{
 			JSONRPC: "2.0",
@@ -64,7 +77,7 @@ func (s *Server) handlePlay(req Request) Response {
 		return Response{
 			JSONRPC: "2.0",
 			ID:      req.ID,
-			Result:  map[string]any{"text": "I don't understand that command."},
+			Result:  PlayResponse{Text: "I don't understand that command."},
 		}
 	}
 
@@ -72,7 +85,7 @@ func (s *Server) handlePlay(req Request) Response {
 		return Response{
 			JSONRPC: "2.0",
 			ID:      req.ID,
-			Result:  map[string]any{"text": "Farewell, adventurer.", "quit": true},
+			Result:  PlayResponse{Text: "Farewell, adventurer.", Quit: true},
 		}
 	}
 
@@ -86,17 +99,18 @@ func (s *Server) handlePlay(req Request) Response {
 		}
 	}
 
-	result := map[string]any{"text": narration}
+	state := deepCopyState(s.state)
+	result := PlayResponse{
+		Text:  narration,
+		State: state,
+	}
 
 	// Check for terminal events.
 	for _, ev := range events {
 		if ev.Type == "hero_died" {
-			result["dead"] = true
+			result.Dead = true
 		}
 	}
-
-	// Include hero status for the prompt.
-	result["hero"] = heroSummary(s.state)
 
 	return Response{
 		JSONRPC: "2.0",
@@ -109,7 +123,7 @@ func (s *Server) handlePlay(req Request) Response {
 // the initial room narration as text.
 func (s *Server) handleNewGamePlay(req Request) Response {
 	// Use the passthrough dispatcher to create the game.
-	result, rpcErr := s.dispatchNewGame(req.Params)
+	_, rpcErr := s.dispatchNewGame(req.Params)
 	if rpcErr != nil {
 		return Response{
 			JSONRPC: "2.0",
@@ -138,24 +152,24 @@ func (s *Server) handleNewGamePlay(req Request) Response {
 	narration, err := s.narr.Narrate(ctx, event, stateCopy)
 	if err != nil {
 		// Fall back to the structured result if narration fails.
-		data, _ := json.Marshal(result)
+		data, _ := json.Marshal(stateCopy)
 		return Response{
 			JSONRPC: "2.0",
 			ID:      req.ID,
-			Result:  map[string]any{"text": string(data)},
+			Result:  PlayResponse{Text: string(data)},
 		}
 	}
 
 	s.mu.Lock()
-	hero := heroSummary(s.state)
+	state := deepCopyState(s.state)
 	s.mu.Unlock()
 
 	return Response{
 		JSONRPC: "2.0",
 		ID:      req.ID,
-		Result: map[string]any{
-			"text": narration,
-			"hero": hero,
+		Result: PlayResponse{
+			Text:  narration,
+			State: state,
 		},
 	}
 }

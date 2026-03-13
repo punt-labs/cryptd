@@ -15,6 +15,7 @@ import (
 
 	"github.com/ergochat/readline"
 	"github.com/punt-labs/cryptd/internal/daemon"
+	"github.com/punt-labs/cryptd/internal/model"
 )
 
 // errConnLost signals that the server connection dropped.
@@ -302,12 +303,7 @@ func startGame(send func(string, any) (json.RawMessage, error), out, errOut io.W
 // displayResult prints the text and hero status from a server response.
 // Returns true if the server signaled quit.
 func displayResult(out io.Writer, raw json.RawMessage) bool {
-	var result struct {
-		Text string         `json:"text"`
-		Hero map[string]any `json:"hero"`
-		Dead bool           `json:"dead"`
-		Quit bool           `json:"quit"`
-	}
+	var result daemon.PlayResponse
 	if err := json.Unmarshal(raw, &result); err != nil {
 		// Not a play response — print raw.
 		fmt.Fprintln(out, string(raw))
@@ -318,8 +314,8 @@ func displayResult(out io.Writer, raw json.RawMessage) bool {
 		fmt.Fprintln(out, result.Text)
 	}
 
-	if result.Hero != nil {
-		printHeroStatus(out, result.Hero)
+	if result.State != nil && len(result.State.Party) > 0 {
+		printHeroStatus(out, &result.State.Party[0])
 	}
 
 	if result.Dead {
@@ -330,13 +326,10 @@ func displayResult(out io.Writer, raw json.RawMessage) bool {
 }
 
 // printHeroStatus prints a compact HP/MP bar.
-func printHeroStatus(out io.Writer, hero map[string]any) {
-	hp, _ := hero["hp"].(float64)
-	maxHP, _ := hero["max_hp"].(float64)
-	fmt.Fprintf(out, "[HP: %.0f/%.0f", hp, maxHP)
-	if mp, ok := hero["mp"].(float64); ok && mp > 0 {
-		maxMP, _ := hero["max_mp"].(float64)
-		fmt.Fprintf(out, " MP: %.0f/%.0f", mp, maxMP)
+func printHeroStatus(out io.Writer, hero *model.Character) {
+	fmt.Fprintf(out, "[HP: %d/%d", hero.HP, hero.MaxHP)
+	if hero.MaxMP > 0 {
+		fmt.Fprintf(out, " MP: %d/%d", hero.MP, hero.MaxMP)
 	}
 	fmt.Fprintln(out, "]")
 }
