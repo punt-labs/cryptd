@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/ergochat/readline"
-	"github.com/punt-labs/cryptd/internal/model"
 	"github.com/punt-labs/cryptd/internal/protocol"
 )
 
@@ -252,7 +251,13 @@ func handleLine(line string, send func(string, any) (json.RawMessage, error), ou
 		return 0, false
 	}
 
-	if displayResult(out, result) {
+	var playResp protocol.PlayResponse
+	if err := json.Unmarshal(result, &playResp); err != nil {
+		// Not a play response — print raw.
+		fmt.Fprintln(out, string(result))
+		return 0, false
+	}
+	if displayPlayResponse(out, playResp) {
 		return 0, true
 	}
 	return 0, false
@@ -296,43 +301,16 @@ func startGame(send func(string, any) (json.RawMessage, error), out, errOut io.W
 		return err
 	}
 
-	displayResult(out, result)
+	var playResp protocol.PlayResponse
+	if err := json.Unmarshal(result, &playResp); err != nil {
+		// Not a play response — print raw.
+		fmt.Fprintln(out, string(result))
+		return nil
+	}
+	displayPlayResponse(out, playResp)
 	return nil
 }
 
-// displayResult prints the text and hero status from a server response.
-// Returns true if the server signaled quit.
-func displayResult(out io.Writer, raw json.RawMessage) bool {
-	var result protocol.PlayResponse
-	if err := json.Unmarshal(raw, &result); err != nil {
-		// Not a play response — print raw.
-		fmt.Fprintln(out, string(raw))
-		return false
-	}
-
-	if result.Text != "" {
-		fmt.Fprintln(out, result.Text)
-	}
-
-	if result.State != nil && len(result.State.Party) > 0 {
-		printHeroStatus(out, &result.State.Party[0])
-	}
-
-	if result.Dead {
-		fmt.Fprintln(out, "\nYou have been slain. Start a new game with 'new <scenario> <name> <class>'.")
-	}
-
-	return result.Quit
-}
-
-// printHeroStatus prints a compact HP/MP bar.
-func printHeroStatus(out io.Writer, hero *model.Character) {
-	fmt.Fprintf(out, "[HP: %d/%d", hero.HP, hero.MaxHP)
-	if hero.MaxMP > 0 {
-		fmt.Fprintf(out, " MP: %d/%d", hero.MP, hero.MaxMP)
-	}
-	fmt.Fprintln(out, "]")
-}
 
 const helpText = `commands:
   new <scenario> <name> <class>   Start a new game
