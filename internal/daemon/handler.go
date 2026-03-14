@@ -9,6 +9,7 @@ import (
 	"log"
 
 	"github.com/punt-labs/cryptd/internal/game"
+	"github.com/punt-labs/cryptd/internal/protocol"
 )
 
 // toolRegistry holds the static list of MCP tools for tools/list responses.
@@ -216,7 +217,30 @@ func (s *Server) runGameLoop(scanner *bufio.Scanner, w io.Writer) {
 
 	if err := loop.Run(ctx, state); err != nil {
 		log.Printf("daemon: game loop error: %v", err)
+		return
 	}
+
+	// The game loop exited cleanly (quit or hero died). Send a final
+	// PlayResponse with the terminal flag so the client exits cleanly.
+	s.mu.Lock()
+	dead := len(state.Party) > 0 && state.Party[0].HP <= 0
+	s.mu.Unlock()
+
+	finalResp := protocol.Response{
+		JSONRPC: "2.0",
+		ID:      rend.getLastID(),
+		Result: protocol.PlayResponse{
+			Quit: !dead,
+			Dead: dead,
+		},
+	}
+	data, err := json.Marshal(finalResp)
+	if err != nil {
+		log.Printf("daemon: marshal final response: %v", err)
+		return
+	}
+	data = append(data, '\n')
+	w.Write(data)
 }
 
 // handleToolCall processes a tools/call request by dispatching to the engine.

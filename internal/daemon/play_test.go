@@ -109,10 +109,19 @@ func TestNormalMode_NewGameAndPlay(t *testing.T) {
 	_, err = clientW.Write(quitData)
 	require.NoError(t, err)
 
-	// Read the quit response (game loop renders the farewell).
-	require.True(t, clientScanner.Scan(), "expected quit response")
-	var quitResp protocol.Response
-	require.NoError(t, json.Unmarshal(clientScanner.Bytes(), &quitResp))
+	// Read the quit narration response (game loop renders the farewell).
+	require.True(t, clientScanner.Scan(), "expected quit narration response")
+	var quitNarrResp protocol.Response
+	require.NoError(t, json.Unmarshal(clientScanner.Bytes(), &quitNarrResp))
+
+	// Read the final terminal response with Quit flag.
+	require.True(t, clientScanner.Scan(), "expected final terminal response")
+	var finalResp protocol.Response
+	require.NoError(t, json.Unmarshal(clientScanner.Bytes(), &finalResp))
+	finalData, _ := json.Marshal(finalResp.Result)
+	var finalPlay protocol.PlayResponse
+	require.NoError(t, json.Unmarshal(finalData, &finalPlay))
+	assert.True(t, finalPlay.Quit, "expected Quit flag in final response")
 
 	// Wait for handleConnection to finish.
 	clientW.Close()
