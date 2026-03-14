@@ -20,22 +20,22 @@ import (
 // RPCRenderer only handles the play loop. Handshake methods (initialize,
 // tools/list, new_game) are handled by the daemon before the game loop starts.
 type RPCRenderer struct {
-	scanner   *bufio.Scanner
-	writer    io.Writer
-	events    chan model.InputEvent
-	startOnce sync.Once
+	scanner          *bufio.Scanner
+	writer           io.Writer
+	events           chan model.InputEvent
+	startOnce        sync.Once
+	skipInitialRender bool // when true, the first Render() call is a no-op
 
 	// mu guards lastID so the reader goroutine and Render() do not race.
 	mu     sync.Mutex
 	lastID json.RawMessage
 }
 
-// NewRPCRenderer creates an RPCRenderer that reads JSON-RPC requests from r
-// and writes JSON-RPC responses to w.
-func NewRPCRenderer(r io.Reader, w io.Writer) *RPCRenderer {
-	scanner := bufio.NewScanner(r)
-	// 1 MiB buffer to match the server/client convention.
-	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+// NewRPCRenderer creates an RPCRenderer that reads JSON-RPC requests from
+// the given scanner and writes JSON-RPC responses to w. The caller owns the
+// scanner — this allows handleConnection to reuse its existing scanner after
+// the handshake phase, avoiding buffered-data loss from creating a second scanner.
+func NewRPCRenderer(scanner *bufio.Scanner, w io.Writer) *RPCRenderer {
 	return &RPCRenderer{
 		scanner: scanner,
 		writer:  w,
@@ -45,7 +45,15 @@ func NewRPCRenderer(r io.Reader, w io.Writer) *RPCRenderer {
 
 // Render writes a PlayResponse as a JSON-RPC 2.0 NDJSON line, echoing the
 // request ID from the most recent Events() input.
+//
+// When skipInitialRender is set, the first call is a no-op — the daemon
+// already sent the initial room description via handleNewGamePlay before
+// the game loop started.
 func (r *RPCRenderer) Render(_ context.Context, state model.GameState, narration string) error {
+	if r.skipInitialRender {
+		r.skipInitialRender = false
+		return nil
+	}
 	stateCopy := deepCopyState(&state)
 
 	resp := protocol.Response{
