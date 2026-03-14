@@ -113,19 +113,21 @@ func (r *RPCRenderer) readLoop(ctx context.Context) {
 			if params.Text == "" {
 				continue
 			}
-			r.setLastID(req.ID)
 			ev := model.InputEvent{Type: "input", Payload: params.Text}
 			select {
 			case r.events <- ev:
+				// Set lastID after delivery so Render() always sees
+				// the ID matching the event the game loop just consumed.
+				r.setLastID(req.ID)
 			case <-ctx.Done():
 				return
 			}
 
 		case "quit":
-			r.setLastID(req.ID)
 			ev := model.InputEvent{Type: "quit"}
 			select {
 			case r.events <- ev:
+				r.setLastID(req.ID)
 			case <-ctx.Done():
 			}
 			return
