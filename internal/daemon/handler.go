@@ -2,10 +2,13 @@ package daemon
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
+
+	"github.com/punt-labs/cryptd/internal/game"
 )
 
 // toolRegistry holds the static list of MCP tools for tools/list responses.
@@ -54,6 +57,13 @@ var toolRegistry = []ToolInfo{
 
 // handleConnection reads NDJSON requests from r, processes them, and writes
 // NDJSON responses to w. It runs until r is closed or an I/O error occurs.
+//
+// In normal mode, the handshake phase (initialize, tools/list, new_game)
+// runs as request-response. After new_game, the game loop takes over via
+// RPCRenderer and blocks until the player quits or the connection closes.
+//
+// In passthrough mode, every request goes through the dispatcher — there is
+// no game loop or RPCRenderer.
 func (s *Server) handleConnection(r io.Reader, w io.Writer) {
 	scanner := bufio.NewScanner(r)
 	// Allow up to 1 MB per line (generous for JSON-RPC).
@@ -91,6 +101,13 @@ func (s *Server) handleConnection(r io.Reader, w io.Writer) {
 			continue
 		}
 		s.writeResponse(w, resp)
+
+		// In normal mode, after a successful new_game, hand the connection
+		// to the game loop via RPCRenderer. The loop blocks until quit/death/EOF.
+		if !s.passthrough && s.isNewGameSuccess(req, resp) {
+			s.runGameLoop(scanner, w)
+			return
+		}
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -146,21 +163,15 @@ func (s *Server) handleRequest(req Request) Response {
 				}
 			}
 			if params.Name == "new_game" {
-				req.Params = params.Arguments
 				return s.handleNewGamePlay(req)
 			}
-			// Normal mode: non-new_game tool calls are not supported.
-			// Clients should use the "play" method for text input.
 			return Response{
 				JSONRPC: "2.0",
 				ID:      req.ID,
-				Error:   &RPCError{Code: CodeMethodNotFound, Message: "tools/call is only available in passthrough mode — use the play method"},
+				Error:   &RPCError{Code: CodeMethodNotFound, Message: "only new_game is available before the game loop starts — use play for text input"},
 			}
 		}
 		return s.handleToolCall(req)
-
-	case "play":
-		return s.handlePlay(req)
 
 	default:
 		return Response{
@@ -168,6 +179,43 @@ func (s *Server) handleRequest(req Request) Response {
 			ID:      req.ID,
 			Error:   &RPCError{Code: CodeMethodNotFound, Message: fmt.Sprintf("unknown method %q", req.Method)},
 		}
+	}
+}
+
+// isNewGameSuccess checks if a request/response pair is a successful new_game.
+func (s *Server) isNewGameSuccess(req Request, resp Response) bool {
+	if resp.Error != nil {
+		return false
+	}
+	if req.Method == "tools/call" {
+		var params ToolCallParams
+		if err := json.Unmarshal(req.Params, &params); err == nil {
+			return params.Name == "new_game"
+		}
+	}
+	return false
+}
+
+// runGameLoop creates an RPCRenderer from the existing scanner and writer,
+// then runs the game loop. The loop drives the renderer: Render() writes
+// PlayResponse NDJSON, Events() reads play requests. Blocks until quit/death/EOF.
+func (s *Server) runGameLoop(scanner *bufio.Scanner, w io.Writer) {
+	rend := NewRPCRenderer(scanner, w)
+	rend.skipInitialRender = true // handleNewGamePlay already sent the initial room
+
+	s.mu.Lock()
+	loop := game.NewLoop(s.eng, s.interp, s.narr, rend)
+	s.mu.Unlock()
+
+	ctx := context.Background()
+	rend.StartReader(ctx)
+
+	s.mu.Lock()
+	state := s.state
+	s.mu.Unlock()
+
+	if err := loop.Run(ctx, state); err != nil {
+		log.Printf("daemon: game loop error: %v", err)
 	}
 }
 

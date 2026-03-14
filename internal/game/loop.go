@@ -127,7 +127,7 @@ func (l *Loop) Run(ctx context.Context, state *model.GameState) error {
 				}
 			}
 
-			events, narration, err := l.Dispatch(ctx, state, action)
+			events, narration, err := l.dispatch(ctx, state, action)
 			if err != nil {
 				return err
 			}
@@ -149,9 +149,9 @@ func (l *Loop) Run(ctx context.Context, state *model.GameState) error {
 	}
 }
 
-// Dispatch resolves an EngineAction against the engine and returns the resulting
-// events and narrated text. Exported for use by the daemon in normal mode.
-func (l *Loop) Dispatch(ctx context.Context, state *model.GameState, action model.EngineAction) ([]model.EngineEvent, string, error) {
+// dispatch resolves an EngineAction against the engine and returns the resulting
+// events and narrated text.
+func (l *Loop) dispatch(ctx context.Context, state *model.GameState, action model.EngineAction) ([]model.EngineEvent, string, error) {
 	// Block non-combat actions during combat.
 	if state.Dungeon.Combat.Active && combatBlockedActions[action.Type] {
 		event := model.EngineEvent{Type: "in_combat"}

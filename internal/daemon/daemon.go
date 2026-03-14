@@ -12,7 +12,6 @@ import (
 	"syscall"
 
 	"github.com/punt-labs/cryptd/internal/engine"
-	"github.com/punt-labs/cryptd/internal/game"
 	"github.com/punt-labs/cryptd/internal/model"
 	"golang.org/x/term"
 )
@@ -26,7 +25,6 @@ import (
 type Server struct {
 	eng         *engine.Engine
 	state       *model.GameState
-	loop        *game.Loop // non-nil in normal mode; used for Dispatch only (not Run)
 	interp      model.CommandInterpreter
 	narr        model.Narrator
 	passthrough bool   // true = structured JSON, false = interpreted + narrated text
@@ -34,7 +32,7 @@ type Server struct {
 	address     string // socket path or host:port
 	scenarioDir string
 	listener    net.Listener
-	mu          sync.Mutex // guards eng, state, and loop
+	mu          sync.Mutex // guards eng and state
 }
 
 // ServerOption configures a Server.

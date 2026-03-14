@@ -14,13 +14,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func testScanner(r io.Reader) *bufio.Scanner {
+	s := bufio.NewScanner(r)
+	s.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	return s
+}
+
 func TestRPCRenderer_Render_WritesValidNDJSON(t *testing.T) {
 	clientR, serverW := io.Pipe()
 	serverR, _ := io.Pipe() // reader side unused in this test
 	defer clientR.Close()
 	defer serverR.Close()
 
-	rend := NewRPCRenderer(serverR, serverW)
+	rend := NewRPCRenderer(testScanner(serverR), serverW)
 
 	// Set a request ID as if Events() had received a play request.
 	rend.setLastID(json.RawMessage(`42`))
@@ -73,7 +79,7 @@ func TestRPCRenderer_Render_DeepCopiesState(t *testing.T) {
 	defer clientR.Close()
 	defer serverR.Close()
 
-	rend := NewRPCRenderer(serverR, serverW)
+	rend := NewRPCRenderer(testScanner(serverR), serverW)
 	rend.setLastID(json.RawMessage(`1`))
 
 	state := model.GameState{
@@ -109,7 +115,7 @@ func TestRPCRenderer_Events_PlayRequest(t *testing.T) {
 	_, serverW := io.Pipe()
 	defer serverW.Close()
 
-	rend := NewRPCRenderer(serverR, serverW)
+	rend := NewRPCRenderer(testScanner(serverR), serverW)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	rend.StartReader(ctx)
@@ -145,7 +151,7 @@ func TestRPCRenderer_Events_QuitRequest(t *testing.T) {
 	_, serverW := io.Pipe()
 	defer serverW.Close()
 
-	rend := NewRPCRenderer(serverR, serverW)
+	rend := NewRPCRenderer(testScanner(serverR), serverW)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	rend.StartReader(ctx)
@@ -184,7 +190,7 @@ func TestRPCRenderer_Events_EOF(t *testing.T) {
 	_, serverW := io.Pipe()
 	defer serverW.Close()
 
-	rend := NewRPCRenderer(serverR, serverW)
+	rend := NewRPCRenderer(testScanner(serverR), serverW)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	rend.StartReader(ctx)
@@ -206,7 +212,7 @@ func TestRPCRenderer_Events_SkipsEmptyText(t *testing.T) {
 	_, serverW := io.Pipe()
 	defer serverW.Close()
 
-	rend := NewRPCRenderer(serverR, serverW)
+	rend := NewRPCRenderer(testScanner(serverR), serverW)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	rend.StartReader(ctx)
@@ -251,7 +257,7 @@ func TestRPCRenderer_Events_SkipsMalformedJSON(t *testing.T) {
 	_, serverW := io.Pipe()
 	defer serverW.Close()
 
-	rend := NewRPCRenderer(serverR, serverW)
+	rend := NewRPCRenderer(testScanner(serverR), serverW)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	rend.StartReader(ctx)
@@ -286,7 +292,7 @@ func TestRPCRenderer_Events_ContextCancellation(t *testing.T) {
 	_, serverW := io.Pipe()
 	defer serverW.Close()
 
-	rend := NewRPCRenderer(serverR, serverW)
+	rend := NewRPCRenderer(testScanner(serverR), serverW)
 	ctx, cancel := context.WithCancel(context.Background())
 	rend.StartReader(ctx)
 
