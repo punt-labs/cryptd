@@ -202,7 +202,7 @@ git push
 
 ## Design Decisions
 
-**Before proposing any design change, read `DESIGN.md`.** It contains 26 settled decisions (DES-001–026) with alternatives considered and outcomes. Do not revisit a settled decision without new evidence. Log any new decision there before implementing.
+**Before proposing any design change, read `DESIGN.md`.** It contains 27 settled decisions (DES-001–027) with alternatives considered and outcomes. Do not revisit a settled decision without new evidence. Log any new decision there before implementing.
 
 ## Documentation Maintenance
 
@@ -226,7 +226,7 @@ for the full specification.
 
 | File | Contents |
 |------|---------|
-| `DESIGN.md` | Authoritative decision log (DES-001–026) |
+| `DESIGN.md` | Authoritative decision log (DES-001–027) |
 | `docs/build-plan.md` | 14-milestone roadmap with guiding principles and red lines |
 | `docs/plan.md` | Architecture evolution plan: interfaces, engine design, MCP tool surface |
 | `docs/testing.md` | Full test architecture: pyramid, fixture layout, fakes reference, CI config |

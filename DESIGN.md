@@ -1471,3 +1471,230 @@ embeds it.
 - `heroSummary()`, `displayResult()`, and `printHeroStatus()` collapse into typed serialization
 - The play handler and exported `Loop.Dispatch()` are replaced by the Server RPC Renderer
 - `cmd/crypt/` imports `internal/model` for typed data contracts
+
+## DES-027: Graph-First Scenario Generation with Visitor Pattern
+
+**Date:** 2026-03-15
+**Status:** SETTLED
+**Topic:** How scenarios are generated, stored, and enriched
+
+### Context
+
+PR #45 attempted to hand-author a 200-room scenario in YAML. The result had
+83 broken one-way connections — rooms that defined a connection back to a parent
+that had no connection to them. The root cause: YAML embeds edges inside nodes,
+so each connection must be authored twice (once in each direction). At scale,
+this is error-prone and unverifiable without tooling.
+
+The deeper issue: a dungeon is a **graph** (nodes + edges), but YAML is a
+**document** format (nested key-value trees). Encoding a graph in a tree format
+forces the author to manually maintain edge consistency. Standard graph
+algorithms produce valid graphs by construction — no post-hoc validation needed.
+
+The 6-direction constraint (north/south/east/west/up/down) means a filesystem
+tree (arbitrary fanout) doesn't map directly to the dungeon grid. Hub rooms and
+branching structures must be computed, not hand-placed.
+
+### Design
+
+Scenario creation is a two-phase process: **generate** the graph, then
+**decorate** it with content via visitors.
+
+#### Phase 1: Graph Generation
+
+A connected graph is generated using standard algorithms. The generator
+produces nodes (rooms) and bidirectional edges (connections). The graph is
+valid by construction — every edge exists in both directions, every node is
+reachable from the start, and no node exceeds 6 edges.
+
+```text
+Input:   Topology source (theme-specific: tree, grid, cave, etc.)
+         Size target (number of rooms)
+         Structure hints (branching factor, cycle density, hub threshold)
+
+Output:  Graph with nodes and edges
+         Each node has: ID, position (for layout), metadata slots
+         Each edge has: direction pair, type (open/locked/hidden/stairway)
+```
+
+The generator is **topology-source agnostic**. It accepts any input that
+produces a set of nodes and adjacency relationships, then converts that
+into a valid 6-direction dungeon graph. Theme-specific topology sources
+are adapters:
+
+| Topology Source | Input | Produces | Theme |
+|----------------|-------|----------|-------|
+| Tree adapter | Hierarchical tree (filesystem, org chart) | Tree graph with hub insertion | UNIX Catacombs |
+| Grid adapter | Width × height × floors | Grid graph with corridors | Classic dungeon |
+| Cave adapter | Seed + density parameters | Randomized connected cavern | Natural caves |
+| Manual adapter | Hand-specified adjacency list | Verbatim graph (validated) | Any |
+
+Each adapter converts its domain-specific input into the generator's
+common internal representation: nodes + weighted adjacency. The generator
+then:
+
+1. Assigns 6-direction edges (north/south/east/west/up/down)
+2. Inserts hub nodes when a node exceeds 6 edges
+3. Adds optional cross-links (shortcuts, secret passages)
+4. Verifies the result is connected from the starting node
+
+The generator guarantees:
+- All edges are bidirectional
+- No node has more than 6 edges
+- All nodes are reachable from the starting node
+- The graph is connected
+
+These invariants hold regardless of which topology source produced the input.
+
+#### Phase 2: Visitor Decoration
+
+Content is added by **visitors** — functions that traverse the graph and
+populate specific content layers. Each visitor does one job. Visitors can
+run in any order (they read the graph structure but write to independent
+content slots). New game features are added by writing a new visitor, not
+by modifying existing ones.
+
+```text
+Graph (from Phase 1)
+  │
+  ├── DescriptionVisitor    → room name, description_seed
+  ├── EnemyVisitor          → enemy placement (type, tier, frequency)
+  ├── ItemVisitor           → item placement (weapons, armor, keys, loot)
+  ├── TrapVisitor           → trap placement (type, trigger, damage)
+  ├── LoreVisitor           → environmental storytelling (logs, notes, clues)
+  ├── LockVisitor           → lock edges, place corresponding keys
+  ├── DifficultyVisitor     → scale enemy HP/damage by distance from start
+  └── QuestVisitor          → place quest items, define win condition
+```
+
+Each visitor receives:
+- The full graph (read-only structure)
+- A mutable content map for its layer
+- Theme configuration (for flavor text, naming conventions)
+
+Visitors can use graph properties to make decisions:
+- Distance from start → difficulty scaling
+- Node degree (many connections) → hub rooms get different descriptions
+- Subtree depth → deeper rooms get harder enemies
+- Edge type → locked doors get key items placed upstream
+
+#### Storage Format
+
+YAML is the wrong format for graph persistence at scale. The scenario format
+changes from a YAML document to a graph-native representation.
+
+**Option A: SQLite**
+
+Nodes table, edges table, content tables per visitor. Foreign keys enforce
+referential integrity. Visitors are UPDATE/INSERT queries. The engine reads
+the graph at load time via SQL queries. SQLite is a single file, zero
+dependencies, battle-tested.
+
+```sql
+CREATE TABLE nodes (
+    id TEXT PRIMARY KEY,
+    name TEXT,
+    description_seed TEXT
+);
+CREATE TABLE edges (
+    from_node TEXT REFERENCES nodes(id),
+    to_node TEXT REFERENCES nodes(id),
+    from_direction TEXT CHECK(from_direction IN ('n','s','e','w','u','d')),
+    to_direction TEXT CHECK(to_direction IN ('n','s','e','w','u','d')),
+    type TEXT DEFAULT 'open',
+    PRIMARY KEY (from_node, from_direction)
+);
+CREATE TABLE room_enemies (
+    node_id TEXT REFERENCES nodes(id),
+    enemy_template TEXT,
+    FOREIGN KEY (enemy_template) REFERENCES enemy_templates(id)
+);
+```
+
+Bidirectionality is enforced: inserting an edge inserts both directions
+in a single transaction. The 6-direction constraint is enforced by the
+primary key on (node, direction).
+
+**Option B: JSON adjacency list**
+
+Two arrays: nodes and edges. Edges are always stored as pairs. Simpler
+than SQLite, but no referential integrity enforcement — validation is
+in the loader.
+
+```json
+{
+  "nodes": [
+    {"id": "root_fs", "name": "/ (root)", "description_seed": "..."}
+  ],
+  "edges": [
+    {"from": "root_fs", "to": "home", "directions": ["south", "north"], "type": "open"}
+  ]
+}
+```
+
+**Option C: Go binary format (gob/protobuf)**
+
+Native Go serialization. Fast load, compact, but not human-readable and
+not queryable. Good for runtime, bad for authoring and debugging.
+
+**Recommendation: SQLite (Option A).**
+
+SQLite provides schema enforcement (no orphaned edges, no >6 directions),
+is human-inspectable (`sqlite3 scenario.db "SELECT * FROM edges"`), supports
+incremental visitor updates (UPDATE individual content layers without
+rewriting the whole file), and Go has a mature driver (`modernc.org/sqlite`
+— pure Go, no CGo). The engine already loads scenarios at startup — the
+load path changes from `yaml.Unmarshal` to SQL queries, but the in-memory
+`Scenario` struct stays the same.
+
+YAML remains as an **export format** for small test scenarios (minimal.yaml)
+and as a human-readable snapshot. The authoritative source for large scenarios
+is SQLite.
+
+### Alternatives Considered
+
+**Keep YAML, add validation tooling** — build a validator that checks for
+one-way connections and fixes them. Rejected because it treats the symptom
+(broken edges) not the cause (edges embedded inside nodes in a tree format).
+Validation can catch errors but can't prevent them. Graph-first generation
+prevents them by construction.
+
+**Hand-author in a graph editor** — use a visual graph editor (yEd, Gephi)
+and export to YAML/JSON. Rejected because it adds an external tool dependency
+and the export still needs the same validation. The generator IS the editor.
+
+**Procedural generation only (no hand-authored content)** — generate
+everything algorithmically, including descriptions and lore. Rejected because
+the UNIX Catacombs scenario's strength is its hand-crafted thematic content
+(trojaned binaries, auth.log evidence, rootkit in /usr/lib). The visitor
+pattern lets thematic content be hand-authored per node while the graph
+structure is generated.
+
+### Compatibility
+
+The existing `internal/scenario` package loads YAML into a `Scenario` struct.
+The struct doesn't change — it's the in-memory representation regardless of
+the on-disk format. The change is in the loader:
+
+```go
+// Before:
+scenario, err := scenario.Load("path/to/scenario.yaml")
+
+// After:
+scenario, err := scenario.LoadSQLite("path/to/scenario.db")
+// or
+scenario, err := scenario.Load("path/to/scenario.yaml")  // still works for small test files
+```
+
+The `Scenario` struct, engine, game loop, and all downstream code are
+unaffected. Only the loader and the authoring pipeline change.
+
+### Outcome
+
+- Scenarios are generated graph-first — valid by construction, no validation needed
+- Content is added via visitors — each visitor handles one concern
+- Large scenarios stored in SQLite — schema enforces edge consistency
+- YAML remains for small test fixtures
+- New game features (traps, shops, NPCs) are added by writing a new visitor
+- Topology sources are pluggable adapters (tree, grid, cave, manual)
+- The 6-direction constraint is handled by the generator (hub node insertion)
