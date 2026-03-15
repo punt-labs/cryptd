@@ -4,6 +4,8 @@ package narrator
 import (
 	"context"
 	"fmt"
+	"log"
+	"sort"
 	"strings"
 
 	"github.com/punt-labs/cryptd/internal/model"
@@ -60,7 +62,7 @@ func (t *Template) Narrate(_ context.Context, event model.EngineEvent, _ model.G
 		}
 		return "You examine it closely.", nil
 	case "inventory_listed":
-		return "You check your belongings.", nil
+		return inventoryNarration(event.Details), nil
 	case "item_not_found":
 		return "You don't see that here.", nil
 	case "not_in_inventory":
@@ -156,6 +158,121 @@ func (t *Template) Narrate(_ context.Context, event model.EngineEvent, _ model.G
 	default:
 		return fmt.Sprintf("Something happens: %s.", event.Type), nil
 	}
+}
+
+// inventoryNarration formats a Zork-style inventory list from event details.
+func inventoryNarration(details map[string]any) string {
+	items := toItemSlice(details["items"])
+	equipped := toEquippedSet(details["equipped"])
+
+	if len(items) == 0 && len(equipped) == 0 {
+		return "You are empty-handed."
+	}
+
+	var lines []string
+	lines = append(lines, "You are carrying:")
+	for _, item := range items {
+		tag := ""
+		if equipped[item.id] {
+			tag = " (equipped)"
+		}
+		lines = append(lines, fmt.Sprintf("  %s%s", item.name, tag))
+	}
+
+	// Equipped items not in inventory (shouldn't happen, but defensive).
+	// Sorted for deterministic output.
+	var orphaned []string
+	for id := range equipped {
+		found := false
+		for _, item := range items {
+			if item.id == id {
+				found = true
+				break
+			}
+		}
+		if !found {
+			orphaned = append(orphaned, id)
+		}
+	}
+	sort.Strings(orphaned)
+	for _, id := range orphaned {
+		lines = append(lines, fmt.Sprintf("  %s (equipped)", id))
+	}
+
+	weight, _ := details["weight"].(float64)
+	capacity, _ := details["capacity"].(float64)
+	if capacity > 0 {
+		lines = append(lines, fmt.Sprintf("Weight: %.1f/%.1f lbs", weight, capacity))
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+// inventoryItem holds the fields we extract from []model.Item or []any.
+type inventoryItem struct {
+	id   string
+	name string
+}
+
+// toItemSlice extracts item id/name pairs from the items detail.
+// Handles both typed Go slices (from the engine) and []any (from JSON round-trip).
+func toItemSlice(v any) []inventoryItem {
+	switch items := v.(type) {
+	case []model.Item:
+		out := make([]inventoryItem, 0, len(items))
+		for _, item := range items {
+			out = append(out, inventoryItem{id: item.ID, name: item.Name})
+		}
+		return out
+	case []any:
+		var out []inventoryItem
+		for _, elem := range items {
+			m, ok := elem.(map[string]any)
+			if !ok {
+				continue
+			}
+			id, _ := m["id"].(string)
+			name, _ := m["name"].(string)
+			if name == "" {
+				name = id
+			}
+			if id == "" && name == "" {
+				continue // skip items with no identity
+			}
+			out = append(out, inventoryItem{id: id, name: name})
+		}
+		return out
+	default:
+		if v != nil {
+			log.Printf("narrator: toItemSlice: unexpected type %T", v)
+		}
+		return nil
+	}
+}
+
+// toEquippedSet returns a set of item IDs that are currently equipped.
+// Handles both typed model.Equipment (from the engine) and map[string]any (from JSON).
+func toEquippedSet(v any) map[string]bool {
+	set := make(map[string]bool)
+	switch eq := v.(type) {
+	case model.Equipment:
+		for _, id := range []string{eq.Weapon, eq.Armor, eq.Ring, eq.Amulet} {
+			if id != "" {
+				set[id] = true
+			}
+		}
+	case map[string]any:
+		for _, val := range eq {
+			if id, ok := val.(string); ok && id != "" {
+				set[id] = true
+			}
+		}
+	default:
+		if v != nil {
+			log.Printf("narrator: toEquippedSet: unexpected type %T", v)
+		}
+	}
+	return set
 }
 
 // roomNarration appends description, exits, and items from event details to a
