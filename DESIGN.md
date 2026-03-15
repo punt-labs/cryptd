@@ -1471,3 +1471,48 @@ embeds it.
 - `heroSummary()`, `displayResult()`, and `printHeroStatus()` collapse into typed serialization
 - The play handler and exported `Loop.Dispatch()` are replaced by the Server RPC Renderer
 - `cmd/crypt/` imports `internal/model` for typed data contracts
+
+## DES-027: Graph-First Scenario Generation with Visitor Pattern
+
+**Status:** SETTLED (2026-03-15)
+
+**Context:** Hand-authoring a 200-room scenario in YAML produced 83 broken one-way
+connections (PR #45, closed). Root cause: YAML embeds edges inside nodes, so each
+connection must be authored twice. At scale this is error-prone and unverifiable
+without tooling.
+
+**Decision:** Scenarios are generated graph-first (valid by construction) then
+decorated with content via visitors. A new `crypt-admin` binary owns authoring.
+
+### Key Choices
+
+| Decision | Choice | Alternatives Rejected |
+|----------|--------|-----------------------|
+| Binary | `crypt-admin` (third binary) | Subcommand in `cryptd` (conflates server and author roles) |
+| Runtime format | YAML directory (manifest + region files) | Monolithic YAML (doesn't scale), SQLite at runtime (adds 5-10MB to server binary) |
+| Working format | SQLite (crypt-admin only) | JSON files (no schema enforcement, no FK constraints) |
+| Direction model | 6-way compass (N/S/E/W/Up/Down) | 4-way (insufficient for multi-level dungeons), free-form strings (no `Opposite()` guarantee) |
+| Graph construction | BFS direction assignment with greedy slot selection | Manual direction specification (error-prone), backtracking solver (overkill for trees) |
+| Content decoration | Visitor pattern on graph | Inline in topology source (couples structure and content) |
+| Hub insertion | Synthetic corridor nodes for >5 children | Error on >6 (too restrictive), ignore limit (breaks game engine) |
+
+### SQLite Dependency Justification
+
+`modernc.org/sqlite` (pure-Go, no CGO) is imported only by `crypt-admin`, never
+by `cryptd` or `crypt`. Verified by `go list -deps ./cmd/cryptd | grep sqlite`
+returning empty. The dependency adds ~8MB to the admin binary but zero to the
+server or client. SQLite was chosen over JSON/YAML for the working format because:
+- Schema-enforced FK constraints prevent broken room references at write time
+- CHECK constraints on direction columns reject invalid values at the DB layer
+- UNIQUE constraints on `(to_node, to_direction)` prevent direction slot collisions
+- Transactional writes prevent partial graph state on failure
+
+### Outcome
+
+- `internal/scengen/` package: Graph types, TopologySource interface, TreeSource
+  adapter (with hub insertion), Visitor interface, DescriptionVisitor, YAML
+  directory exporter, SQLite store
+- `internal/scenario.LoadDir()`: directory-format loader with cross-region duplicate detection
+- `internal/scenariodir.Load()`: tries directory format first, falls back to single-file
+- `cmd/crypt-admin/`: generate, validate, export subcommands
+- `cryptd validate` prints deprecation warning

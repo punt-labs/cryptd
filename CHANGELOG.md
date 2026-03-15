@@ -11,6 +11,13 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **`crypt-admin` binary** — third binary for scenario authoring (alongside `cryptd` and `crypt`). Subcommands: `generate`, `validate`, `export`.
+- **Graph-first scenario generation (DES-027):** `crypt-admin generate --topology tree --source <dir>` walks a filesystem tree, builds a connected graph with bidirectional edges, assigns 6-direction compass directions, and exports to YAML directory format. Hub nodes inserted automatically for directories with >5 children.
+- **YAML directory format:** scenarios can now be a directory with `scenario.yaml` manifest and `regions/*.yaml` sub-files. Cross-region room references work naturally. `scenariodir.Load()` tries directory format first, falls back to single-file.
+- `internal/scengen` package: `Graph`, `Node`, `Edge`, `Direction` types with `Validate()` (bidirectionality, max degree 6, BFS connectivity); `TopologySource` interface with `TreeSource` adapter; `Visitor` interface with `DescriptionVisitor`; `WriteYAMLDir()` exporter; SQLite `Store` for iterative authoring.
+- `internal/scenario.LoadDir()` — loads directory-format scenarios with duplicate room ID detection across regions.
+- `internal/scenariodir` tests — directory fallback, precedence, path traversal protection.
+
 - **Thin client architecture (DES-025 revised):** `crypt` is now a thin client — connects to `cryptd serve`, sends natural language text via the `play` JSON-RPC method, displays narrated text. No engine, interpreter, or narrator in the client. Auto-starts `cryptd serve` if the socket is not present.
 - **Two daemon modes (DES-025):** `cryptd serve` runs in Normal mode (interpreter → engine → narrator → display text for CLI) or `--passthrough` mode (raw MCP tool surface with structured JSON for Claude Code). Normal mode auto-detects ollama for SLM inference, falls back to Rules + Template.
 - `internal/daemon/play.go` — `handlePlay()` processes text input through the full interpreter → engine → narrator pipeline; `handleNewGamePlay()` starts a game and narrates the initial room description.
@@ -27,6 +34,8 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- `cryptd validate` prints deprecation warning directing users to `crypt-admin validate`.
+- `make build` now builds all three binaries (`cryptd`, `crypt`, `crypt-admin`).
 - `crypt` takes no subcommands. Flags: `--socket`, `--addr`, `--scenario`, `--name`, `--class`.
 - Existing daemon tests updated to use `WithPassthrough()` (they exercise the MCP tool surface, which is passthrough mode by definition).
 - `internal/scenariodir` package — canonical scenario ID resolution with path-traversal protection, eliminating duplication between CLI and daemon

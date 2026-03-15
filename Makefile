@@ -1,5 +1,5 @@
 .PHONY: help vet test test-integration test-e2e lint markdownlint coverage \
-       check check-full build build-server build-client clean help \
+       check check-full build build-server build-client build-admin clean help \
        ollama-install ollama-start ollama-pull ollama-setup eval-slm \
        demo demo-solo demo-exploration demo-inventory \
        demo-combat demo-save-load demo-unix-catacombs
@@ -36,7 +36,7 @@ markdownlint:                              ## Lint markdown files
 	npx markdownlint-cli2 "**/*.md" "#node_modules"
 
 ##@ Build
-build: build-server build-client           ## Build both binaries
+build: build-server build-client build-admin  ## Build all binaries
 
 build-server:                              ## Build the cryptd server binary
 	go build -o cryptd ./cmd/cryptd
@@ -44,8 +44,11 @@ build-server:                              ## Build the cryptd server binary
 build-client:                              ## Build the crypt client binary
 	go build -o crypt ./cmd/crypt
 
+build-admin:                               ## Build the crypt-admin authoring binary
+	go build -o crypt-admin ./cmd/crypt-admin
+
 clean:                                     ## Remove build artifacts
-	rm -f cryptd crypt coverage.out
+	rm -f cryptd crypt crypt-admin coverage.out
 
 ##@ Demos — Scripted Playthroughs
 demo: demo-exploration demo-inventory demo-combat demo-save-load demo-unix-catacombs  ## Run all CLI demos
