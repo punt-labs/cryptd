@@ -42,14 +42,14 @@ jobs:
           go-version-file: go.mod
       - name: Check engine coverage ≥ 90%
         run: |
-          go test -cover -coverprofile=coverage.out ./internal/engine/... 2>/dev/null || true
-          if [ -f coverage.out ]; then
-            pct=$(go tool cover -func=coverage.out | awk '/^total:/{gsub(/%/,"",$3); print $3}')
-            echo "Engine coverage: ${pct}%"
-            awk "BEGIN{if(${pct:-100}<90){print \"Coverage ${pct}% < 90% required\"; exit 1}}"
-          else
+          if ! go list ./internal/engine/... > /dev/null 2>&1; then
             echo "No engine packages yet — coverage gate passes trivially"
+            exit 0
           fi
+          go test -cover -coverprofile=coverage.out ./internal/engine/...
+          pct=$(go tool cover -func=coverage.out | awk '/^total:/{gsub(/%/,"",$3); print $3}')
+          echo "Engine coverage: ${pct}%"
+          awk "BEGIN{if(${pct:-0}<90){print \"Coverage ${pct}% < 90% required\"; exit 1}}"
 
   mcp-schema:
     name: MCP Schema Contract
