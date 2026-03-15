@@ -182,6 +182,102 @@ func TestTemplateNarrator_AttackKillContainsXP(t *testing.T) {
 	assert.Contains(t, text, "8")
 }
 
+func TestTemplateNarrator_Inventory(t *testing.T) {
+	n := narrator.NewTemplate()
+
+	tests := []struct {
+		name     string
+		details  map[string]any
+		contains []string
+		excludes []string
+	}{
+		{
+			name: "typed items with equipped weapon",
+			details: map[string]any{
+				"items": []model.Item{
+					{ID: "man_page", Name: "Man Page", Type: "misc", Weight: 1.0},
+					{ID: "short_sword", Name: "Short Sword", Type: "weapon", Weight: 3.0},
+				},
+				"equipped": model.Equipment{Weapon: "short_sword"},
+				"weight":   4.0,
+				"capacity": 50.0,
+			},
+			contains: []string{"You are carrying:", "Man Page", "Short Sword (equipped)", "4.0/50.0"},
+			excludes: []string{"Man Page (equipped)"},
+		},
+		{
+			name: "empty inventory",
+			details: map[string]any{
+				"items":    []model.Item{},
+				"equipped": model.Equipment{},
+				"weight":   0.0,
+				"capacity": 50.0,
+			},
+			contains: []string{"empty-handed"},
+		},
+		{
+			name: "JSON-unmarshalled items and equipment",
+			details: map[string]any{
+				"items": []any{
+					map[string]any{"id": "torch", "name": "Torch"},
+					map[string]any{"id": "rope", "name": "Rope"},
+				},
+				"equipped": map[string]any{"weapon": "torch"},
+				"weight":   2.0,
+				"capacity": 50.0,
+			},
+			contains: []string{"You are carrying:", "Torch (equipped)", "Rope", "2.0/50.0"},
+			excludes: []string{"Rope (equipped)"},
+		},
+		{
+			name: "JSON items with missing name uses id",
+			details: map[string]any{
+				"items": []any{
+					map[string]any{"id": "mystery_item"},
+				},
+				"equipped": map[string]any{},
+				"weight":   1.0,
+				"capacity": 50.0,
+			},
+			contains: []string{"mystery_item"},
+		},
+		{
+			name: "JSON items with empty id and name are skipped",
+			details: map[string]any{
+				"items": []any{
+					map[string]any{"id": "sword", "name": "Sword"},
+					map[string]any{},
+				},
+				"equipped": map[string]any{},
+				"weight":   1.0,
+				"capacity": 50.0,
+			},
+			contains: []string{"Sword"},
+		},
+		{
+			name: "nil items and equipment",
+			details: map[string]any{},
+			contains: []string{"empty-handed"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			text, err := n.Narrate(context.Background(), model.EngineEvent{
+				Type:    "inventory_listed",
+				Details: tt.details,
+			}, model.GameState{})
+			require.NoError(t, err)
+			for _, s := range tt.contains {
+				assert.Contains(t, text, s)
+			}
+			for _, s := range tt.excludes {
+				assert.NotContains(t, text, s)
+			}
+		})
+	}
+}
+
 func TestTemplateNarrator_ExaminedNoDescription(t *testing.T) {
 	n := narrator.NewTemplate()
 	text, err := n.Narrate(context.Background(), model.EngineEvent{
