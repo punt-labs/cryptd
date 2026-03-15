@@ -221,7 +221,14 @@ func toItemSlice(v any) []inventoryItem {
 	case []model.Item:
 		out := make([]inventoryItem, 0, len(items))
 		for _, item := range items {
-			out = append(out, inventoryItem{id: item.ID, name: item.Name})
+			name := item.Name
+			if name == "" {
+				name = item.ID
+			}
+			if item.ID == "" && name == "" {
+				continue
+			}
+			out = append(out, inventoryItem{id: item.ID, name: name})
 		}
 		return out
 	case []any:
