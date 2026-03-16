@@ -1,6 +1,7 @@
 .PHONY: help vet test test-integration test-e2e lint markdownlint coverage \
        check check-full build build-server build-client build-admin clean help \
        ollama-install ollama-start ollama-pull ollama-setup eval-slm \
+       eval-balance eval-balance-quick \
        demo demo-solo demo-exploration demo-inventory \
        demo-combat demo-save-load demo-unix-catacombs
 
@@ -96,6 +97,13 @@ ollama-setup: ollama-pull                  ## Install ollama, start server, pull
 
 eval-slm: ollama-setup build              ## Run SLM accuracy eval (65+ inputs, needs ollama)
 	go run ./cmd/eval-slm --model $(SLM_MODEL)
+
+##@ Balance
+eval-balance:                              ## Run monkey balance eval (1000 sessions, all classes)
+	CRYPT_SCENARIO_DIR=$(SCENARIO_DIR) go run ./cmd/eval-balance --scenario minimal --class all --players 1000 --max-moves 200
+
+eval-balance-quick:                        ## Quick balance check (100 sessions, fighter only)
+	CRYPT_SCENARIO_DIR=$(SCENARIO_DIR) go run ./cmd/eval-balance --scenario minimal --class fighter --players 100 --max-moves 50
 
 ##@ Help
 help:                                      ## Show this help

@@ -11,6 +11,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **Monkey test harness for game balance tuning** (`cmd/eval-balance`): runs N parallel game sessions with weighted-random action selection, collects per-session metrics (moves, XP, kills, damage, survival, flee rate, spells), and produces JSON aggregate reports with per-class breakdowns. `make eval-balance` runs 1000 sessions across all classes; `make eval-balance-quick` runs 100 fighter sessions.
+- `internal/monkeytest` package: `MonkeyRenderer` (state-aware weighted-random Renderer), `SessionMetrics`, `AggregateReport`, parallel `Run()` with configurable workers, percentile computation.
 - **`crypt-admin` binary** — third binary for scenario authoring (alongside `cryptd` and `crypt`). Subcommands: `generate`, `validate`, `export`.
 - **Graph-first scenario generation (DES-027):** `crypt-admin generate --topology tree --source <dir>` walks a filesystem tree, builds a connected graph with bidirectional edges, assigns 6-direction compass directions, and exports to YAML directory format. Hub nodes inserted automatically for directories with >5 children.
 - **YAML directory format:** scenarios can now be a directory with `scenario.yaml` manifest and `regions/*.yaml` sub-files. Cross-region room references work naturally. `scenariodir.Load()` tries directory format first, falls back to single-file.
