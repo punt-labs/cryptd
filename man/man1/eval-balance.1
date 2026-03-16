@@ -1,0 +1,143 @@
+.TH EVAL\-BALANCE 1 "March 2026" "Punt Labs" "Crypt Game Engine"
+.SH NAME
+eval\-balance \- monkey test harness for Crypt game balance tuning
+.SH SYNOPSIS
+.B eval\-balance
+.RB [ \-\-scenario
+.IR id ]
+.RB [ \-\-players
+.IR n ]
+.RB [ \-\-max\-moves
+.IR n ]
+.RB [ \-\-class
+.IR class ]
+.RB [ \-\-workers
+.IR n ]
+.RB [ \-\-seed
+.IR n ]
+.RB [ \-\-verbose ]
+.SH DESCRIPTION
+.B eval\-balance
+runs parallel game sessions with weighted\-random action selection
+and produces a JSON aggregate report for game balance tuning.
+.PP
+Each session creates a character, plays through a scenario making
+state\-aware random decisions, and collects metrics.
+The monkey player is smarter than pure random: it auto\-equips weapons
+and armor, uses health potions when low on HP, prioritizes item pickup,
+and adjusts combat strategy based on health (flee\-heavy when HP is
+low, attack\-heavy when healthy).
+.PP
+Sessions run in\-process using the game engine directly (no network,
+no SLM), achieving thousands of sessions per second.
+.SH OPTIONS
+.TP
+.BI \-\-scenario " id"
+Scenario ID to test. Default:
+.IR minimal .
+Resolved via
+.IR CRYPT_SCENARIO_DIR .
+.TP
+.BI \-\-players " n"
+Number of sessions to run. Default:
+.IR 1000 .
+.TP
+.BI \-\-max\-moves " n"
+Maximum moves per session before forced quit. Default:
+.IR 200 .
+.TP
+.BI \-\-class " class"
+Character class:
+.BR fighter ,
+.BR mage ,
+.BR priest ,
+.BR thief ,
+or
+.BR all
+(distribute evenly across classes).
+Default:
+.IR fighter .
+.TP
+.BI \-\-workers " n"
+Parallel worker goroutines. Default:
+.IR 8 .
+Use
+.B 1
+for fully deterministic sessions (the engine uses the global RNG
+for combat dice).
+.TP
+.BI \-\-seed " n"
+Master RNG seed for deterministic session generation. Default:
+.IR 42 .
+Per\-session seeds are derived deterministically from this value.
+.TP
+.B \-\-verbose
+Include per\-session detail in the JSON output.
+Without this flag, only aggregate metrics are reported.
+.SH MONKEY STRATEGY
+.SS Combat (HP > 30%)
+Attack 70%, defend 15%, flee 10%, cast heal 5% (casters only).
+.SS Combat (HP \(<= 30%)
+Flee 40%, defend 20%, attack 20%, cast heal 20% (casters only).
+.SS Out of combat
+Auto\-equip weapons and armor immediately.
+Use health potions at \(<= 50% HP.
+Take items from room (60%), move randomly (30%), look (10%).
+Empty room: move (80%), look (10%), inventory (10%).
+.SS Class\-optimal stats
+Each class uses a tailored 8\-point stat allocation:
+.TS
+l c c c c c c.
+\fBClass\fR	STR	DEX	CON	INT	WIS	CHA
+Fighter	14	10	14	10	10	10
+Mage	10	12	10	14	12	10
+Priest	10	12	12	10	14	10
+Thief	12	14	12	10	10	10
+.TE
+.SH METRICS
+.SS Per\-session
+Total moves, rooms visited, enemies killed, XP gained, final level,
+levels gained, items picked up, items equipped, combat rounds,
+damage dealt, damage taken, survival (boolean), flee attempts,
+flee successes, spells cast, heals cast, potions used.
+.SS Aggregate
+Survival rate, mean/p50/p95 for moves/XP/kills, mean level,
+mean damage dealt/taken, mean combat rounds, flee success rate,
+level\-up rate, mean potions used.
+Per\-class breakdown when
+.B \-\-class=all
+is used.
+.SH OUTPUT
+JSON report to stdout.
+Summary line to stderr.
+.PP
+Example:
+.PP
+.RS
+.nf
+eval\-balance \-\-scenario unix\-catacombs \\
+    \-\-players 500 \-\-class all \-\-workers 1
+.fi
+.RE
+.SH BALANCE TARGETS
+Target ranges for a well\-balanced scenario:
+.TS
+l l.
+\fBMetric\fR	\fBTarget\fR
+Survival rate (all classes)	50\(en75%
+Class survival spread	< 20 percentage points
+Level\-up rate	> 50%
+Mean enemies killed	\(>= 3
+Flee success rate	55\(en70%
+.TE
+.SH ENVIRONMENT
+.TP
+.B CRYPT_SCENARIO_DIR
+Scenario directory. Default:
+.IR scenarios .
+.SH SEE ALSO
+.BR cryptd (1),
+.BR crypt (1),
+.BR crypt\-admin (1)
+.SH AUTHORS
+Punt Labs.

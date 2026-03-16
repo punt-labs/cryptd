@@ -1,5 +1,6 @@
 .PHONY: help vet test test-integration test-e2e lint markdownlint coverage \
        check check-full build build-server build-client build-admin clean help \
+       install uninstall man \
        ollama-install ollama-start ollama-pull ollama-setup eval-slm \
        eval-balance eval-balance-quick \
        demo demo-solo demo-exploration demo-inventory \
@@ -7,6 +8,9 @@
 
 SCENARIO_DIR = testdata/scenarios
 DEMO_DIR     = testdata/demos
+PREFIX       = /usr/local
+BINDIR       = $(PREFIX)/bin
+MANDIR       = $(PREFIX)/share/man/man1
 
 ##@ Quality Gates
 check: vet test lint markdownlint          ## Quick gate (before every commit)
@@ -50,6 +54,24 @@ build-admin:                               ## Build the crypt-admin authoring bi
 
 clean:                                     ## Remove build artifacts
 	rm -f cryptd crypt crypt-admin coverage.out
+
+##@ Install
+install: build                             ## Install binaries and man pages to PREFIX (/usr/local)
+	install -d $(BINDIR) $(MANDIR)
+	install -m 755 cryptd $(BINDIR)/cryptd
+	install -m 755 crypt $(BINDIR)/crypt
+	install -m 755 crypt-admin $(BINDIR)/crypt-admin
+	install -m 644 man/man1/cryptd.1 $(MANDIR)/cryptd.1
+	install -m 644 man/man1/crypt.1 $(MANDIR)/crypt.1
+	install -m 644 man/man1/crypt-admin.1 $(MANDIR)/crypt-admin.1
+	install -m 644 man/man1/eval-balance.1 $(MANDIR)/eval-balance.1
+
+uninstall:                                 ## Remove installed binaries and man pages
+	rm -f $(BINDIR)/cryptd $(BINDIR)/crypt $(BINDIR)/crypt-admin
+	rm -f $(MANDIR)/cryptd.1 $(MANDIR)/crypt.1 $(MANDIR)/crypt-admin.1 $(MANDIR)/eval-balance.1
+
+man:                                       ## View man pages locally (without installing)
+	man man/man1/cryptd.1
 
 ##@ Demos — Scripted Playthroughs
 demo: demo-exploration demo-inventory demo-combat demo-save-load demo-unix-catacombs  ## Run all CLI demos

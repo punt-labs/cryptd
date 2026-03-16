@@ -1,0 +1,157 @@
+.TH CRYPTD 1 "March 2026" "Punt Labs" "Crypt Game Engine"
+.SH NAME
+cryptd \- game engine server for the Crypt text adventure
+.SH SYNOPSIS
+.B cryptd serve
+.RB [ \-f ]
+.RB [ \-t ]
+.RB [ \-\-scenario
+.IR id ]
+.RB [ \-\-socket
+.IR path ]
+.RB [ \-\-listen
+.IR addr ]
+.RB [ \-\-passthrough ]
+.RB [ \-\-script
+.IR file ]
+.RB [ \-\-name
+.IR name ]
+.RB [ \-\-class
+.IR class ]
+.RB [ \-\-json ]
+.br
+.B cryptd validate
+.I scenario\-file
+.SH DESCRIPTION
+.B cryptd
+is the game engine server for Crypt, a text adventure game playable via
+CLI, Claude Code, or Lux.
+It owns the deterministic game engine (movement, combat, inventory, spells,
+leveling, save/load) and exposes it as a JSON\-RPC 2.0 service over Unix
+socket or TCP.
+.PP
+The server runs in two modes:
+.TP
+.B Normal mode
+Accepts free text from the player, routes it through an interpreter
+(SLM with Rules fallback) and narrator (SLM with Template fallback),
+and returns display\-ready narrated text.
+Auto\-detects ollama for SLM inference; falls back to deterministic
+rules + templates if no inference server is available.
+.TP
+.B Passthrough mode
+Exposes the raw MCP tool surface with structured JSON responses.
+Used by the Crypt plugin for Claude Code.
+.SH SUBCOMMANDS
+.TP
+.B serve
+Start the game server. By default, daemonizes and listens on a Unix
+socket at
+.IR ~/.crypt/daemon.sock .
+.TP
+.B validate
+Validate a scenario YAML file.
+.B Deprecated:
+use
+.BR crypt\-admin (1)
+validate instead.
+.SH OPTIONS
+.SS Server options
+.TP
+.BI \-\-socket " path"
+Unix socket path. Default:
+.IR ~/.crypt/daemon.sock .
+Mutually exclusive with
+.BR \-\-listen .
+.TP
+.BI \-\-listen " addr"
+TCP listen address (e.g.\&
+.BR :9000 ).
+Mutually exclusive with
+.BR \-\-socket .
+.TP
+.B \-\-passthrough
+Enable MCP passthrough mode (structured JSON, no interpreter/narrator).
+.TP
+.B \-f
+Run in foreground (don't daemonize).
+.SS Testing mode
+.TP
+.B \-t
+Testing mode: run on stdin/stdout with no network. Implies
+.BR \-f .
+In interactive mode (no
+.BR \-\-script ),
+prompts for character creation (name, class, stat allocation) and
+auto\-detects ollama for SLM narration.
+.TP
+.BI \-\-scenario " id"
+Scenario ID to load. Required with
+.BR \-t .
+Resolved via
+.I CRYPT_SCENARIO_DIR
+(default:
+.IR scenarios ).
+.TP
+.BI \-\-script " file"
+Read commands from a text file (one per line,
+.B #
+comments). Uses deterministic rules + templates (no SLM).
+.TP
+.BI \-\-name " name"
+Character name for scripted mode. Default:
+.IR Adventurer .
+.TP
+.BI \-\-class " class"
+Character class for scripted mode:
+.BR fighter ,
+.BR mage ,
+.BR priest ,
+.BR thief .
+Default:
+.IR fighter .
+.TP
+.B \-\-json
+Output JSON transcript (requires
+.BR \-\-script ).
+.SH CHARACTER CREATION
+In interactive
+.B \-t
+mode, the server prompts for:
+.IP 1. 4
+Character name (default: Adventurer)
+.IP 2. 4
+Class: fighter, mage, priest, thief
+.IP 3. 4
+Stat allocation: distribute 8 points across STR, DEX, CON, INT, WIS, CHA
+(base 10 each). Enter 6 numbers (e.g.\&
+.BR "4 0 2 0 2 0" )
+or press Enter for defaults (STR 14, DEX 12, CON 12).
+.SH ENVIRONMENT
+.TP
+.B CRYPT_SCENARIO_DIR
+Directory containing scenario files. Default:
+.IR scenarios .
+.SH MCP TOOLS
+15 tools exposed via JSON\-RPC 2.0:
+.BR new_game ,
+.BR move ,
+.BR look ,
+.BR pick_up ,
+.BR drop ,
+.BR equip ,
+.BR unequip ,
+.BR examine ,
+.BR inventory ,
+.BR attack ,
+.BR defend ,
+.BR flee ,
+.BR cast_spell ,
+.BR save_game ,
+.BR load_game .
+.SH SEE ALSO
+.BR crypt (1),
+.BR crypt\-admin (1),
+.BR eval\-balance (1)
+.SH AUTHORS
+Punt Labs.
