@@ -35,8 +35,8 @@ func runServe(args []string) {
 	foreground := fs.Bool("f", false, "run in foreground (don't daemonize)")
 	testing := fs.Bool("t", false, "testing mode: stdin/stdout, no network (implies -f)")
 
-	// Testing mode flags.
-	scenarioID := fs.String("scenario", "", "scenario ID for -t mode")
+	// Scenario flag — used for both -t mode and daemon default scenario.
+	scenarioID := fs.String("scenario", "", "scenario ID (-t mode: required; daemon: default for new_game)")
 	charName := fs.String("name", "Adventurer", "character name for -t mode")
 	charClass := fs.String("class", "fighter", "character class for -t mode")
 	scriptFile := fs.String("script", "", "read commands from file instead of stdin (-t mode)")
@@ -94,6 +94,10 @@ func runServe(args []string) {
 	} else {
 		interp, narr := resolveInterpreterNarrator()
 		opts = append(opts, daemon.WithInterpreter(interp), daemon.WithNarrator(narr))
+	}
+
+	if *scenarioID != "" {
+		opts = append(opts, daemon.WithDefaultScenario(*scenarioID))
 	}
 
 	var srv *daemon.Server

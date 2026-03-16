@@ -75,6 +75,10 @@ func (s *Server) dispatchNewGame(raw json.RawMessage) (any, *RPCError) {
 	if err := json.Unmarshal(raw, &a); err != nil {
 		return nil, &RPCError{Code: CodeInvalidParams, Message: "invalid arguments: " + err.Error()}
 	}
+	// Fall back to server default scenario if not specified by client.
+	if a.ScenarioID == "" {
+		a.ScenarioID = s.defaultScenario
+	}
 	if a.ScenarioID == "" || a.CharacterName == "" || a.CharacterClass == "" {
 		return nil, &RPCError{Code: CodeInvalidParams, Message: "scenario_id, character_name, and character_class are required"}
 	}

@@ -1,6 +1,6 @@
 .PHONY: help vet test test-integration test-e2e lint markdownlint coverage \
        check check-full build build-server build-client build-admin clean help \
-       install uninstall man \
+       install uninstall man play play-unix \
        ollama-install ollama-start ollama-pull ollama-setup eval-slm \
        eval-balance eval-balance-quick \
        demo demo-solo demo-exploration demo-inventory \
@@ -72,6 +72,21 @@ uninstall:                                 ## Remove installed binaries and man 
 
 man:                                       ## View man pages locally (without installing)
 	man man/man1/cryptd.1
+
+##@ Play
+play: build-server build-client            ## Play the game (client connects to server with default scenario)
+	@CRYPT_SCENARIO_DIR=$(SCENARIO_DIR) ./cryptd serve -f --scenario minimal &\
+	CRYPTD_PID=$$!; \
+	sleep 0.5; \
+	./crypt --scenario minimal; \
+	kill $$CRYPTD_PID 2>/dev/null; wait $$CRYPTD_PID 2>/dev/null
+
+play-unix: build-server build-client       ## Play the UNIX Catacombs scenario
+	@CRYPT_SCENARIO_DIR=scenarios ./cryptd serve -f --scenario unix-catacombs &\
+	CRYPTD_PID=$$!; \
+	sleep 0.5; \
+	./crypt --scenario unix-catacombs; \
+	kill $$CRYPTD_PID 2>/dev/null; wait $$CRYPTD_PID 2>/dev/null
 
 ##@ Demos — Scripted Playthroughs
 demo: demo-exploration demo-inventory demo-combat demo-save-load demo-unix-catacombs  ## Run all CLI demos
