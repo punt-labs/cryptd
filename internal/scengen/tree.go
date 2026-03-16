@@ -116,18 +116,27 @@ func insertHubs(nodes []RawNode, edges []RawEdge) ([]RawNode, []RawEdge) {
 			replaced[idx] = true
 		}
 
-		// Chain hubs: each hub gets up to maxChildrenPerNode children,
-		// plus a link to the next hub.
+		// Chain hubs: the first batch connects directly to the parent but
+		// reserves one direction slot for the hub link to the next batch.
+		// Subsequent hubs get the full maxChildrenPerNode capacity (one
+		// slot is used for the prev-hub link, leaving maxChildrenPerNode
+		// for children since they have no other parent edge).
 		hubNum := 0
-		for i := 0; i < len(childIndices); i += maxChildrenPerNode {
-			end := i + maxChildrenPerNode
+		firstBatch := maxChildrenPerNode - 1 // reserve 1 slot for hub→next link
+		pos := 0
+		for pos < len(childIndices) {
+			batchSize := maxChildrenPerNode
+			if pos == 0 {
+				batchSize = firstBatch
+			}
+			end := pos + batchSize
 			if end > len(childIndices) {
 				end = len(childIndices)
 			}
-			batch := childIndices[i:end]
+			batch := childIndices[pos:end]
 
 			var hubID string
-			if i == 0 {
+			if pos == 0 {
 				// First batch connects directly to the parent.
 				hubID = parentID
 			} else {
@@ -164,6 +173,7 @@ func insertHubs(nodes []RawNode, edges []RawEdge) ([]RawNode, []RawEdge) {
 			for _, idx := range batch {
 				newEdges = append(newEdges, RawEdge{From: hubID, To: edges[idx].To, EdgeType: edges[idx].EdgeType})
 			}
+			pos = end
 		}
 	}
 

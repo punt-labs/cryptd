@@ -383,6 +383,9 @@ func (e *Engine) rollHeroDamage(state *model.GameState) int {
 }
 
 // applyDefenses reduces raw damage by defend stance and equipped armor defense.
+// Order: halve for defend first, then subtract armor defense. This order
+// makes armor slightly less effective when defending (intentional — defend
+// is already powerful). Final damage is floored at 1.
 func (e *Engine) applyDefenses(state *model.GameState, damage int, defending bool) int {
 	if defending {
 		damage /= 2

@@ -367,9 +367,3 @@ func sumAliveHP(enemies []model.EnemyInstance) int {
 	return total
 }
 
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}

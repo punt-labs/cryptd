@@ -47,9 +47,13 @@ func NewCharacter(name, class string, stats *model.Stats) (model.Character, erro
 		return model.Character{}, err
 	}
 
+	baseHP := 20 + StatModifier(s.CON)
+	if baseHP < 1 {
+		baseHP = 1
+	}
 	hero := model.Character{
 		ID: "hero", Name: name, Class: class,
-		Level: 1, HP: 20, MaxHP: 20,
+		Level: 1, HP: baseHP, MaxHP: baseHP,
 		Stats: s,
 	}
 	if class == "mage" || class == "priest" {

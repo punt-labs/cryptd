@@ -16,7 +16,7 @@ func TestNewCharacter_DefaultStats(t *testing.T) {
 	assert.Equal(t, "Conan", hero.Name)
 	assert.Equal(t, "fighter", hero.Class)
 	assert.Equal(t, 1, hero.Level)
-	assert.Equal(t, 20, hero.HP)
+	assert.Equal(t, 21, hero.HP) // base 20 + CON 12 modifier (+1)
 	assert.Equal(t, 0, hero.MP) // fighter has no MP
 	assert.Equal(t, 14, hero.Stats.STR)
 	assert.Equal(t, 12, hero.Stats.DEX)

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/punt-labs/cryptd/internal/scenario"
 	"github.com/punt-labs/cryptd/internal/scengen"
@@ -37,6 +38,10 @@ func printUsage() {
 func requireFlagValue(flag string, args []string, i int) string {
 	if i >= len(args) {
 		fmt.Fprintf(os.Stderr, "error: %s requires a value\n", flag)
+		os.Exit(1)
+	}
+	if strings.HasPrefix(args[i], "--") {
+		fmt.Fprintf(os.Stderr, "error: %s requires a value, got flag %s\n", flag, args[i])
 		os.Exit(1)
 	}
 	return args[i]
