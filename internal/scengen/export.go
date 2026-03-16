@@ -24,6 +24,9 @@ type itemYAML struct {
 	Name        string  `yaml:"name"`
 	Type        string  `yaml:"type"`
 	Damage      string  `yaml:"damage,omitempty"`
+	Defense     int     `yaml:"defense,omitempty"`
+	Power       string  `yaml:"power,omitempty"`
+	Effect      string  `yaml:"effect,omitempty"`
 	Weight      float64 `yaml:"weight"`
 	Value       int     `yaml:"value"`
 	Description string  `yaml:"description,omitempty"`
@@ -104,6 +107,7 @@ func WriteYAMLDir(g *Graph, content *ScenarioContent, outputDir string) error {
 		for id, item := range content.Items {
 			manifest.Items[id] = &itemYAML{
 				Name: item.Name, Type: item.Type, Damage: item.Damage,
+				Defense: item.Defense, Power: item.Power, Effect: item.Effect,
 				Weight: item.Weight, Value: item.Value, Description: item.Description,
 			}
 		}

@@ -115,11 +115,15 @@ func (m *MonkeyRenderer) updateMetrics(state *model.GameState) {
 	// Enemies killed: count enemies that went from HP>0 to HP≤0.
 	if m.prev.Dungeon.Combat.Active {
 		m.metrics.EnemiesKilled += countNewKills(m.prev.Dungeon.Combat.Enemies, state.Dungeon.Combat.Enemies)
-		// Also count kills that ended combat (enemies array cleared).
+		// Count kills that ended combat (enemies array cleared on victory).
+		// Only count if room was cleared (victory), not on flee.
 		if !state.Dungeon.Combat.Active {
-			m.metrics.EnemiesKilled += countAliveEnemies(m.prev.Dungeon.Combat.Enemies)
-			// Damage dealt for the final blow(s).
-			m.metrics.DamageDealt += sumAliveHP(m.prev.Dungeon.Combat.Enemies)
+			room := state.Dungeon.CurrentRoom
+			rs := state.Dungeon.RoomState[room]
+			if rs.Cleared {
+				m.metrics.EnemiesKilled += countAliveEnemies(m.prev.Dungeon.Combat.Enemies)
+				m.metrics.DamageDealt += sumAliveHP(m.prev.Dungeon.Combat.Enemies)
+			}
 		}
 	}
 

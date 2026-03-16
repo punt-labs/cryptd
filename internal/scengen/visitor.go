@@ -42,7 +42,7 @@ type RoomContent struct {
 
 // DescriptionVisitor populates room names and description seeds from node metadata.
 // For regular nodes, it uses the "name" and "path" metadata fields.
-// For synthetic hub nodes (inserted when a directory exceeds 6 children),
+// For synthetic hub nodes (inserted when a directory exceeds maxChildrenPerNode children),
 // it generates generic corridor descriptions.
 type DescriptionVisitor struct{}
 

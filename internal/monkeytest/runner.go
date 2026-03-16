@@ -12,6 +12,7 @@ import (
 	"github.com/punt-labs/cryptd/internal/model"
 	"github.com/punt-labs/cryptd/internal/narrator"
 	"github.com/punt-labs/cryptd/internal/scenario"
+	"github.com/punt-labs/cryptd/internal/scenariodir"
 )
 
 // AllClasses is the list of playable character classes.
@@ -156,21 +157,8 @@ func classStats(class string) *model.Stats {
 	}
 }
 
-// loadScenario loads a scenario from a directory, trying directory format first.
+// loadScenario loads a scenario using scenariodir.Load, which tries
+// directory format first (id/scenario.yaml), then single-file (id.yaml).
 func loadScenario(scenarioDir, id string) (*scenario.Scenario, error) {
-	// Try the scenariodir loader which handles both formats.
-	// Import it inline to avoid circular deps — but scenariodir imports scenario,
-	// and we only need scenario.Load / scenario.LoadDir here.
-	// Use scenario.Load directly with the resolved path.
-	path := scenarioDir + "/" + id + ".yaml"
-	s, err := scenario.Load(path)
-	if err != nil {
-		// Try directory format.
-		dirPath := scenarioDir + "/" + id
-		s, err = scenario.LoadDir(dirPath)
-		if err != nil {
-			return nil, fmt.Errorf("load %s: %w", id, err)
-		}
-	}
-	return s, nil
+	return scenariodir.Load(scenarioDir, id)
 }

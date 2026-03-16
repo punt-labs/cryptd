@@ -130,6 +130,9 @@ func (s *Store) SaveGraph(g *Graph) error {
 	}
 	defer metaStmt.Close()
 	for k, v := range g.Meta {
+		if k == "start" {
+			continue // "start" is stored separately below
+		}
 		if _, err := metaStmt.Exec(k, v); err != nil {
 			return fmt.Errorf("save meta %s: %w", k, err)
 		}
