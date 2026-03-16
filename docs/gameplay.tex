@@ -76,21 +76,49 @@ Every character has six attributes, inspired by Wizardry~I (DES-022).
 
 \begin{table}[h]
 \centering
-\begin{tabular}{@{}llll@{}}
+\begin{tabular}{@{}llp{7cm}@{}}
 \toprule
-\textbf{Attribute} & \textbf{Abbreviation} & \textbf{Default} & \textbf{Mechanical Effect} \\
+\textbf{Attribute} & \textbf{Abbr.} & \textbf{Mechanical Effect} \\
 \midrule
-Strength     & \stat{STR} & 14 & None (reserved for damage bonus) \\
-Dexterity    & \stat{DEX} & 12 & Initiative roll, flee success rate \\
-Constitution & \stat{CON} & 12 & HP bonus per level: $(\stat{CON} - 10) / 2$ \\
-Intelligence & \stat{INT} & 10 & None (reserved for spell power) \\
-Wisdom       & \stat{WIS} & 10 & None (reserved for MP regen) \\
-Charisma     & \stat{CHA} & 10 & None (reserved for shop prices) \\
+Strength     & \stat{STR} & None (reserved for damage bonus) \\
+Dexterity    & \stat{DEX} & Initiative roll (+\stat{DEX} to 1d20), flee success (1d20 $\leq$ \stat{DEX}) \\
+Constitution & \stat{CON} & HP bonus per level-up: $\lfloor(\stat{CON} - 10) / 2\rfloor$ \\
+Intelligence & \stat{INT} & None (reserved for spell power) \\
+Wisdom       & \stat{WIS} & None (reserved for MP regen) \\
+Charisma     & \stat{CHA} & None (reserved for shop prices) \\
 \bottomrule
 \end{tabular}
-\caption{Character attributes. All characters start with identical values.
-         Only \stat{DEX} has a mechanical effect in the current implementation.}
+\caption{Character attributes. \stat{DEX} and \stat{CON} have mechanical effects;
+         others are reserved for future systems.}
 \label{tab:attributes}
+\end{table}
+
+% -------------------------------------------------------------------
+\subsection{Stat Modifier}
+% -------------------------------------------------------------------
+
+The \emph{stat modifier} converts a raw attribute value to a bonus or
+penalty. Used by the \stat{CON}~$\to$~HP system and reserved for future
+\stat{STR}~$\to$~damage and \stat{INT}~$\to$~spell power systems.
+
+\[
+  \text{modifier}(\text{stat}) = \left\lfloor \frac{\text{stat} - 10}{2} \right\rfloor
+\]
+
+Go integer division truncates toward zero, so odd values below 10
+(e.g.\ stat~9) produce modifier~0, not~$-1$.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}rrrrrrrrrr@{}}
+\toprule
+\textbf{Stat} & 8 & 10 & 11 & 12 & 13 & 14 & 16 & 18 & 20 \\
+\midrule
+\textbf{Modifier} & $-1$ & 0 & 0 & $+1$ & $+1$ & $+2$ & $+3$ & $+4$ & $+5$ \\
+\bottomrule
+\end{tabular}
+\caption{Stat modifier reference. Values below 10 are rare (base is 10,
+         stats only increase on level-up).}
 \end{table}
 
 % -------------------------------------------------------------------
@@ -117,6 +145,43 @@ Thief   & 0  & +6 & +0 & No  & \stat{DEX}, \stat{CHA} \\
 \end{table}
 
 % -------------------------------------------------------------------
+\subsection{Point-Buy Stat Allocation}
+% -------------------------------------------------------------------
+
+At character creation, the player distributes \textbf{8 points} across
+the six attributes. Each attribute starts at a base of \textbf{10}. No
+attribute may be set below 10. The total points spent above base must
+equal exactly 8.
+
+\[
+  \sum_{a \in \{\text{STR}, \text{DEX}, \text{CON}, \text{INT}, \text{WIS}, \text{CHA}\}}
+    (a - 10) = 8, \quad a \geq 10 \;\forall\; a
+\]
+
+If no stats are provided, the default allocation is used:
+\stat{STR}~14, \stat{DEX}~12, \stat{CON}~12, \stat{INT}~10, \stat{WIS}~10, \stat{CHA}~10.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+\textbf{Build} & \stat{STR} & \stat{DEX} & \stat{CON} & \stat{INT} & \stat{WIS} & \stat{CHA} \\
+\midrule
+Default          & 14 & 12 & 12 & 10 & 10 & 10 \\
+Tank (fighter)   & 14 & 10 & 14 & 10 & 10 & 10 \\
+Agile (thief)    & 12 & 14 & 12 & 10 & 10 & 10 \\
+Scholarly (mage) & 10 & 12 & 10 & 14 & 12 & 10 \\
+Devout (priest)  & 10 & 12 & 12 & 10 & 14 & 10 \\
+\bottomrule
+\end{tabular}
+\caption{Example 8-point allocations. All sum to 68 (6 $\times$ 10 + 8).}
+\end{table}
+
+Stat validation is enforced by \texttt{engine.ValidateStats()} and
+\texttt{engine.NewCharacter()}. The daemon's \texttt{new\_game} RPC
+accepts an optional \texttt{stats} field; if omitted, defaults are used.
+
+% -------------------------------------------------------------------
 \subsection{Starting State}
 % -------------------------------------------------------------------
 
@@ -134,10 +199,10 @@ MP / MaxMP & 10 / 10 (mage, priest) or 0 / 0 (fighter, thief) \\
 Gold & 0 \\
 Inventory & Empty \\
 Equipment & All slots empty (weapon, armor, ring, amulet) \\
-Stats & \stat{STR}~14, \stat{DEX}~12, \stat{CON}~12, \stat{INT}~10, \stat{WIS}~10, \stat{CHA}~10 \\
+Stats & Player-allocated (8-point pool, base 10 each) \\
 \bottomrule
 \end{tabular}
-\caption{Default character creation values. No point-buy or random rolling.}
+\caption{Character creation values. Stats are player-configured via point-buy.}
 \end{table}
 
 % ===================================================================
@@ -738,8 +803,9 @@ engine implementation:
   \item \stat{INT} modifier to spell power (stored, leveled, not used).
   \item \stat{WIS} modifier to MP regen or spell accuracy.
   \item \stat{CHA} modifier to shop prices or NPC interactions.
-  \item Per-class starting stat distributions (all classes share identical
-        starting stats).
+  \item Per-class starting stat \emph{defaults} (currently all classes use
+        the same default if no stats are provided; class-specific defaults
+        could guide new players).
   \item Key items unlocking locked doors.
   \item Respawn mechanics (the \field{death} field is parsed but not acted on).
   \item Ring and amulet mechanical effects.
