@@ -11,6 +11,12 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **EnemyVisitor:** distance-based enemy placement with 5-tier progression (rat→goblin→skeleton→troll→dragon). 40% spawn rate, hub skipping, ±1 tier jitter for variety.
+- **ItemVisitor:** distance-based item placement with 5-tier weapons (dagger→sword→longsword→axe→vorpal blade), matching armor tiers (leather→chain→plate→dragon scale), and scaling health potions. Starter weapon at distance 1, starter potion at start, potions at hub rest stops.
+- **DefaultSpells():** standard spell catalog (fireball, heal, lightning, blessing) added to generated scenarios.
+- `Graph.MaxDistance()` for normalizing distance-to-tier mapping.
+- `crypt-admin generate` now runs description→enemy→item visitors and prints room/enemy/XP/item stats.
+- Make targets: `generate-dungeon`, `validate-dungeon`, `eval-balance-generated`, `eval-balance-unix`.
 - **Armor damage reduction:** equipped armor's `defense` field reduces incoming enemy damage (flat subtraction, floor 1). Defend stance and armor stack: halve first, then subtract defense.
 - **Consumable items:** `use`/`drink`/`eat` verbs consume items with `effect`/`power` fields. Health potions heal dice-based HP (e.g. `2d6`). New engine method `UseItem()`, typed error `NotConsumableError`.
 - **CON modifier scales HP per level:** HP gain = class base + floor((CON-10)/2). Fighters (CON growth) gain 9-10+ HP/level at higher levels; mages (no CON growth) gain base 4. New `StatModifier()` function.
