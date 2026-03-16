@@ -1,0 +1,100 @@
+.TH CRYPT 1 "March 2026" "Punt Labs" "Crypt Game Engine"
+.SH NAME
+crypt \- thin client for the Crypt text adventure
+.SH SYNOPSIS
+.B crypt
+.RB [ \-\-socket
+.IR path ]
+.RB [ \-\-addr
+.IR host:port ]
+.RB [ \-\-scenario
+.IR id ]
+.RB [ \-\-name
+.IR name ]
+.RB [ \-\-class
+.IR class ]
+.SH DESCRIPTION
+.B crypt
+is the player\-facing CLI client for Crypt.
+It connects to a running
+.BR cryptd (1)
+server, sends natural language text via the
+.B play
+JSON\-RPC method, and renders the game with readline input, HP/MP
+progress bars, and combat enemy lists.
+.PP
+If the server is not running on the local Unix socket,
+.B crypt
+auto\-starts
+.B cryptd serve
+in the background.
+.PP
+Crypt is playable in three environments:
+.IP \(bu 3
+Standalone CLI in a terminal shell
+.IP \(bu 3
+CLI within Claude Code (via the crypt plugin)
+.IP \(bu 3
+Lux display surface with Claude Code (ImGui\-based GUI)
+.SH OPTIONS
+.TP
+.BI \-\-socket " path"
+Unix socket to connect to. Default:
+.IR ~/.crypt/daemon.sock .
+.TP
+.BI \-\-addr " host:port"
+TCP address to connect to (e.g.\&
+.BR host:9000 ).
+Overrides
+.BR \-\-socket .
+.TP
+.BI \-\-scenario " id"
+Scenario ID for auto\-started server. If the server is already running,
+this flag is ignored.
+.TP
+.BI \-\-name " name"
+Character name. Default:
+.IR Adventurer .
+.TP
+.BI \-\-class " class"
+Character class:
+.BR fighter ,
+.BR mage ,
+.BR priest ,
+.BR thief .
+Default:
+.IR fighter .
+.SH GAME COMMANDS
+.TS
+l l l.
+\fBCommand\fR	\fBAliases\fR	\fBAction\fR
+north, south, etc.	n, s, e, w, u, d	Move in direction
+go <dir>	\-	Move in direction
+look	l	Describe current room
+examine <item>	x	Inspect an item
+take <item>	get, grab	Pick up from room
+drop <item>	\-	Drop to room
+equip <item>	wear, wield	Equip from inventory
+unequip <slot>	remove	Unequip to inventory
+use <item>	drink, eat	Use consumable item
+attack [target]	a, hit, strike, kill	Attack enemy (combat)
+defend	block, guard	Defensive stance (combat)
+flee	run, escape	Attempt to flee (combat)
+cast <spell>	\-	Cast a spell
+inventory	i	List inventory
+save [slot]	\-	Save game
+load [slot]	\-	Load game
+help	?	List commands
+quit	exit, q	End the game
+.TE
+.SH ENVIRONMENT
+.TP
+.B CRYPT_SCENARIO_DIR
+Scenario directory for auto\-started servers. Default:
+.IR scenarios .
+.SH SEE ALSO
+.BR cryptd (1),
+.BR crypt\-admin (1),
+.BR eval\-balance (1)
+.SH AUTHORS
+Punt Labs.

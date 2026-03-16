@@ -7,6 +7,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/punt-labs/cryptd/internal/dice"
 	"github.com/punt-labs/cryptd/internal/model"
 	"github.com/punt-labs/cryptd/internal/scenario"
 )
@@ -340,6 +341,9 @@ func scenarioItem(id string, si *scenario.ScenarioItem) model.Item {
 		Name:        si.Name,
 		Type:        si.Type,
 		Damage:      si.Damage,
+		Defense:     si.Defense,
+		Power:       si.Power,
+		Effect:      si.Effect,
 		Weight:      si.Weight,
 		Value:       si.Value,
 		Description: si.Description,
@@ -520,6 +524,82 @@ func (e *Engine) Unequip(state *model.GameState, slot string) (UnequipResult, er
 	})
 
 	return UnequipResult{Item: item, Slot: slot}, nil
+}
+
+// UseItemResult holds the outcome of using a consumable item.
+type UseItemResult struct {
+	Item   model.Item
+	Effect string // "heal"
+	Power  int    // amount healed/damaged
+	HeroHP int    // HP after effect
+}
+
+// NotConsumableError is returned when trying to use a non-consumable item.
+type NotConsumableError struct {
+	ItemID   string
+	ItemType string
+}
+
+func (e *NotConsumableError) Error() string {
+	return fmt.Sprintf("cannot use %q (type %s)", e.ItemID, e.ItemType)
+}
+
+// UseItem consumes an item from inventory, applying its effect.
+func (e *Engine) UseItem(state *model.GameState, itemID string) (UseItemResult, error) {
+	char := hero(state)
+	idx := -1
+	for i, item := range char.Inventory {
+		if item.ID == itemID {
+			idx = i
+			break
+		}
+	}
+	if idx == -1 {
+		return UseItemResult{}, &ItemNotInInventoryError{ItemID: itemID}
+	}
+
+	item := char.Inventory[idx]
+	if item.Type != "consumable" {
+		return UseItemResult{}, &NotConsumableError{ItemID: itemID, ItemType: item.Type}
+	}
+
+	// Apply effect.
+	var power int
+	switch item.Effect {
+	case "heal":
+		if item.Power == "" {
+			return UseItemResult{}, fmt.Errorf("consumable %q has no power defined", item.ID)
+		}
+		d, err := dice.Parse(item.Power)
+		if err != nil {
+			return UseItemResult{}, fmt.Errorf("invalid power dice %q: %w", item.Power, err)
+		}
+		power = d.Roll()
+		if power < 1 {
+			power = 1
+		}
+		char.HP += power
+		if char.HP > char.MaxHP {
+			char.HP = char.MaxHP
+		}
+	default:
+		return UseItemResult{}, fmt.Errorf("unknown consumable effect %q", item.Effect)
+	}
+
+	// Remove from inventory (consumed).
+	char.Inventory = append(char.Inventory[:idx], char.Inventory[idx+1:]...)
+
+	state.AdventureLog = append(state.AdventureLog, model.LogEntry{
+		Text:      fmt.Sprintf("You use %s.", item.Name),
+		Timestamp: e.Now().UTC().Format(time.RFC3339),
+	})
+
+	return UseItemResult{
+		Item:   item,
+		Effect: item.Effect,
+		Power:  power,
+		HeroHP: char.HP,
+	}, nil
 }
 
 // Examine returns details about an item in inventory, equipped, or the current room.

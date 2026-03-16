@@ -93,9 +93,9 @@ func TestCheckLevelUp_MultiLevel(t *testing.T) {
 	assert.True(t, result.Leveled)
 	assert.Equal(t, 4, result.NewLevel)
 	assert.Equal(t, 4, state.Party[0].Level)
-	// 3 levels × 8 HP = 24 HP gained
-	assert.Equal(t, 24, result.HPGain)
-	assert.Equal(t, 44, state.Party[0].MaxHP)
+	// 3 levels: L2 (CON 11, mod 0) +8, L3 (CON 12, mod 1) +9, L4 (CON 13, mod 1) +9 = 26
+	assert.Equal(t, 26, result.HPGain)
+	assert.Equal(t, 46, state.Party[0].MaxHP)
 	// 3 levels × +1 STR = +3 STR
 	assert.Equal(t, 3, result.StatGain["STR"])
 	assert.Equal(t, 13, state.Party[0].Stats.STR)
@@ -156,6 +156,65 @@ func TestNextLevelXP(t *testing.T) {
 			assert.Equal(t, tt.want, engine.NextLevelXP(tt.class, tt.level))
 		})
 	}
+}
+
+func TestStatModifier(t *testing.T) {
+	tests := []struct {
+		stat int
+		want int
+	}{
+		{8, -1},
+		{9, 0},  // Go truncates toward zero: (9-10)/2 = 0
+		{10, 0},
+		{11, 0},
+		{12, 1},
+		{13, 1},
+		{14, 2},
+		{15, 2},
+		{16, 3},
+		{18, 4},
+		{20, 5},
+	}
+	for _, tt := range tests {
+		assert.Equal(t, tt.want, engine.StatModifier(tt.stat), "StatModifier(%d)", tt.stat)
+	}
+}
+
+func TestCheckLevelUp_CONModifierAffectsHP(t *testing.T) {
+	e := engine.New(levelScenario())
+	// Fighter with high CON (14 → modifier +2) should gain 8+2 = 10 HP per level.
+	char := model.Character{
+		ID: "c1", Name: "Tank", Class: "fighter", Level: 1,
+		HP: 20, MaxHP: 20, XP: 20,
+		Stats: model.Stats{STR: 10, INT: 10, DEX: 10, CON: 14, WIS: 10, CHA: 10},
+	}
+	state, err := e.NewGame(char)
+	require.NoError(t, err)
+
+	result := e.CheckLevelUp(&state)
+	assert.True(t, result.Leveled)
+	// CON 14 → +1 from level-up → CON 15, but modifier computed after stat gain:
+	// CON 15 → modifier +2, so HP = 8 + 2 = 10
+	assert.Equal(t, 10, result.HPGain)
+	assert.Equal(t, 30, state.Party[0].MaxHP)
+}
+
+func TestCheckLevelUp_LowCONFloors(t *testing.T) {
+	e := engine.New(levelScenario())
+	// Mage with CON 6 (modifier -2): base 4 + (-2) = 2, still positive.
+	char := model.Character{
+		ID: "c1", Name: "Frail", Class: "mage", Level: 1,
+		HP: 20, MaxHP: 20, MP: 10, MaxMP: 10, XP: 30,
+		Stats: model.Stats{STR: 10, INT: 10, DEX: 10, CON: 6, WIS: 10, CHA: 10},
+	}
+	state, err := e.NewGame(char)
+	require.NoError(t, err)
+
+	result := e.CheckLevelUp(&state)
+	assert.True(t, result.Leveled)
+	// CON 6, mage doesn't gain CON, so modifier = (6-10)/2 = -2. HP = 4 + (-2) = 2.
+	assert.Equal(t, 2, result.HPGain)
+	assert.Equal(t, 22, state.Party[0].MaxHP)
 }
 
 func TestCheckLevelUp_ThiefStatGains(t *testing.T) {

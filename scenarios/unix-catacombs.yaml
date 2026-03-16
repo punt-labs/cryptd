@@ -10,7 +10,7 @@ rooms:
       south:
         room: home_dir
         type: open
-    items: [man_page]
+    items: [man_page, short_sword]
 
   home_dir:
     name: "/home/guest"
@@ -28,7 +28,7 @@ rooms:
       south:
         room: etc_shadow
         type: open
-    items: [alias_shield]
+    items: [alias_shield, health_potion]
 
   tmp_wasteland:
     name: "/tmp Wasteland"
@@ -65,6 +65,7 @@ rooms:
       west:
         room: dev_null
         type: open
+    items: [health_elixir]
 
   dev_null:
     name: "/dev/null"
@@ -98,24 +99,31 @@ rooms:
 
   etc_shadow:
     name: "/etc/shadow"
-    description_seed: "The secrets of the system lie bare before you. Password hashes line the walls like ancient runes. This vault was worth the trouble."
+    description_seed: "The secrets of the system lie bare before you. Password hashes line the walls like ancient runes. A corrupted process lurks in the shadows."
     connections:
       north:
         room: home_dir
         type: open
-    items: [shadow_file]
+    enemies: [zombie_process]
+    items: [shadow_file, health_draught]
 
 enemies:
+  zombie_process:
+    name: "Zombie Process"
+    hp: 6
+    attack: "1d3"
+    ai: aggressive
+
   segfault_daemon:
     name: "Segfault Daemon"
-    hp: 15
+    hp: 12
     attack: "1d6"
     ai: aggressive
 
   oom_killer:
     name: "OOM Killer"
-    hp: 25
-    attack: "1d8+2"
+    hp: 15
+    attack: "1d6+1"
     ai: aggressive
 
   null_byte:
@@ -146,12 +154,48 @@ items:
     weight: 0.1
     value: 0
 
+  short_sword:
+    name: "Short Sword"
+    description: "A simple but serviceable blade found near the login terminal."
+    type: weapon
+    damage: "1d6"
+    weight: 3.0
+    value: 10
+
   alias_shield:
     name: "Alias Shield"
     description: "Sourced from .bashrc. The alias 'shield=deflect -a' wraps around you like armor, deflecting the worst of incoming signals."
     type: armor
+    defense: 2
     weight: 2.0
     value: 15
+
+  health_potion:
+    name: "Health Potion"
+    description: "A shimmering vial of regenerative code. Restores 2d6 hit points."
+    type: consumable
+    effect: heal
+    power: "2d6"
+    weight: 0.5
+    value: 15
+
+  health_draught:
+    name: "Health Draught"
+    description: "A smaller dose of restorative logic. Restores 1d6+2 hit points."
+    type: consumable
+    effect: heal
+    power: "1d6+2"
+    weight: 0.3
+    value: 8
+
+  health_elixir:
+    name: "Health Elixir"
+    description: "A potent brew found in the pipe maze. Restores 3d6 hit points."
+    type: consumable
+    effect: heal
+    power: "3d6"
+    weight: 0.5
+    value: 25
 
   pipe_connector:
     name: "Pipe Connector"

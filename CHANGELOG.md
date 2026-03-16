@@ -11,6 +11,21 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **Armor damage reduction:** equipped armor's `defense` field reduces incoming enemy damage (flat subtraction, floor 1). Defend stance and armor stack: halve first, then subtract defense.
+- **Consumable items:** `use`/`drink`/`eat` verbs consume items with `effect`/`power` fields. Health potions heal dice-based HP (e.g. `2d6`). New engine method `UseItem()`, typed error `NotConsumableError`.
+- **CON modifier scales HP per level:** HP gain = class base + floor((CON-10)/2). Fighters (CON growth) gain 9-10+ HP/level at higher levels; mages (no CON growth) gain base 4. New `StatModifier()` function.
+- **Point-buy stat allocation:** 8 points distributed across 6 stats (base 10 each). `engine.NewCharacter()` centralizes character creation with `ValidateStats()`. Daemon `new_game` RPC accepts optional `stats` field.
+- **Interactive character creation:** `cryptd serve -t` (without `--script`) prompts for name, class, and stat allocation before the game begins. Enter for defaults (STR +4, DEX +2, CON +2).
+- **Monkey test harness for game balance tuning** (`cmd/eval-balance`): runs N parallel game sessions with weighted-random action selection, collects per-session metrics (moves, XP, kills, damage, survival, flee rate, spells, potions, level-ups), and produces JSON aggregate reports with per-class breakdowns. `make eval-balance` runs 1000 sessions across all classes; `make eval-balance-quick` runs 100 fighter sessions.
+- `internal/monkeytest` package: `MonkeyRenderer` (state-aware weighted-random Renderer), `SessionMetrics`, `AggregateReport`, parallel `Run()` with configurable workers, percentile computation. Monkey auto-equips weapons and armor, uses health potions at ≤50% HP, class-optimal stat distributions.
+- `docs/gameplay.tex` / `.pdf` — 10-page gameplay mechanics specification: attributes, point-buy, classes, XP tables, combat, spells, inventory, consumables, movement, commands, balance tuning targets.
+- **`crypt-admin` binary** — third binary for scenario authoring (alongside `cryptd` and `crypt`). Subcommands: `generate`, `validate`, `export`.
+- **Graph-first scenario generation (DES-027):** `crypt-admin generate --topology tree --source <dir>` walks a filesystem tree, builds a connected graph with bidirectional edges, assigns 6-direction compass directions, and exports to YAML directory format. Hub nodes inserted automatically for directories with >5 children.
+- **YAML directory format:** scenarios can now be a directory with `scenario.yaml` manifest and `regions/*.yaml` sub-files. Cross-region room references work naturally. `scenariodir.Load()` tries directory format first, falls back to single-file.
+- `internal/scengen` package: `Graph`, `Node`, `Edge`, `Direction` types with `Validate()` (bidirectionality, max degree 6, BFS connectivity); `TopologySource` interface with `TreeSource` adapter; `Visitor` interface with `DescriptionVisitor`; `WriteYAMLDir()` exporter; SQLite `Store` for iterative authoring.
+- `internal/scenario.LoadDir()` — loads directory-format scenarios with duplicate room ID detection across regions.
+- `internal/scenariodir` tests — directory fallback, precedence, path traversal protection.
+
 - **Thin client architecture (DES-025 revised):** `crypt` is now a thin client — connects to `cryptd serve`, sends natural language text via the `play` JSON-RPC method, displays narrated text. No engine, interpreter, or narrator in the client. Auto-starts `cryptd serve` if the socket is not present.
 - **Two daemon modes (DES-025):** `cryptd serve` runs in Normal mode (interpreter → engine → narrator → display text for CLI) or `--passthrough` mode (raw MCP tool surface with structured JSON for Claude Code). Normal mode auto-detects ollama for SLM inference, falls back to Rules + Template.
 - `internal/daemon/play.go` — `handlePlay()` processes text input through the full interpreter → engine → narrator pipeline; `handleNewGamePlay()` starts a game and narrates the initial room description.
@@ -27,6 +42,11 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- `cryptd validate` prints deprecation warning directing users to `crypt-admin validate`.
+- `make build` now builds all three binaries (`cryptd`, `crypt`, `crypt-admin`).
+- `cryptd serve -t` (interactive, no `--script`) now probes for ollama and uses SLM interpreter + narrator when available. Scripted mode retains deterministic rules+templates.
+- unix-catacombs scenario rebalanced: OOM Killer 25→15 HP and 1d8+2→1d6+1, Segfault Daemon 15→12 HP, new Zombie Process enemy (6 HP), short sword in starting room, alias shield gains defense 2, three health potions placed along the critical path. Survival rate: 0%→65%.
+- `ScenarioItem` gains `defense` (int), `power` (dice string), `effect` (string) fields for armor and consumable mechanics.
 - `crypt` takes no subcommands. Flags: `--socket`, `--addr`, `--scenario`, `--name`, `--class`.
 - Existing daemon tests updated to use `WithPassthrough()` (they exercise the MCP tool surface, which is passthrough mode by definition).
 - `internal/scenariodir` package — canonical scenario ID resolution with path-traversal protection, eliminating duplication between CLI and daemon

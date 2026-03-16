@@ -293,13 +293,7 @@ func (e *Engine) ProcessEnemyTurn(state *model.GameState) (EnemyTurnResult, erro
 		// Otherwise fall through to attack.
 		fallthrough
 	case "aggressive", "scripted":
-		damage := e.rollEnemyDamage(enemy)
-		if combat.HeroDefending {
-			damage /= 2
-			if damage < 1 {
-				damage = 1
-			}
-		}
+		damage := e.applyDefenses(state, e.rollEnemyDamage(enemy), combat.HeroDefending)
 		h.HP -= damage
 		heroDead := h.HP <= 0
 
@@ -315,13 +309,7 @@ func (e *Engine) ProcessEnemyTurn(state *model.GameState) (EnemyTurnResult, erro
 		}, nil
 	default:
 		// Unknown AI — treat as aggressive.
-		damage := e.rollEnemyDamage(enemy)
-		if combat.HeroDefending {
-			damage /= 2
-			if damage < 1 {
-				damage = 1
-			}
-		}
+		damage := e.applyDefenses(state, e.rollEnemyDamage(enemy), combat.HeroDefending)
 		h.HP -= damage
 		e.advanceTurn(combat)
 		return EnemyTurnResult{
@@ -392,6 +380,27 @@ func (e *Engine) rollHeroDamage(state *model.GameState) int {
 		return 1
 	}
 	return result
+}
+
+// applyDefenses reduces raw damage by defend stance and equipped armor defense.
+// Order: halve for defend first, then subtract armor defense. This order
+// makes armor slightly less effective when defending (intentional — defend
+// is already powerful). Final damage is floored at 1.
+func (e *Engine) applyDefenses(state *model.GameState, damage int, defending bool) int {
+	if defending {
+		damage /= 2
+	}
+	// Armor damage reduction.
+	h := hero(state)
+	if h.Equipped.Armor != "" {
+		if si, ok := e.s.Items[h.Equipped.Armor]; ok && si.Defense > 0 {
+			damage -= si.Defense
+		}
+	}
+	if damage < 1 {
+		damage = 1
+	}
+	return damage
 }
 
 func (e *Engine) rollEnemyDamage(enemy *model.EnemyInstance) int {

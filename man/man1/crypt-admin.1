@@ -1,0 +1,158 @@
+.TH CRYPT\-ADMIN 1 "March 2026" "Punt Labs" "Crypt Game Engine"
+.SH NAME
+crypt\-admin \- scenario authoring tools for the Crypt text adventure
+.SH SYNOPSIS
+.B crypt\-admin generate
+.B \-\-topology
+.I type
+.B \-\-source
+.I path
+.B \-\-title
+.I title
+.B \-\-output
+.I dir
+.RB [ \-\-db
+.IR path ]
+.br
+.B crypt\-admin validate
+.I path
+.br
+.B crypt\-admin export
+.B \-\-db
+.I path
+.B \-\-output
+.I dir
+.SH DESCRIPTION
+.B crypt\-admin
+is the scenario authoring tool for Crypt.
+It generates game scenarios graph\-first (DES\-027): a topology source
+produces nodes and edges, BFS direction assignment creates valid
+bidirectional 6\-direction connections, and visitors decorate rooms
+with content.
+.PP
+Output is YAML directory format (manifest + region files) that
+.BR cryptd (1)
+loads directly.
+An optional SQLite working format persists the graph for iterative
+authoring.
+.SH SUBCOMMANDS
+.SS generate
+Generate a new scenario from a topology source.
+.TP
+.BI \-\-topology " type"
+Topology source type. Currently supported:
+.BR tree
+(filesystem directory tree).
+.TP
+.BI \-\-source " path"
+Source path for the topology (e.g.\& a directory to walk for
+.B tree
+topology).
+.TP
+.BI \-\-title " title"
+Scenario title.
+.TP
+.BI \-\-output " dir"
+Output directory for the generated YAML scenario.
+Written atomically (temp dir + rename).
+.TP
+.BI \-\-db " path"
+Optional: persist the graph to a SQLite database for iterative editing.
+.SS validate
+Validate a scenario file or directory.
+.PP
+.I path
+may be a single YAML file or a directory containing
+.IR scenario.yaml .
+Prints
+.B OK
+on success; error message and exit code 1 on failure.
+.SS export
+Export a SQLite working database to YAML directory format.
+.TP
+.BI \-\-db " path"
+Path to the SQLite database.
+.TP
+.BI \-\-output " dir"
+Output directory for the exported YAML scenario.
+.SH SCENARIO FORMATS
+.SS Single\-file format
+One
+.I .yaml
+file per scenario with rooms, items, enemies, and spells.
+.SS Directory format
+A directory containing:
+.IP \(bu 3
+.I scenario.yaml
+\(em manifest with title, starting_room, death mode, region list,
+and item/enemy/spell catalogs
+.IP \(bu 3
+.I regions/*.yaml
+\(em room definitions grouped by region
+.PP
+Room IDs are globally unique across regions.
+Cross\-region connections work naturally.
+.B scenariodir.Load()
+tries directory format first, falls back to single\-file.
+.SH GRAPH CONSTRUCTION
+The generator builds a connected graph with these invariants:
+.IP \(bu 3
+Bidirectionality: every edge has a reverse (north \(lA south)
+.IP \(bu 3
+Max degree 6: one edge per compass direction (N/S/E/W/Up/Down)
+.IP \(bu 3
+Connectivity: all nodes reachable from the start via BFS
+.IP \(bu 3
+Hub insertion: directories with >5 children get synthetic corridor nodes
+.SH SQLITE SCHEMA
+The working database enforces constraints at the schema level:
+.IP \(bu 3
+Foreign keys on edges reference existing nodes
+.IP \(bu 3
+CHECK constraints restrict directions to the 6 valid values
+.IP \(bu 3
+UNIQUE constraints prevent direction slot collisions
+.IP \(bu 3
+Meta table stores start node, title, and death mode
+.SH EXAMPLES
+Generate a scenario from a filesystem tree:
+.PP
+.RS
+.nf
+crypt\-admin generate \\
+    \-\-topology tree \\
+    \-\-source /usr/local \\
+    \-\-title "UNIX Catacombs" \\
+    \-\-output scenarios/unix\-catacombs/
+.fi
+.RE
+.PP
+Validate a directory\-format scenario:
+.PP
+.RS
+.nf
+crypt\-admin validate scenarios/unix\-catacombs/
+.fi
+.RE
+.PP
+Generate with SQLite working copy, then export:
+.PP
+.RS
+.nf
+crypt\-admin generate \\
+    \-\-topology tree \-\-source ~/project \\
+    \-\-title "My Dungeon" \\
+    \-\-output scenarios/my\-dungeon/ \\
+    \-\-db .tmp/my\-dungeon.db
+
+# Edit the database, then re\-export:
+crypt\-admin export \-\-db .tmp/my\-dungeon.db \\
+    \-\-output scenarios/my\-dungeon/
+.fi
+.RE
+.SH SEE ALSO
+.BR cryptd (1),
+.BR crypt (1),
+.BR eval\-balance (1)
+.SH AUTHORS
+Punt Labs.

@@ -1,11 +1,16 @@
 .PHONY: help vet test test-integration test-e2e lint markdownlint coverage \
-       check check-full build build-server build-client clean help \
+       check check-full build build-server build-client build-admin clean help \
+       install uninstall man play play-unix \
        ollama-install ollama-start ollama-pull ollama-setup eval-slm \
+       eval-balance eval-balance-quick \
        demo demo-solo demo-exploration demo-inventory \
        demo-combat demo-save-load demo-unix-catacombs
 
 SCENARIO_DIR = testdata/scenarios
 DEMO_DIR     = testdata/demos
+PREFIX       = /usr/local
+BINDIR       = $(PREFIX)/bin
+MANDIR       = $(PREFIX)/share/man/man1
 
 ##@ Quality Gates
 check: vet test lint markdownlint          ## Quick gate (before every commit)
@@ -36,7 +41,7 @@ markdownlint:                              ## Lint markdown files
 	npx markdownlint-cli2 "**/*.md" "#node_modules"
 
 ##@ Build
-build: build-server build-client           ## Build both binaries
+build: build-server build-client build-admin  ## Build all binaries
 
 build-server:                              ## Build the cryptd server binary
 	go build -o cryptd ./cmd/cryptd
@@ -44,8 +49,44 @@ build-server:                              ## Build the cryptd server binary
 build-client:                              ## Build the crypt client binary
 	go build -o crypt ./cmd/crypt
 
+build-admin:                               ## Build the crypt-admin authoring binary
+	go build -o crypt-admin ./cmd/crypt-admin
+
 clean:                                     ## Remove build artifacts
-	rm -f cryptd crypt coverage.out
+	rm -f cryptd crypt crypt-admin coverage.out
+
+##@ Install
+install: build                             ## Install binaries and man pages to PREFIX (/usr/local)
+	install -d $(BINDIR) $(MANDIR)
+	install -m 755 cryptd $(BINDIR)/cryptd
+	install -m 755 crypt $(BINDIR)/crypt
+	install -m 755 crypt-admin $(BINDIR)/crypt-admin
+	install -m 644 man/man1/cryptd.1 $(MANDIR)/cryptd.1
+	install -m 644 man/man1/crypt.1 $(MANDIR)/crypt.1
+	install -m 644 man/man1/crypt-admin.1 $(MANDIR)/crypt-admin.1
+	install -m 644 man/man1/eval-balance.1 $(MANDIR)/eval-balance.1
+
+uninstall:                                 ## Remove installed binaries and man pages
+	rm -f $(BINDIR)/cryptd $(BINDIR)/crypt $(BINDIR)/crypt-admin
+	rm -f $(MANDIR)/cryptd.1 $(MANDIR)/crypt.1 $(MANDIR)/crypt-admin.1 $(MANDIR)/eval-balance.1
+
+man:                                       ## View man pages locally (without installing)
+	man man/man1/cryptd.1
+
+##@ Play
+play: build-server build-client            ## Play the game (client connects to server with default scenario)
+	@CRYPT_SCENARIO_DIR=$(SCENARIO_DIR) ./cryptd serve -f --scenario minimal &\
+	CRYPTD_PID=$$!; \
+	sleep 0.5; \
+	./crypt --scenario minimal; \
+	kill $$CRYPTD_PID 2>/dev/null; wait $$CRYPTD_PID 2>/dev/null
+
+play-unix: build-server build-client       ## Play the UNIX Catacombs scenario
+	@CRYPT_SCENARIO_DIR=scenarios ./cryptd serve -f --scenario unix-catacombs &\
+	CRYPTD_PID=$$!; \
+	sleep 0.5; \
+	./crypt --scenario unix-catacombs; \
+	kill $$CRYPTD_PID 2>/dev/null; wait $$CRYPTD_PID 2>/dev/null
 
 ##@ Demos — Scripted Playthroughs
 demo: demo-exploration demo-inventory demo-combat demo-save-load demo-unix-catacombs  ## Run all CLI demos
@@ -93,6 +134,13 @@ ollama-setup: ollama-pull                  ## Install ollama, start server, pull
 
 eval-slm: ollama-setup build              ## Run SLM accuracy eval (65+ inputs, needs ollama)
 	go run ./cmd/eval-slm --model $(SLM_MODEL)
+
+##@ Balance
+eval-balance:                              ## Run monkey balance eval (1000 sessions, all classes)
+	CRYPT_SCENARIO_DIR=$(SCENARIO_DIR) go run ./cmd/eval-balance --scenario minimal --class all --players 1000 --max-moves 200
+
+eval-balance-quick:                        ## Quick balance check (100 sessions, fighter only)
+	CRYPT_SCENARIO_DIR=$(SCENARIO_DIR) go run ./cmd/eval-balance --scenario minimal --class fighter --players 100 --max-moves 50
 
 ##@ Help
 help:                                      ## Show this help

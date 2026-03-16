@@ -26,11 +26,16 @@ func main() {
 }
 
 func runValidate(args []string) {
+	fmt.Fprintln(os.Stderr, "warning: 'cryptd validate' is deprecated, use 'crypt-admin validate' instead")
 	if len(args) != 1 {
 		fmt.Fprintln(os.Stderr, "usage: cryptd validate <scenario-file>")
 		os.Exit(1)
 	}
 	path := args[0]
+	if info, err := os.Stat(path); err == nil && info.IsDir() {
+		fmt.Fprintln(os.Stderr, "error: directory-format scenarios require 'crypt-admin validate'")
+		os.Exit(1)
+	}
 	if _, err := scenario.Load(path); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)

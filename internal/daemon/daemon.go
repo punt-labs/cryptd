@@ -27,10 +27,11 @@ type Server struct {
 	state       *model.GameState
 	interp      model.CommandInterpreter
 	narr        model.Narrator
-	passthrough bool   // true = structured JSON, false = interpreted + narrated text
-	network     string // "unix" or "tcp"
-	address     string // socket path or host:port
-	scenarioDir string
+	passthrough     bool   // true = structured JSON, false = interpreted + narrated text
+	network         string // "unix" or "tcp"
+	address         string // socket path or host:port
+	scenarioDir     string
+	defaultScenario string // scenario ID used when new_game omits scenario_id
 	listener    net.Listener
 	mu          sync.Mutex // guards eng and state
 }
@@ -53,6 +54,12 @@ func WithInterpreter(interp model.CommandInterpreter) ServerOption {
 // WithNarrator sets the narrator for normal mode.
 func WithNarrator(narr model.Narrator) ServerOption {
 	return func(s *Server) { s.narr = narr }
+}
+
+// WithDefaultScenario sets the scenario ID used when new_game is called
+// without a scenario_id argument.
+func WithDefaultScenario(id string) ServerOption {
+	return func(s *Server) { s.defaultScenario = id }
 }
 
 // NewServer creates a Server that listens on a Unix socket at the given path.

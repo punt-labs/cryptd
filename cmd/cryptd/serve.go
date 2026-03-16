@@ -5,8 +5,10 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -33,8 +35,8 @@ func runServe(args []string) {
 	foreground := fs.Bool("f", false, "run in foreground (don't daemonize)")
 	testing := fs.Bool("t", false, "testing mode: stdin/stdout, no network (implies -f)")
 
-	// Testing mode flags.
-	scenarioID := fs.String("scenario", "", "scenario ID for -t mode")
+	// Scenario flag — used for both -t mode and daemon default scenario.
+	scenarioID := fs.String("scenario", "", "scenario ID (-t mode: required; daemon: default for new_game)")
 	charName := fs.String("name", "Adventurer", "character name for -t mode")
 	charClass := fs.String("class", "fighter", "character class for -t mode")
 	scriptFile := fs.String("script", "", "read commands from file instead of stdin (-t mode)")
@@ -94,6 +96,10 @@ func runServe(args []string) {
 		opts = append(opts, daemon.WithInterpreter(interp), daemon.WithNarrator(narr))
 	}
 
+	if *scenarioID != "" {
+		opts = append(opts, daemon.WithDefaultScenario(*scenarioID))
+	}
+
 	var srv *daemon.Server
 	if *listenAddr != "" {
 		srv = daemon.NewTCPServer(*listenAddr, absScenarioDir, opts...)
@@ -128,14 +134,22 @@ func runTestingMode(scenarioID, charName, charClass, scriptFile string, jsonMode
 		os.Exit(1)
 	}
 
-	hero := model.Character{
-		ID: "hero", Name: charName, Class: charClass,
-		Level: 1, HP: 20, MaxHP: 20,
-		Stats: model.Stats{STR: 14, DEX: 12, CON: 12, INT: 10, WIS: 10, CHA: 10},
-	}
-	if charClass == "mage" || charClass == "priest" {
-		hero.MP = 10
-		hero.MaxMP = 10
+	var hero model.Character
+
+	if scriptFile != "" {
+		// Scripted mode: use defaults (no interactive prompt).
+		hero, err = engine.NewCharacter(charName, charClass, nil)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error creating character: %v\n", err)
+			os.Exit(1)
+		}
+	} else {
+		// Interactive mode: prompt for character creation.
+		hero, err = promptCharacterCreation(os.Stdout, os.Stdin)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
 	}
 
 	eng := engine.New(s)
@@ -145,10 +159,10 @@ func runTestingMode(scenarioID, charName, charClass, scriptFile string, jsonMode
 		os.Exit(1)
 	}
 
-	interp := interpreter.NewRules()
-	narr := narrator.NewTemplate()
-
 	if scriptFile != "" {
+		// Scripted mode: deterministic rules+templates, no SLM.
+		interp := interpreter.NewRules()
+		narr := narrator.NewTemplate()
 		commands, err := readCommandFile(scriptFile)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error reading script: %v\n", err)
@@ -167,6 +181,8 @@ func runTestingMode(scenarioID, charName, charClass, scriptFile string, jsonMode
 			}
 		}
 	} else {
+		// Interactive mode: probe for SLM, fall back to rules+templates.
+		interp, narr := resolveInterpreterNarrator()
 		rend := renderer.NewCLI(os.Stdout, os.Stdin)
 		loop := game.NewLoop(eng, interp, narr, rend)
 		if err := loop.Run(context.Background(), &state); err != nil {
@@ -213,4 +229,104 @@ func resolveInterpreterNarrator() (*interpreter.SLM, *narrator.SLM) {
 
 	fmt.Fprintln(os.Stderr, "cryptd: no inference server found — using rules+templates")
 	return interpreter.NewSLM(nil, rules), narrator.NewSLM(nil, tmpl)
+}
+
+// promptCharacterCreation runs an interactive character creation flow,
+// asking for name, class, and stat allocation.
+func promptCharacterCreation(out io.Writer, in io.Reader) (model.Character, error) {
+	scanner := bufio.NewScanner(in)
+	prompt := func(msg string) string {
+		fmt.Fprint(out, msg)
+		if !scanner.Scan() {
+			return ""
+		}
+		return strings.TrimSpace(scanner.Text())
+	}
+
+	fmt.Fprintln(out, "=== Character Creation ===")
+	fmt.Fprintln(out)
+
+	// Name.
+	name := prompt("Name: ")
+	if name == "" {
+		name = "Adventurer"
+	}
+
+	// Class.
+	fmt.Fprintln(out)
+	fmt.Fprintln(out, "Classes: fighter, mage, priest, thief")
+	class := strings.ToLower(prompt("Class: "))
+	if !engine.ValidClasses[class] {
+		return model.Character{}, fmt.Errorf("unknown class %q", class)
+	}
+
+	// Stat allocation.
+	fmt.Fprintln(out)
+	fmt.Fprintf(out, "Distribute %d points across 6 stats (base %d each).\n",
+		engine.PointBuyPool, engine.BaseStatValue)
+	fmt.Fprintln(out, "Enter points to ADD to each stat (e.g. 4 0 2 0 2 0).")
+	fmt.Fprintln(out, "Press Enter for defaults (STR +4, DEX +2, CON +2).")
+	fmt.Fprintln(out)
+
+	statNames := []string{"STR", "DEX", "CON", "INT", "WIS", "CHA"}
+	defaults := engine.DefaultStats()
+	defaultBonuses := []int{
+		defaults.STR - engine.BaseStatValue,
+		defaults.DEX - engine.BaseStatValue,
+		defaults.CON - engine.BaseStatValue,
+		defaults.INT - engine.BaseStatValue,
+		defaults.WIS - engine.BaseStatValue,
+		defaults.CHA - engine.BaseStatValue,
+	}
+
+	// Show current defaults.
+	for i, n := range statNames {
+		fmt.Fprintf(out, "  %s: %d (+%d)\n", n, engine.BaseStatValue+defaultBonuses[i], defaultBonuses[i])
+	}
+	fmt.Fprintln(out)
+
+	line := prompt("Allocation (6 numbers, or Enter for defaults): ")
+
+	var stats model.Stats
+	if line == "" {
+		stats = defaults
+	} else {
+		parts := strings.Fields(line)
+		if len(parts) != 6 {
+			return model.Character{}, fmt.Errorf("expected 6 numbers, got %d", len(parts))
+		}
+		bonuses := make([]int, 6)
+		for i, p := range parts {
+			v, err := strconv.Atoi(p)
+			if err != nil {
+				return model.Character{}, fmt.Errorf("invalid number %q for %s", p, statNames[i])
+			}
+			if v < 0 {
+				return model.Character{}, fmt.Errorf("%s bonus cannot be negative", statNames[i])
+			}
+			bonuses[i] = v
+		}
+		stats = model.Stats{
+			STR: engine.BaseStatValue + bonuses[0],
+			DEX: engine.BaseStatValue + bonuses[1],
+			CON: engine.BaseStatValue + bonuses[2],
+			INT: engine.BaseStatValue + bonuses[3],
+			WIS: engine.BaseStatValue + bonuses[4],
+			CHA: engine.BaseStatValue + bonuses[5],
+		}
+	}
+
+	hero, err := engine.NewCharacter(name, class, &stats)
+	if err != nil {
+		return model.Character{}, err
+	}
+
+	fmt.Fprintln(out)
+	fmt.Fprintf(out, "Created %s the %s (STR %d, DEX %d, CON %d, INT %d, WIS %d, CHA %d)\n",
+		hero.Name, hero.Class,
+		hero.Stats.STR, hero.Stats.DEX, hero.Stats.CON,
+		hero.Stats.INT, hero.Stats.WIS, hero.Stats.CHA)
+	fmt.Fprintln(out)
+
+	return hero, nil
 }
