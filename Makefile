@@ -2,7 +2,8 @@
        check check-full build build-server build-client build-admin clean help \
        install uninstall man play play-unix \
        ollama-install ollama-start ollama-pull ollama-setup eval-slm \
-       eval-balance eval-balance-quick \
+       generate-dungeon validate-dungeon \
+       eval-balance eval-balance-quick eval-balance-generated eval-balance-unix \
        demo demo-solo demo-exploration demo-inventory \
        demo-combat demo-save-load demo-unix-catacombs
 
@@ -135,12 +136,28 @@ ollama-setup: ollama-pull                  ## Install ollama, start server, pull
 eval-slm: ollama-setup build              ## Run SLM accuracy eval (65+ inputs, needs ollama)
 	go run ./cmd/eval-slm --model $(SLM_MODEL)
 
+##@ Scenario Generation
+GENERATED_DIR = .tmp/generated-scenario
+TREE_SOURCE   = .tmp/dungeon-tree
+
+generate-dungeon: build-admin              ## Generate a scenario from .tmp/dungeon-tree/
+	./crypt-admin generate --topology tree --source $(TREE_SOURCE) --title "Generated Dungeon" --output $(GENERATED_DIR)/
+
+validate-dungeon: build-admin              ## Validate the generated scenario
+	./crypt-admin validate $(GENERATED_DIR)/
+
 ##@ Balance
-eval-balance:                              ## Run monkey balance eval (1000 sessions, all classes)
+eval-balance:                              ## Run monkey balance eval (1000 sessions, all classes, minimal)
 	CRYPT_SCENARIO_DIR=$(SCENARIO_DIR) go run ./cmd/eval-balance --scenario minimal --class all --players 1000 --max-moves 200
 
 eval-balance-quick:                        ## Quick balance check (100 sessions, fighter only)
 	CRYPT_SCENARIO_DIR=$(SCENARIO_DIR) go run ./cmd/eval-balance --scenario minimal --class fighter --players 100 --max-moves 50
+
+eval-balance-generated:                    ## Balance eval on generated scenario (200 sessions)
+	CRYPT_SCENARIO_DIR=.tmp go run ./cmd/eval-balance --scenario generated-scenario --class all --players 200 --max-moves 300
+
+eval-balance-unix:                         ## Balance eval on unix-catacombs (500 sessions)
+	CRYPT_SCENARIO_DIR=scenarios go run ./cmd/eval-balance --scenario unix-catacombs --class all --players 500 --max-moves 200
 
 ##@ Help
 help:                                      ## Show this help

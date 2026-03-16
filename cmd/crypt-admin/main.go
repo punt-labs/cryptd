@@ -2,8 +2,10 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/punt-labs/cryptd/internal/scenario"
 	"github.com/punt-labs/cryptd/internal/scengen"
@@ -125,15 +127,28 @@ func runGenerate(args []string) {
 		fmt.Fprintf(os.Stderr, "saved graph to %s\n", dbPath)
 	}
 
-	// Run visitors and export.
+	// Run visitors in order: description → enemies → items.
+	// ItemVisitor depends on EnemyVisitor (places potions near enemies).
 	content := scengen.NewScenarioContent()
 	content.Title = title
 	content.Death = "respawn"
-	visitor := &scengen.DescriptionVisitor{}
-	if err := visitor.Visit(g, content); err != nil {
-		fmt.Fprintf(os.Stderr, "error running visitor: %v\n", err)
-		os.Exit(1)
+	genSeed := time.Now().UnixNano()
+	rng := rand.New(rand.NewSource(genSeed))
+	fmt.Fprintf(os.Stderr, "  seed: %d\n", genSeed)
+	visitors := []scengen.Visitor{
+		&scengen.DescriptionVisitor{},
+		&scengen.EnemyVisitor{Rng: rng, SpawnRate: -1},
+		&scengen.ItemVisitor{Rng: rng, IncludeSpells: true},
 	}
+	for _, vis := range visitors {
+		if err := vis.Visit(g, content); err != nil {
+			fmt.Fprintf(os.Stderr, "error running visitor %s: %v\n", vis.Name(), err)
+			os.Exit(1)
+		}
+	}
+
+	fmt.Fprintf(os.Stderr, "  rooms: %d, enemies: %d rooms, total XP: %d, items: %d\n",
+		len(g.Nodes), scengen.EnemyCount(content), scengen.TotalXP(content), len(content.Items))
 
 	if err := scengen.WriteYAMLDir(g, content, output); err != nil {
 		fmt.Fprintf(os.Stderr, "error writing output: %v\n", err)
@@ -221,10 +236,17 @@ func runExport(args []string) {
 	if content.Death == "" {
 		content.Death = "respawn"
 	}
-	visitor := &scengen.DescriptionVisitor{}
-	if err := visitor.Visit(g, content); err != nil {
-		fmt.Fprintf(os.Stderr, "error running visitor: %v\n", err)
-		os.Exit(1)
+	exportRng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	visitors := []scengen.Visitor{
+		&scengen.DescriptionVisitor{},
+		&scengen.EnemyVisitor{Rng: exportRng, SpawnRate: -1},
+		&scengen.ItemVisitor{Rng: exportRng, IncludeSpells: true},
+	}
+	for _, vis := range visitors {
+		if err := vis.Visit(g, content); err != nil {
+			fmt.Fprintf(os.Stderr, "error running visitor %s: %v\n", vis.Name(), err)
+			os.Exit(1)
+		}
 	}
 
 	if err := scengen.WriteYAMLDir(g, content, output); err != nil {
