@@ -155,10 +155,10 @@ func runTestingMode(scenarioID, charName, charClass, scriptFile string, jsonMode
 		os.Exit(1)
 	}
 
-	interp := interpreter.NewRules()
-	narr := narrator.NewTemplate()
-
 	if scriptFile != "" {
+		// Scripted mode: deterministic rules+templates, no SLM.
+		interp := interpreter.NewRules()
+		narr := narrator.NewTemplate()
 		commands, err := readCommandFile(scriptFile)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error reading script: %v\n", err)
@@ -177,6 +177,8 @@ func runTestingMode(scenarioID, charName, charClass, scriptFile string, jsonMode
 			}
 		}
 	} else {
+		// Interactive mode: probe for SLM, fall back to rules+templates.
+		interp, narr := resolveInterpreterNarrator()
 		rend := renderer.NewCLI(os.Stdout, os.Stdin)
 		loop := game.NewLoop(eng, interp, narr, rend)
 		if err := loop.Run(context.Background(), &state); err != nil {
