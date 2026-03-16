@@ -642,6 +642,7 @@ func engineError(err error) *RPCError {
 	var notInInv *engine.ItemNotInInventoryError
 	var tooHeavy *engine.TooHeavyError
 	var notEquip *engine.NotEquippableError
+	var notConsumable *engine.NotConsumableError
 	var occupied *engine.SlotOccupiedError
 	var slotEmpty *engine.SlotEmptyError
 	var invalidTarget *engine.InvalidTargetError
@@ -672,6 +673,8 @@ func engineError(err error) *RPCError {
 	case errors.As(err, &tooHeavy):
 		return &RPCError{Code: CodeInvalidParams, Message: err.Error()}
 	case errors.As(err, &notEquip):
+		return &RPCError{Code: CodeInvalidParams, Message: err.Error()}
+	case errors.As(err, &notConsumable):
 		return &RPCError{Code: CodeInvalidParams, Message: err.Error()}
 	case errors.As(err, &occupied):
 		return &RPCError{Code: CodeInvalidParams, Message: err.Error()}

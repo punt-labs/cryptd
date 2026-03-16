@@ -256,6 +256,43 @@ func TestEquipAndUnequip(t *testing.T) {
 	assert.Equal(t, "weapon", unequipResult["slot"])
 }
 
+func TestUseItem(t *testing.T) {
+	srv := testServer(t)
+	reqs := []Request{
+		toolCall(1, "new_game", map[string]any{
+			"scenario_id": "minimal", "character_name": "Tester", "character_class": "fighter",
+		}),
+		toolCall(2, "pick_up", map[string]any{"item_id": "health_potion"}),
+		toolCall(3, "use_item", map[string]any{"item_id": "health_potion"}),
+	}
+	resps := multiRoundTrip(t, srv, reqs)
+	require.Len(t, resps, 3)
+
+	useResult := extractResult(t, resps[2])
+	assert.Equal(t, "heal", useResult["effect"])
+	assert.Equal(t, "Health Potion", useResult["item"])
+	power, ok := useResult["power"].(float64) // JSON numbers are float64
+	require.True(t, ok)
+	assert.GreaterOrEqual(t, power, 1.0)
+}
+
+func TestUseItem_NotConsumable(t *testing.T) {
+	srv := testServer(t)
+	reqs := []Request{
+		toolCall(1, "new_game", map[string]any{
+			"scenario_id": "minimal", "character_name": "Tester", "character_class": "fighter",
+		}),
+		toolCall(2, "pick_up", map[string]any{"item_id": "short_sword"}),
+		toolCall(3, "use_item", map[string]any{"item_id": "short_sword"}),
+	}
+	resps := multiRoundTrip(t, srv, reqs)
+	require.Len(t, resps, 3)
+
+	// In passthrough mode, engine errors are ToolResult with isError=true.
+	errText := extractToolError(t, resps[2])
+	assert.Contains(t, errText, "weapon")
+}
+
 func TestExamine(t *testing.T) {
 	srv := testServer(t)
 	reqs := []Request{

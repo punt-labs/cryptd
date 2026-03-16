@@ -75,7 +75,7 @@ func TestTreeSource_HubInsertion(t *testing.T) {
 		childCount[e.From]++
 	}
 	for id, count := range childCount {
-		assert.LessOrEqual(t, count, maxChildrenPerNode+1,
+		assert.LessOrEqual(t, count, maxChildrenPerNode,
 			"node %s has %d children after hub insertion", id, count)
 	}
 

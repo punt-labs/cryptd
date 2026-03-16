@@ -16,7 +16,7 @@ rooms:
       north:
         room: secret_room
         type: hidden
-    items: [short_sword]
+    items: [short_sword, health_potion]
   goblin_lair:
     name: "Goblin Lair"
     description_seed: "Damp and foul-smelling. Bones crunch underfoot."
@@ -80,6 +80,15 @@ items:
     type: key
     weight: 0.1
     value: 0
+
+  health_potion:
+    name: "Health Potion"
+    description: "A shimmering vial. Restores 2d6 hit points."
+    type: consumable
+    effect: heal
+    power: "2d6"
+    weight: 0.5
+    value: 15
 
   gold_coin:
     name: "Gold Coin"
