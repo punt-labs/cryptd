@@ -125,15 +125,24 @@ func runGenerate(args []string) {
 		fmt.Fprintf(os.Stderr, "saved graph to %s\n", dbPath)
 	}
 
-	// Run visitors and export.
+	// Run visitors: description → enemies → items.
 	content := scengen.NewScenarioContent()
 	content.Title = title
 	content.Death = "respawn"
-	visitor := &scengen.DescriptionVisitor{}
-	if err := visitor.Visit(g, content); err != nil {
-		fmt.Fprintf(os.Stderr, "error running visitor: %v\n", err)
-		os.Exit(1)
+	visitors := []scengen.Visitor{
+		&scengen.DescriptionVisitor{},
+		&scengen.EnemyVisitor{},
+		&scengen.ItemVisitor{IncludeSpells: true},
 	}
+	for _, vis := range visitors {
+		if err := vis.Visit(g, content); err != nil {
+			fmt.Fprintf(os.Stderr, "error running visitor %s: %v\n", vis.Name(), err)
+			os.Exit(1)
+		}
+	}
+
+	fmt.Fprintf(os.Stderr, "  rooms: %d, enemies: %d rooms, total XP: %d, items: %d\n",
+		len(g.Nodes), scengen.EnemyCount(content), scengen.TotalXP(content), len(content.Items))
 
 	if err := scengen.WriteYAMLDir(g, content, output); err != nil {
 		fmt.Fprintf(os.Stderr, "error writing output: %v\n", err)

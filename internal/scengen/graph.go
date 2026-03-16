@@ -156,6 +156,33 @@ func (g *Graph) Distance(id string) int {
 	return -1
 }
 
+// MaxDistance returns the maximum BFS depth from Start across all nodes.
+// Returns 0 if the graph has only the start node.
+func (g *Graph) MaxDistance() int {
+	adj := g.adjacencyMap()
+	visited := map[string]bool{g.Start: true}
+	queue := []string{g.Start}
+	depth := map[string]int{g.Start: 0}
+	maxD := 0
+
+	for len(queue) > 0 {
+		curr := queue[0]
+		queue = queue[1:]
+		for _, neighbor := range adj[curr] {
+			if visited[neighbor] {
+				continue
+			}
+			visited[neighbor] = true
+			depth[neighbor] = depth[curr] + 1
+			if depth[neighbor] > maxD {
+				maxD = depth[neighbor]
+			}
+			queue = append(queue, neighbor)
+		}
+	}
+	return maxD
+}
+
 // Validate checks graph invariants:
 //   - Start node exists in Nodes
 //   - Every edge references existing nodes
