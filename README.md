@@ -123,6 +123,8 @@ linked only into `crypt-admin` — never into `cryptd` or `crypt`.
 | `cmd/crypt-admin` | Author binary: `generate`, `validate`, `export` |
 | `cmd/dump-mcp-schema` | Generates MCP schema JSON for CI contract check |
 | `cmd/eval-slm` | SLM accuracy evaluation harness (65+ inputs, needs ollama) |
+| `cmd/eval-balance` | Monkey test harness for game balance tuning (parallel sessions, JSON reports) |
+| `internal/monkeytest` | MonkeyRenderer, SessionMetrics, AggregateReport, parallel runner |
 | `internal/daemon` | JSON-RPC 2.0 handler, tool dispatcher, Unix socket/TCP listener |
 | `internal/engine` | Deterministic game rules: movement, combat, inventory, spells, leveling, save/load |
 | `internal/game` | Game loop: drives engine + interpreter + narrator + renderer |
@@ -185,11 +187,14 @@ Schema contract: `testdata/mcp-schema.json` committed; CI diffs against
 
 | System | Implementation |
 |--------|---------------|
+| **Character Creation** | Point-buy stat allocation: 8 points across 6 stats (base 10 each). Interactive prompt in `-t` mode |
 | **Movement** | 6-direction compass (N/S/E/W/Up/Down), locked doors, hidden exits |
-| **Combat** | Turn-based: initiative rolls, attack/defend/flee/cast, enemy AI (aggressive/cautious/scripted), XP on kill |
-| **Inventory** | Pick up/drop/equip/unequip/examine, weight limit (50.0), equipment slots (weapon/armor/ring/amulet) |
+| **Combat** | Turn-based: initiative (DEX+1d20), attack/defend/flee/cast, enemy AI (aggressive/cautious/scripted), XP = enemy MaxHP |
+| **Armor** | Equipped armor reduces incoming damage by flat `defense` value (floor 1). Stacks with defend stance |
+| **Consumables** | `use` command consumes items with effect/power (e.g. health potions heal 2d6 HP) |
+| **Inventory** | Pick up/drop/equip/unequip/examine/use, weight limit (50.0), equipment slots (weapon/armor/ring/amulet) |
 | **Spells** | MP cost, class gates (mage/priest), damage and heal effects, dice-based power |
-| **Leveling** | Per-class XP tables (fighter cheapest → mage most expensive), max level 10, stat gains on level-up |
+| **Leveling** | Per-class XP tables (fighter cheapest → mage most expensive), max level 10, CON modifier scales HP/level, stat gains on level-up |
 | **Save/Load** | Named slots (default: `quicksave`), JSON with `schema_version`, forward compat |
 
 ## Building
@@ -240,6 +245,14 @@ make demo-unix-catacombs     # 9-room UNIX-themed dungeon crawl
 make demo-solo               # interactive solo mode (rules+templates)
 ```
 
+### Balance Testing
+
+```bash
+make eval-balance        # 1000 sessions, all classes, 200 max moves
+make eval-balance-quick  # 100 sessions, fighter only, 50 max moves
+eval-balance --scenario unix-catacombs --players 5000 --class all --workers 8
+```
+
 ### SLM Setup (optional)
 
 ```bash
@@ -257,7 +270,8 @@ roadmap.
 
 | File | Contents |
 |------|---------|
-| [DESIGN.md](DESIGN.md) | Authoritative decision log (DES-001–027) |
+| [DESIGN.md](DESIGN.md) | Authoritative decision log (DES-001–028) |
+| [docs/gameplay.pdf](docs/gameplay.pdf) | Gameplay mechanics specification: combat, leveling, items, balance |
 | [docs/build-plan.md](docs/build-plan.md) | 14-milestone roadmap with guiding principles and red lines |
 | [docs/architecture.pdf](docs/architecture.pdf) | Technical architecture specification (LaTeX) |
 | [docs/plan.md](docs/plan.md) | Architecture evolution plan: interfaces, engine, MCP tools |

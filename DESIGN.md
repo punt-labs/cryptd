@@ -1516,3 +1516,57 @@ server or client. SQLite was chosen over JSON/YAML for the working format becaus
 - `internal/scenariodir.Load()`: tries directory format first, falls back to single-file
 - `cmd/crypt-admin/`: generate, validate, export subcommands
 - `cryptd validate` prints deprecation warning
+
+## DES-028: Game Balance Mechanics — Armor, Consumables, Point-Buy, CON Scaling
+
+**Status:** SETTLED (2026-03-15)
+
+**Context:** Monkey testing (500 sessions on unix-catacombs) revealed 0% survival
+rate. Root causes: (1) no weapon available before first combat, (2) OOM Killer
+boss had 25 HP and 1d8+2 damage against a 20 HP hero, (3) armor items were
+cosmetic (no damage reduction), (4) no healing for non-caster classes, (5) all
+classes shared identical starting stats, and (6) CON had no mechanical effect.
+
+**Decision:** Implement four new engine mechanics and rebalance the scenario,
+validated by iterative monkey testing.
+
+### Changes
+
+| Mechanic | Implementation | Balance Impact |
+|----------|---------------|----------------|
+| Armor defense | `ScenarioItem.Defense` (flat int), subtracted from enemy damage after defend halving, floor 1 | Alias shield (defense 2) absorbs 1-2 damage/hit |
+| Consumable items | `use` verb, `UseItem()` engine method, `effect`/`power` fields | 3 health potions along critical path |
+| CON modifier | HP/level = base + floor((CON-10)/2), stats applied before HP calc | Fighters gain +1-2 HP/level as CON grows |
+| Point-buy stats | 8 points, base 10 each, `NewCharacter()` + `ValidateStats()` | Class-optimal builds equalize survival spread |
+
+### Alternatives Rejected
+
+| Alternative | Why Rejected |
+|-------------|-------------|
+| AC system (subtract from hit roll) | No hit/miss mechanic exists; would require accuracy rework |
+| Percentage damage reduction for armor | Flat subtraction is simpler and more predictable for balance tuning |
+| Random stat rolling (3d6 per stat) | Introduces uncontrolled variance; point-buy gives deterministic builds for testing |
+| Per-class starting stat distributions | Point-buy is strictly more flexible; defaults serve as class-appropriate presets |
+| MP regen per turn | Would make casters dominant; potions provide limited healing for all classes |
+
+### Balance Results (500 sessions, unix-catacombs)
+
+Before: 0% survival, 4.2 mean XP, 0% level-up rate, 15pp class spread.
+
+After: 65% survival, 27.7 mean XP, 66% level-up rate, 3pp class spread
+(fighter 63%, mage 66%, priest 66%, thief 65%).
+
+### Outcome
+
+- `internal/engine/combat.go`: `applyDefenses()` consolidates defend + armor
+- `internal/engine/engine.go`: `UseItem()`, `NotConsumableError`
+- `internal/engine/leveling.go`: `StatModifier()`, `NewCharacter()`,
+  `ValidateStats()`, `DefaultStats()`, CON scaling in `CheckLevelUp()`
+- `internal/interpreter/rules.go`: `use`/`drink`/`eat` verbs
+- `internal/narrator/template.go`: `used_item`, `not_consumable` templates
+- `internal/game/loop.go`: `use` action dispatch
+- `internal/model/game_state.go`: `Defense`, `Power`, `Effect` on `Item`
+- `internal/scenario/types.go`: same fields on `ScenarioItem`
+- `cmd/cryptd/serve.go`: interactive character creation prompt, SLM in `-t` mode
+- `cmd/eval-balance/main.go` + `internal/monkeytest/`: balance testing harness
+- `docs/gameplay.tex`: full mechanics specification
