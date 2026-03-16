@@ -250,5 +250,9 @@ func (s *Store) LoadGraph() (*Graph, error) {
 	if err := edgeRows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate edges: %w", err)
 	}
+
+	if err := g.Validate(); err != nil {
+		return nil, fmt.Errorf("loaded graph failed validation: %w", err)
+	}
 	return g, nil
 }

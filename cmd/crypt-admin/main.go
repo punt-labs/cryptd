@@ -232,5 +232,11 @@ func runExport(args []string) {
 		os.Exit(1)
 	}
 
+	// Self-validate the exported scenario (mirrors runGenerate).
+	if _, err := scenario.LoadDir(output); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: exported scenario failed self-validation: %v\n", err)
+		os.Exit(1)
+	}
+
 	fmt.Printf("exported %d rooms → %s\n", len(g.Nodes), output)
 }
