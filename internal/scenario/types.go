@@ -37,6 +37,9 @@ type ScenarioItem struct {
 	Name        string  `yaml:"name"`
 	Type        string  `yaml:"type"` // weapon|armor|ring|amulet|consumable|key|misc
 	Damage      string  `yaml:"damage,omitempty"`
+	Defense     int     `yaml:"defense,omitempty"` // flat damage reduction when equipped as armor
+	Power       string  `yaml:"power,omitempty"`   // dice notation for consumable effect (e.g. heal)
+	Effect      string  `yaml:"effect,omitempty"`  // consumable effect type: "heal"
 	Weight      float64 `yaml:"weight"`
 	Value       int     `yaml:"value"`
 	Description string  `yaml:"description,omitempty"`

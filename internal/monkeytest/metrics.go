@@ -29,6 +29,9 @@ type SessionMetrics struct {
 	FleeSuccesses int    `json:"flee_successes"`
 	SpellsCast    int    `json:"spells_cast"`
 	HealsCast     int    `json:"heals_cast"`
+	LeveledUp     bool   `json:"leveled_up"`
+	LevelsGained  int    `json:"levels_gained"`
+	PotionsUsed   int    `json:"potions_used"`
 }
 
 // RunConfig configures a batch of monkey test sessions.
@@ -68,6 +71,8 @@ type AggregateMetrics struct {
 	P95XP           int     `json:"p95_xp"`
 	P50Enemies      int     `json:"p50_enemies_killed"`
 	P95Enemies      int     `json:"p95_enemies_killed"`
+	LevelUpRate     float64 `json:"level_up_rate"`
+	MeanPotionsUsed float64 `json:"mean_potions_used"`
 }
 
 // Compute calculates aggregate metrics from a slice of session results.
@@ -78,17 +83,19 @@ func Compute(sessions []SessionMetrics) AggregateMetrics {
 	}
 
 	var (
-		survived    int
-		totalMoves  int
-		totalXP     int
-		totalRooms  int
-		totalKills  int
-		totalLevel  int
-		totalDDealt int
-		totalDTaken int
-		totalRounds int
+		survived      int
+		totalMoves    int
+		totalXP       int
+		totalRooms    int
+		totalKills    int
+		totalLevel    int
+		totalDDealt   int
+		totalDTaken   int
+		totalRounds   int
 		totalFAttempt int
 		totalFSuccess int
+		leveledUp     int
+		totalPotions  int
 	)
 
 	moves := make([]int, n)
@@ -109,6 +116,10 @@ func Compute(sessions []SessionMetrics) AggregateMetrics {
 		totalRounds += s.CombatRounds
 		totalFAttempt += s.FleeAttempts
 		totalFSuccess += s.FleeSuccesses
+		if s.LeveledUp {
+			leveledUp++
+		}
+		totalPotions += s.PotionsUsed
 
 		moves[i] = s.TotalMoves
 		xps[i] = s.XPGained
@@ -137,8 +148,10 @@ func Compute(sessions []SessionMetrics) AggregateMetrics {
 		P95Moves:       percentile(moves, 95),
 		P50XP:          percentile(xps, 50),
 		P95XP:          percentile(xps, 95),
-		P50Enemies:     percentile(kills, 50),
-		P95Enemies:     percentile(kills, 95),
+		P50Enemies:      percentile(kills, 50),
+		P95Enemies:      percentile(kills, 95),
+		LevelUpRate:     float64(leveledUp) / fn,
+		MeanPotionsUsed: float64(totalPotions) / fn,
 	}
 }
 

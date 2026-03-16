@@ -163,6 +163,19 @@ func (m *MonkeyRenderer) updateMetrics(state *model.GameState) {
 		}
 	}
 
+	// Potion/consumable tracking.
+	if len(m.lastCmd) > 4 && m.lastCmd[:4] == "use " {
+		if hero.HP > prevHero.HP || len(hero.Inventory) < len(prevHero.Inventory) {
+			m.metrics.PotionsUsed++
+		}
+	}
+
+	// Level tracking.
+	if hero.Level > prevHero.Level {
+		m.metrics.LeveledUp = true
+		m.metrics.LevelsGained += hero.Level - prevHero.Level
+	}
+
 	m.prev = copyState(state)
 }
 
@@ -171,11 +184,29 @@ func (m *MonkeyRenderer) chooseCommand(state *model.GameState) string {
 	hero := state.Party[0]
 	combat := state.Dungeon.Combat
 
-	// Priority: equip any unequipped weapon in inventory (always, not random).
-	if !combat.Active && hero.Equipped.Weapon == "" {
+	// Priority: equip any unequipped weapon or armor in inventory (always, not random).
+	if !combat.Active {
+		if hero.Equipped.Weapon == "" {
+			for _, item := range hero.Inventory {
+				if item.Type == "weapon" {
+					return "equip " + item.ID
+				}
+			}
+		}
+		if hero.Equipped.Armor == "" {
+			for _, item := range hero.Inventory {
+				if item.Type == "armor" {
+					return "equip " + item.ID
+				}
+			}
+		}
+	}
+
+	// Use health potion if low HP and have one.
+	if float64(hero.HP)/float64(hero.MaxHP) <= 0.5 {
 		for _, item := range hero.Inventory {
-			if item.Type == "weapon" {
-				return "equip " + item.ID
+			if item.Type == "consumable" && item.Effect == "heal" {
+				return "use " + item.ID
 			}
 		}
 	}

@@ -29,7 +29,7 @@ var longDirs = map[string]bool{
 // Used for edit-distance autocorrection of typos.
 var knownVerbs = []string{
 	"go", "look", "examine", "take", "get", "grab", "pick", "drop",
-	"equip", "wear", "wield", "unequip", "remove",
+	"equip", "wear", "wield", "unequip", "remove", "use", "drink", "eat",
 	"attack", "hit", "strike", "kill", "defend", "block", "guard",
 	"cast", "flee", "run", "escape", "inventory", "save", "load",
 	"help", "quit", "exit",
@@ -189,6 +189,11 @@ func (r *Rules) Interpret(_ context.Context, input string, _ model.GameState) (m
 	case "unequip", "remove":
 		if rest != "" {
 			return model.EngineAction{Type: "unequip", Target: rest}, nil
+		}
+
+	case "use", "drink", "eat":
+		if rest != "" {
+			return model.EngineAction{Type: "use", ItemID: rest}, nil
 		}
 
 	case "attack", "a", "hit", "strike", "kill":

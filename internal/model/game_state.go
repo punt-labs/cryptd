@@ -105,6 +105,9 @@ type Item struct {
 	Name        string  `json:"name"`
 	Type        string  `json:"type"` // weapon|armor|ring|amulet|consumable|key|misc
 	Damage      string  `json:"damage,omitempty"`
+	Defense     int     `json:"defense,omitempty"` // flat damage reduction when equipped as armor
+	Power       string  `json:"power,omitempty"`   // dice notation for consumable effect
+	Effect      string  `json:"effect,omitempty"`  // consumable effect type: "heal"
 	Weight      float64 `json:"weight"`
 	Value       int     `json:"value"`
 	Description string  `json:"description,omitempty"`

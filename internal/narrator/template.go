@@ -146,9 +146,22 @@ func (t *Template) Narrate(_ context.Context, event model.EngineEvent, _ model.G
 		level, _ := event.Details["level"].(int)
 		hpGain, _ := event.Details["hp_gain"].(int)
 		return fmt.Sprintf("You have reached level %d! (+%d HP)", level, hpGain), nil
+	case "used_item":
+		name, _ := event.Details["item_name"].(string)
+		effect, _ := event.Details["effect"].(string)
+		power, _ := event.Details["power"].(int)
+		hp, _ := event.Details["hero_hp"].(int)
+		switch effect {
+		case "heal":
+			return fmt.Sprintf("You use the %s and recover %d HP. (HP: %d)", name, power, hp), nil
+		default:
+			return fmt.Sprintf("You use the %s.", name), nil
+		}
+	case "not_consumable":
+		return "You can't use that item.", nil
 	case "help":
 		return "Commands: go <dir> (n/s/e/w/u/d), look (l), take <item>, drop <item>, " +
-			"equip <item>, unequip <slot>, examine <item> (x), inventory (i), " +
+			"equip <item>, unequip <slot>, use <item>, examine <item> (x), inventory (i), " +
 			"attack [target] (a), defend, flee, cast <spell> [at <target>], " +
 			"save [slot], load [slot], help (?), quit (q).", nil
 	case "quit":

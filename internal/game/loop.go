@@ -300,6 +300,26 @@ func (l *Loop) dispatch(ctx context.Context, state *model.GameState, action mode
 	case "cast":
 		return l.dispatchCast(ctx, state, action)
 
+	case "use":
+		result, err := l.eng.UseItem(state, action.ItemID)
+		if err != nil {
+			var notInInv *engine.ItemNotInInventoryError
+			var notConsumable *engine.NotConsumableError
+			switch {
+			case errors.As(err, &notInInv):
+				event = model.EngineEvent{Type: "not_in_inventory"}
+			case errors.As(err, &notConsumable):
+				event = model.EngineEvent{Type: "not_consumable"}
+			default:
+				return nil, "", err
+			}
+		} else {
+			event = model.EngineEvent{Type: "used_item", Details: map[string]any{
+				"item_name": result.Item.Name, "effect": result.Effect,
+				"power": result.Power, "hero_hp": result.HeroHP,
+			}}
+		}
+
 	case "save":
 		result, err := l.eng.SaveGame(state, action.Target)
 		if err != nil {
