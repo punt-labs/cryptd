@@ -151,7 +151,8 @@ func classStats(class string) *model.Stats {
 	case "thief":
 		return &model.Stats{STR: 12, DEX: 14, CON: 12, INT: 10, WIS: 10, CHA: 10}
 	default:
-		return nil // use defaults
+		s := engine.DefaultStats()
+		return &s
 	}
 }
 

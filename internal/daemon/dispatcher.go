@@ -52,6 +52,8 @@ func (s *Server) dispatch(name string, args json.RawMessage) (any, *RPCError) {
 		return s.dispatchFlee()
 	case "cast_spell":
 		return s.dispatchCastSpell(args)
+	case "use_item":
+		return s.dispatchUseItem(args)
 	case "save_game":
 		return s.dispatchSaveGame(args)
 	case "load_game":
@@ -454,6 +456,28 @@ func (s *Server) dispatchCastSpell(raw json.RawMessage) (any, *RPCError) {
 	}
 
 	return response, nil
+}
+
+// --- use_item ---
+
+func (s *Server) dispatchUseItem(raw json.RawMessage) (any, *RPCError) {
+	var a itemArgs
+	if err := json.Unmarshal(raw, &a); err != nil {
+		return nil, &RPCError{Code: CodeInvalidParams, Message: "invalid arguments: " + err.Error()}
+	}
+	if a.ItemID == "" {
+		return nil, &RPCError{Code: CodeInvalidParams, Message: "item_id is required"}
+	}
+	result, err := s.eng.UseItem(s.state, a.ItemID)
+	if err != nil {
+		return nil, engineError(err)
+	}
+	return map[string]any{
+		"item":    result.Item.Name,
+		"effect":  result.Effect,
+		"power":   result.Power,
+		"hero_hp": result.HeroHP,
+	}, nil
 }
 
 // --- save/load ---

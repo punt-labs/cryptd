@@ -567,15 +567,16 @@ func (e *Engine) UseItem(state *model.GameState, itemID string) (UseItemResult, 
 	var power int
 	switch item.Effect {
 	case "heal":
-		if item.Power != "" {
-			d, err := dice.Parse(item.Power)
-			if err != nil {
-				return UseItemResult{}, fmt.Errorf("invalid power dice %q: %w", item.Power, err)
-			}
-			power = d.Roll()
-			if power < 1 {
-				power = 1
-			}
+		if item.Power == "" {
+			return UseItemResult{}, fmt.Errorf("consumable %q has no power defined", item.ID)
+		}
+		d, err := dice.Parse(item.Power)
+		if err != nil {
+			return UseItemResult{}, fmt.Errorf("invalid power dice %q: %w", item.Power, err)
+		}
+		power = d.Roll()
+		if power < 1 {
+			power = 1
 		}
 		char.HP += power
 		if char.HP > char.MaxHP {
