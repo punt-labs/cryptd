@@ -1,0 +1,752 @@
+%
+% gameplay.tex
+%
+% Crypt: Gameplay Mechanics Specification
+% Defines all game rules as implemented in internal/engine/.
+%
+% Compile: pdflatex gameplay.tex
+%
+
+\documentclass[a4paper,10pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{longtable}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  framerule=0.3pt,
+  rulecolor=\color{gray!50},
+  backgroundcolor=\color{gray!5},
+  columns=fullflexible,
+}
+
+\newcommand{\dice}[1]{\texttt{#1}}
+\newcommand{\stat}[1]{\textsc{#1}}
+\newcommand{\cmd}[1]{\texttt{#1}}
+\newcommand{\field}[1]{\texttt{#1}}
+
+\begin{document}
+
+\title{Crypt: Gameplay Mechanics Specification}
+\author{Punt Labs}
+\date{March 2026 --- v1.0}
+\hypersetup{
+  pdftitle={Crypt: Gameplay Mechanics Specification},
+  pdfauthor={Punt Labs},
+  pdfsubject={Game Design},
+  pdfcreator={pdflatex}
+}
+\maketitle
+\tableofcontents
+\newpage
+
+% ===================================================================
+\section{Design Principles}
+% ===================================================================
+
+All game rules are implemented deterministically in \texttt{internal/engine/}.
+The engine is the single source of truth for state transitions. No game rule
+or state mutation is left to probabilistic LLM output (DES-009).
+
+\begin{itemize}[nosep]
+  \item All randomness uses dice notation: \dice{NdS} (roll $N$ dice with
+        $S$ sides) with optional modifiers \dice{NdS+M} or \dice{NdS-M}.
+  \item All damage floors at 1 --- no attack can deal 0 damage.
+  \item All HP caps at \field{MaxHP} --- healing cannot exceed the maximum.
+  \item The engine uses \texttt{math/rand} for all dice rolls. Seeding the
+        global RNG before a session produces a fully deterministic playthrough.
+\end{itemize}
+
+% ===================================================================
+\section{Character Model}
+% ===================================================================
+
+% -------------------------------------------------------------------
+\subsection{Attributes}
+% -------------------------------------------------------------------
+
+Every character has six attributes, inspired by Wizardry~I (DES-022).
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Attribute} & \textbf{Abbreviation} & \textbf{Default} & \textbf{Mechanical Effect} \\
+\midrule
+Strength     & \stat{STR} & 14 & None (reserved for damage bonus) \\
+Dexterity    & \stat{DEX} & 12 & Initiative roll, flee success rate \\
+Constitution & \stat{CON} & 12 & HP bonus per level: $(\stat{CON} - 10) / 2$ \\
+Intelligence & \stat{INT} & 10 & None (reserved for spell power) \\
+Wisdom       & \stat{WIS} & 10 & None (reserved for MP regen) \\
+Charisma     & \stat{CHA} & 10 & None (reserved for shop prices) \\
+\bottomrule
+\end{tabular}
+\caption{Character attributes. All characters start with identical values.
+         Only \stat{DEX} has a mechanical effect in the current implementation.}
+\label{tab:attributes}
+\end{table}
+
+% -------------------------------------------------------------------
+\subsection{Classes}
+% -------------------------------------------------------------------
+
+Four classes are available. All share the same starting attributes and HP
+(20). Classes differ in MP access, XP progression rate, and per-level gains.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lccccl@{}}
+\toprule
+\textbf{Class} & \textbf{Starting MP} & \textbf{HP/Level} & \textbf{MP/Level} & \textbf{Can Cast} & \textbf{Primary Stats} \\
+\midrule
+Fighter & 0  & +8 & +0 & No  & \stat{STR}, \stat{CON} \\
+Mage    & 10 & +4 & +4 & Yes & \stat{INT}, \stat{WIS} \\
+Priest  & 10 & +6 & +3 & Yes & \stat{WIS}, \stat{CHA} \\
+Thief   & 0  & +6 & +0 & No  & \stat{DEX}, \stat{CHA} \\
+\bottomrule
+\end{tabular}
+\caption{Class progression. Primary stats gain +1 per level-up.}
+\label{tab:classes}
+\end{table}
+
+% -------------------------------------------------------------------
+\subsection{Starting State}
+% -------------------------------------------------------------------
+
+All new characters begin with:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Field} & \textbf{Value} \\
+\midrule
+Level & 1 \\
+HP / MaxHP & 20 / 20 \\
+MP / MaxMP & 10 / 10 (mage, priest) or 0 / 0 (fighter, thief) \\
+Gold & 0 \\
+Inventory & Empty \\
+Equipment & All slots empty (weapon, armor, ring, amulet) \\
+Stats & \stat{STR}~14, \stat{DEX}~12, \stat{CON}~12, \stat{INT}~10, \stat{WIS}~10, \stat{CHA}~10 \\
+\bottomrule
+\end{tabular}
+\caption{Default character creation values. No point-buy or random rolling.}
+\end{table}
+
+% ===================================================================
+\section{Experience and Leveling}
+% ===================================================================
+
+% -------------------------------------------------------------------
+\subsection{XP Awards}
+% -------------------------------------------------------------------
+
+XP is awarded when an enemy is killed. The award equals the enemy's
+\field{MaxHP}, not its current HP at death.
+
+\[
+  \text{XP}_\text{award} = \text{enemy.MaxHP}
+\]
+
+XP is cumulative and never lost. Level-up checks occur after each combat
+victory (all enemies defeated). Multiple level-ups can occur in a single
+check if accumulated XP is sufficient.
+
+% -------------------------------------------------------------------
+\subsection{XP Thresholds}
+% -------------------------------------------------------------------
+
+Each class has a distinct XP table. Fighters level cheaply; mages require
+the most XP. Inspired by Wizardry~I's class-based progression rates.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}rrrrr@{}}
+\toprule
+\textbf{Level} & \textbf{Fighter} & \textbf{Thief} & \textbf{Priest} & \textbf{Mage} \\
+\midrule
+2  & 20    & 22    & 25    & 30    \\
+3  & 50    & 55    & 60    & 75    \\
+4  & 100   & 110   & 120   & 150   \\
+5  & 200   & 220   & 250   & 300   \\
+6  & 400   & 440   & 500   & 600   \\
+7  & 800   & 880   & 1000  & 1200  \\
+8  & 1600  & 1760  & 2000  & 2400  \\
+9  & 3200  & 3520  & 4000  & 4800  \\
+10 & 6400  & 7040  & 8000  & 9600  \\
+\bottomrule
+\end{tabular}
+\caption{Cumulative XP required to reach each level. Max level is 10.}
+\label{tab:xp}
+\end{table}
+
+% -------------------------------------------------------------------
+\subsection{Level-Up Effects}
+% -------------------------------------------------------------------
+
+On level-up, effects are applied in this order:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Stats:} +1 to each of the class's two primary stats
+        (see Table~\ref{tab:classes}). Applied first so the new \stat{CON}
+        value is used for the HP calculation.
+  \item \textbf{HP:} class base amount + \stat{CON} modifier, minimum 1:
+        \[
+          \text{HP gain} = \max\!\big(1,\; \text{hpPerLevel}[\text{class}] + \lfloor(\stat{CON} - 10) / 2\rfloor\big)
+        \]
+        Fighters (base 8, CON growth) gain 9--10+ HP at higher levels.
+        Mages (base 4, no CON growth) gain 4 HP throughout.
+  \item \textbf{MP:} class-specific amount added to both \field{MP} and
+        \field{MaxMP} (fighters and thieves gain 0).
+\end{enumerate}
+
+% ===================================================================
+\section{Combat}
+% ===================================================================
+
+Combat is turn-based and auto-starts when the hero enters a room containing
+enemies (unless the room has been cleared by a previous victory).
+
+% -------------------------------------------------------------------
+\subsection{Initiative}
+% -------------------------------------------------------------------
+
+At combat start, initiative determines turn order:
+
+\begin{align}
+  \text{Hero initiative}  &= \stat{DEX} + \dice{1d20} \\
+  \text{Enemy initiative} &= 10 + \dice{1d20} \quad \text{(per enemy)}
+\end{align}
+
+Turn order is sorted descending by initiative roll. Ties are broken in
+favor of the hero. Once set, turn order is fixed for the duration of
+combat. Dead enemies are skipped during turn processing.
+
+% -------------------------------------------------------------------
+\subsection{Hero Actions}
+% -------------------------------------------------------------------
+
+On the hero's turn, one of four actions may be taken:
+
+\subsubsection{Attack}
+
+The hero attacks a target enemy (defaults to the first alive enemy if no
+target is specified).
+
+\[
+  \text{damage} = \begin{cases}
+    \text{Roll}(\text{weapon.Damage}) & \text{if weapon equipped} \\
+    \dice{1d2} & \text{unarmed}
+  \end{cases}
+\]
+
+Damage is applied directly to the target's HP. Minimum damage is 1.
+If the target's HP drops to 0 or below, the target is killed and the hero
+is awarded XP equal to the target's \field{MaxHP}. If all enemies are dead,
+combat ends and the room is marked \field{Cleared}.
+
+\subsubsection{Defend}
+
+The hero assumes a defensive stance. Incoming damage from all enemies is
+halved (integer division, floor 1) until the hero's next turn. The
+\field{HeroDefending} flag is cleared when the hero's turn comes around
+again.
+
+\subsubsection{Flee}
+
+The hero attempts to escape combat.
+
+\[
+  \text{Roll } \dice{1d20}: \quad \text{success if roll} \leq \stat{DEX}
+\]
+
+With the default \stat{DEX} of 12, the base flee rate is $12/20 = 60\%$.
+Thieves gain +1 \stat{DEX} per level, improving their flee rate.
+
+\begin{itemize}[nosep]
+  \item \textbf{Success:} Combat ends. The room is \emph{not} marked cleared
+        --- enemies will attack again if the hero re-enters.
+  \item \textbf{Failure:} The hero loses their turn. Enemies still act.
+\end{itemize}
+
+\subsubsection{Cast Spell}
+
+See Section~\ref{sec:spells}.
+
+% -------------------------------------------------------------------
+\subsection{Enemy Actions}
+% -------------------------------------------------------------------
+
+After the hero acts, all enemies take their turns in initiative order
+before the hero acts again. Each enemy follows its AI pattern:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lp{9cm}@{}}
+\toprule
+\textbf{AI} & \textbf{Behavior} \\
+\midrule
+\texttt{aggressive} & Always attacks. \\
+\texttt{cautious}   & Attacks normally. Flees (removed from combat) when
+                       $\text{HP} \leq 30\%$ of \field{MaxHP}. Flee awards
+                       no XP. \\
+\texttt{scripted}    & Alias for aggressive. \\
+\bottomrule
+\end{tabular}
+\caption{Enemy AI patterns.}
+\end{table}
+
+Enemy attack damage:
+
+\[
+  \text{raw damage} = \text{Roll}(\text{enemy.Attack})
+\]
+
+Damage is then reduced by defenses (see Section~\ref{sec:armor}).
+
+% -------------------------------------------------------------------
+\subsection{Damage Reduction}
+\label{sec:armor}
+% -------------------------------------------------------------------
+
+When an enemy attacks the hero, raw damage is reduced by two mechanisms
+applied in order:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Defend stance:} If the hero is defending,
+        $\text{damage} = \lfloor \text{damage} / 2 \rfloor$.
+  \item \textbf{Armor defense:} If the hero has armor equipped with a
+        \field{defense} value $d > 0$, $\text{damage} = \text{damage} - d$.
+\end{enumerate}
+
+After both reductions, damage is floored at 1:
+
+\[
+  \text{final damage} = \max\!\big(1,\; \lfloor \text{raw} / k \rfloor - d\big)
+  \quad \text{where } k = \begin{cases} 2 & \text{defending} \\ 1 & \text{otherwise} \end{cases}
+\]
+
+% -------------------------------------------------------------------
+\subsection{Death}
+% -------------------------------------------------------------------
+
+When the hero's HP drops to 0 or below during enemy turns, the hero dies.
+The game loop terminates immediately after narrating the death event.
+The scenario's \field{death} field (\texttt{respawn} or \texttt{permadeath})
+determines whether the game can be reloaded, but the engine does not
+currently implement respawn mechanics.
+
+% -------------------------------------------------------------------
+\subsection{Room Clearing}
+% -------------------------------------------------------------------
+
+When all enemies in a room are killed (HP~$\leq 0$), the room's
+\field{Cleared} flag is set to \texttt{true}. A cleared room will not
+trigger combat on re-entry. Enemies that flee (cautious AI) are removed
+from combat; if all remaining enemies are dead or fled, the room is cleared
+and the hero is awarded XP for kills (not for fled enemies).
+
+% ===================================================================
+\section{Spells}
+\label{sec:spells}
+% ===================================================================
+
+Spells are defined in scenario YAML with five fields: \field{name},
+\field{mp} (cost), \field{effect} (\texttt{damage} or \texttt{heal}),
+\field{power} (dice notation), and \field{classes} (list of allowed classes).
+
+% -------------------------------------------------------------------
+\subsection{Casting Prerequisites}
+% -------------------------------------------------------------------
+
+A spell cast fails (and costs no MP) if any of the following are true:
+
+\begin{enumerate}[nosep]
+  \item The hero is dead (HP~$\leq 0$).
+  \item The spell ID does not exist in the scenario.
+  \item The hero's class is not in the spell's \field{classes} list.
+  \item The hero's MP is less than the spell's \field{mp} cost.
+  \item (Damage spells only) Combat is not active.
+  \item (Damage spells only) It is not the hero's turn.
+  \item (Damage spells only) The target is invalid (dead or nonexistent).
+\end{enumerate}
+
+MP is deducted \emph{after} the spell effect resolves, never on failure.
+
+% -------------------------------------------------------------------
+\subsection{Damage Spells}
+% -------------------------------------------------------------------
+
+Damage spells require active combat and a valid target. The spell's
+\field{power} is rolled as dice notation.
+
+\[
+  \text{spell damage} = \max(1,\; \text{Roll}(\text{spell.Power}))
+\]
+
+The damage is applied directly to the target's HP. If the target dies,
+XP is awarded (equal to target's \field{MaxHP}) and combat may end.
+Casting a damage spell consumes the hero's turn.
+
+% -------------------------------------------------------------------
+\subsection{Heal Spells}
+% -------------------------------------------------------------------
+
+Heal spells work both in and out of combat. When cast in combat, they
+consume the hero's turn. The spell's \field{power} is rolled as dice
+notation and added to the hero's HP, capped at \field{MaxHP}.
+
+\[
+  \text{hero.HP} = \min(\text{MaxHP},\; \text{hero.HP} + \max(1,\; \text{Roll}(\text{spell.Power})))
+\]
+
+% ===================================================================
+\section{Inventory and Equipment}
+% ===================================================================
+
+% -------------------------------------------------------------------
+\subsection{Item Types}
+% -------------------------------------------------------------------
+
+Items have a \field{type} field that determines how they can be used:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}llp{7cm}@{}}
+\toprule
+\textbf{Type} & \textbf{Slot} & \textbf{Behavior} \\
+\midrule
+\texttt{weapon}     & Weapon & Equipped to weapon slot. \field{damage} field used for attack rolls. \\
+\texttt{armor}      & Armor  & Equipped to armor slot. \field{defense} field reduces incoming damage. \\
+\texttt{ring}       & Ring   & Equipped to ring slot. No mechanical effect (reserved). \\
+\texttt{amulet}     & Amulet & Equipped to amulet slot. No mechanical effect (reserved). \\
+\texttt{consumable} & ---    & Used via \cmd{use} command. Consumed on use. \field{effect} and \field{power} determine the effect. \\
+\texttt{key}        & ---    & Carried in inventory. No use action (reserved for locked doors). \\
+\texttt{misc}       & ---    & Carried in inventory. No mechanical effect. \\
+\bottomrule
+\end{tabular}
+\caption{Item types and their equipment behavior.}
+\end{table}
+
+% -------------------------------------------------------------------
+\subsection{Weight Limit}
+% -------------------------------------------------------------------
+
+Every character has a carry weight limit of \textbf{50.0} units. Total
+weight includes both inventory items and equipped items. Picking up an
+item that would exceed the limit returns a \texttt{TooHeavyError}.
+
+% -------------------------------------------------------------------
+\subsection{Equipment Slots}
+% -------------------------------------------------------------------
+
+Four equipment slots exist: weapon, armor, ring, amulet. Each slot holds
+at most one item. Equipping an item removes it from inventory and places
+it in the slot. Unequipping moves it back to inventory. Attempting to equip
+into an occupied slot returns a \texttt{SlotOccupiedError}.
+
+% -------------------------------------------------------------------
+\subsection{Consumable Items}
+% -------------------------------------------------------------------
+
+Consumable items are used via the \cmd{use} command. On use, the item is
+removed from inventory and its effect is applied:
+
+\begin{itemize}[nosep]
+  \item \textbf{Heal:} Roll \field{power} dice, add to hero HP (capped
+        at \field{MaxHP}). Can be used in or out of combat.
+\end{itemize}
+
+Using a non-consumable item returns a \texttt{NotConsumableError}.
+Using consumables does not consume a combat turn (it is processed outside
+the combat turn system).
+
+% ===================================================================
+\section{Movement and Exploration}
+% ===================================================================
+
+% -------------------------------------------------------------------
+\subsection{Connections}
+% -------------------------------------------------------------------
+
+Rooms are connected by directional exits. Six directions are supported:
+north, south, east, west, up, down. Each connection has a type:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lp{8cm}@{}}
+\toprule
+\textbf{Type} & \textbf{Behavior} \\
+\midrule
+\texttt{open}     & Freely traversable. \\
+\texttt{locked}   & Returns \texttt{LockedError}. Cannot be traversed (key mechanics not yet implemented). \\
+\texttt{hidden}   & Invisible to the player. Not listed in exits. Returns \texttt{NoExitError} if attempted. \\
+\texttt{stairway} & Freely traversable (functionally identical to \texttt{open}). \\
+\bottomrule
+\end{tabular}
+\caption{Connection types.}
+\end{table}
+
+% -------------------------------------------------------------------
+\subsection{Room State}
+% -------------------------------------------------------------------
+
+Each room has mutable state tracking:
+
+\begin{itemize}[nosep]
+  \item \field{Cleared}: whether all enemies have been defeated.
+        A cleared room does not trigger combat on re-entry.
+  \item \field{Items}: list of item IDs currently in the room. Items can
+        be picked up (removed from room, added to inventory) or dropped
+        (added to room from inventory). Room items are seeded from the
+        scenario on \texttt{NewGame}.
+\end{itemize}
+
+% -------------------------------------------------------------------
+\subsection{Fog of War}
+% -------------------------------------------------------------------
+
+The \field{VisitedRooms} list tracks which rooms the hero has entered.
+Rooms not in this list are unvisited. The list grows monotonically ---
+rooms are never removed.
+
+% -------------------------------------------------------------------
+\subsection{Combat Auto-Start}
+% -------------------------------------------------------------------
+
+When the hero moves into a room that has enemies and is not cleared,
+\texttt{StartCombat} is called automatically after the move resolves.
+The hero sees the room description, then immediately enters combat.
+If enemies win initiative, they act before the hero.
+
+% ===================================================================
+\section{Commands}
+% ===================================================================
+
+The \texttt{RulesInterpreter} maps text input to engine actions. All
+commands are case-insensitive. Articles (\textit{the}, \textit{a},
+\textit{an}) are stripped. Multi-word targets are joined with underscores.
+Typos within edit distance~1 of known verbs are auto-corrected.
+
+\begin{longtable}{@{}llp{6cm}@{}}
+\toprule
+\textbf{Input} & \textbf{Aliases} & \textbf{Action} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Input} & \textbf{Aliases} & \textbf{Action} \\
+\midrule
+\endhead
+\cmd{north}, \cmd{south}, etc. & \cmd{n}, \cmd{s}, \cmd{e}, \cmd{w}, \cmd{u}, \cmd{d} & Move in direction \\
+\cmd{go <dir>}         & ---                        & Move in direction \\
+\cmd{ascend}           & ---                        & Move up \\
+\cmd{descend}          & ---                        & Move down \\
+\cmd{look}             & \cmd{l}                    & Describe current room \\
+\cmd{examine <item>}   & \cmd{x}                    & Inspect an item \\
+\cmd{look at <item>}   & ---                        & Alias for examine \\
+\cmd{take <item>}      & \cmd{get}, \cmd{grab}      & Pick up from room \\
+\cmd{pick up <item>}   & ---                        & Pick up from room \\
+\cmd{drop <item>}      & ---                        & Drop to room \\
+\cmd{equip <item>}     & \cmd{wear}, \cmd{wield}    & Equip from inventory \\
+\cmd{unequip <slot>}   & \cmd{remove}               & Unequip to inventory \\
+\cmd{use <item>}       & \cmd{drink}, \cmd{eat}     & Use consumable item \\
+\cmd{attack [target]}  & \cmd{a}, \cmd{hit}, \cmd{strike}, \cmd{kill} & Attack enemy (combat only) \\
+\cmd{defend}           & \cmd{block}, \cmd{guard}   & Defensive stance (combat only) \\
+\cmd{flee}             & \cmd{run}, \cmd{escape}    & Attempt to flee (combat only) \\
+\cmd{cast <spell>}     & ---                        & Cast a spell \\
+\cmd{cast <spell> at <target>} & ---                & Cast damage spell at target \\
+\cmd{inventory}        & \cmd{i}                    & List inventory and equipment \\
+\cmd{save [slot]}      & ---                        & Save game (default: quicksave) \\
+\cmd{load [slot]}      & ---                        & Load game (default: quicksave) \\
+\cmd{help}             & \cmd{?}                    & List available commands \\
+\cmd{quit}             & \cmd{exit}, \cmd{q}        & End the game \\
+\bottomrule
+\end{longtable}
+
+Actions blocked during combat: \cmd{move}, \cmd{take}, \cmd{drop},
+\cmd{equip}, \cmd{unequip}, \cmd{examine}. Attempting them returns an
+\texttt{in\_combat} event.
+
+% ===================================================================
+\section{Save and Load}
+% ===================================================================
+
+The game supports named save slots (default: \texttt{quicksave}). The
+full \texttt{GameState} is serialized to JSON with a \field{schema\_version}
+field. Unknown fields in save files are silently ignored for forward
+compatibility. Loading replaces the entire in-memory game state.
+
+Save files are stored in \texttt{.dungeon/saves/<slot>.json}.
+
+% ===================================================================
+\section{Scenario Format}
+% ===================================================================
+
+Scenarios are defined in YAML. Two formats are supported:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Single-file:} one \texttt{.yaml} file with all rooms,
+        items, enemies, and spells.
+  \item \textbf{Directory:} a directory containing \texttt{scenario.yaml}
+        (manifest with title, starting room, catalogs, and region list)
+        plus \texttt{regions/*.yaml} sub-files. Room IDs are globally
+        unique across regions.
+\end{enumerate}
+
+Scenario resolution (\texttt{scenariodir.Load}): tries directory format
+first (\texttt{id/scenario.yaml}), falls back to single-file
+(\texttt{id.yaml}).
+
+% -------------------------------------------------------------------
+\subsection{Scenario Fields}
+% -------------------------------------------------------------------
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}llp{7cm}@{}}
+\toprule
+\textbf{Field} & \textbf{Type} & \textbf{Description} \\
+\midrule
+\field{title}         & string & Display name \\
+\field{starting\_room} & string & Room ID where the adventure begins \\
+\field{death}         & string & \texttt{respawn} or \texttt{permadeath} \\
+\field{rooms}         & map    & Room definitions keyed by ID \\
+\field{items}         & map    & Item templates keyed by ID \\
+\field{enemies}       & map    & Enemy templates keyed by ID \\
+\field{spells}        & map    & Spell templates keyed by ID \\
+\bottomrule
+\end{tabular}
+\caption{Top-level scenario fields.}
+\end{table}
+
+% ===================================================================
+\section{Balance Tuning}
+% ===================================================================
+
+The \texttt{eval-balance} tool runs Monte Carlo simulations using a
+monkey-testing harness (\texttt{internal/monkeytest}). The monkey player
+makes weighted-random decisions based on game state:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+\textbf{State} & \textbf{Attack} & \textbf{Defend} & \textbf{Flee} & \textbf{Heal} \\
+\midrule
+Combat, HP $> 30\%$  & 70\% & 15\% & 10\% & 5\%\textsuperscript{*} \\
+Combat, HP $\leq 30\%$ & 20\% & 20\% & 40\% & 20\%\textsuperscript{*} \\
+\bottomrule
+\end{tabular}
+\caption{Combat action weights. \textsuperscript{*}Heal only available to
+         casters with sufficient MP; otherwise weight redistributed.}
+\end{table}
+
+Out of combat, the monkey auto-equips weapons and armor, uses health
+potions at $\leq 50\%$ HP, picks up items (60\%), moves randomly (30\%),
+or looks around (10\%).
+
+% -------------------------------------------------------------------
+\subsection{Key Metrics}
+% -------------------------------------------------------------------
+
+Per-session metrics collected:
+
+\begin{multicols}{2}
+\begin{itemize}[nosep]
+  \item Total moves
+  \item Rooms visited (unique)
+  \item Enemies killed
+  \item XP gained
+  \item Final level
+  \item Levels gained
+  \item Items picked up / equipped
+  \item Combat rounds fought
+  \item Damage dealt / taken
+  \item Survival (alive at end)
+  \item Flee attempts / successes
+  \item Spells cast / heals cast
+  \item Potions used
+\end{itemize}
+\end{multicols}
+
+Aggregate report includes: survival rate, mean/median/p95 for all metrics,
+level-up rate, per-class breakdowns. Output is JSON to stdout.
+
+% -------------------------------------------------------------------
+\subsection{Design Targets}
+% -------------------------------------------------------------------
+
+Target ranges for a well-balanced scenario:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lr@{}}
+\toprule
+\textbf{Metric} & \textbf{Target Range} \\
+\midrule
+Survival rate (all classes)          & 50--75\% \\
+Class survival spread (max -- min)   & $< 20$ percentage points \\
+Level-up rate                        & $> 50\%$ \\
+Mean enemies killed                  & $\geq 3$ \\
+Flee success rate                    & 55--70\% (consistent with \stat{DEX} 12) \\
+\bottomrule
+\end{tabular}
+\caption{Balance targets for monkey testing. A scenario that falls outside
+         these ranges needs tuning.}
+\end{table}
+
+% ===================================================================
+\section{Notation Reference}
+% ===================================================================
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lp{8cm}@{}}
+\toprule
+\textbf{Notation} & \textbf{Meaning} \\
+\midrule
+\dice{NdS}   & Roll $N$ dice, each with $S$ sides. Sum the results. \\
+\dice{NdS+M} & Roll $N$d$S$ and add modifier $M$. \\
+\dice{NdS-M} & Roll $N$d$S$ and subtract modifier $M$. \\
+\dice{1d20}  & Standard 20-sided die roll (range 1--20). \\
+\dice{1d2}   & Unarmed damage (range 1--2). \\
+\dice{1d6}   & Standard weapon damage (short sword). \\
+\dice{2d6}   & Spell damage (fireball). \\
+\dice{1d6+2} & Spell heal (heal spell). \\
+\bottomrule
+\end{tabular}
+\caption{Dice notation used throughout the engine.}
+\end{table}
+
+% ===================================================================
+\section{Unimplemented Mechanics}
+\label{sec:unimplemented}
+% ===================================================================
+
+The following mechanics are defined in the data model but have no
+engine implementation:
+
+\begin{enumerate}[nosep]
+  \item \stat{STR} modifier to melee damage (stored, leveled, not used).
+  \item \stat{INT} modifier to spell power (stored, leveled, not used).
+  \item \stat{WIS} modifier to MP regen or spell accuracy.
+  \item \stat{CHA} modifier to shop prices or NPC interactions.
+  \item Per-class starting stat distributions (all classes share identical
+        starting stats).
+  \item Key items unlocking locked doors.
+  \item Respawn mechanics (the \field{death} field is parsed but not acted on).
+  \item Ring and amulet mechanical effects.
+  \item Accuracy / miss chance (all attacks hit).
+  \item Critical hits.
+  \item Status conditions (\field{Conditions} field exists on
+        \texttt{Character} and \texttt{EnemyInstance} but is never read).
+\end{enumerate}
+
+\end{document}

@@ -91,8 +91,18 @@ func (e *Engine) CheckLevelUp(state *model.GameState) LevelUpResult {
 		result.Leveled = true
 		result.NewLevel = nextLevel
 
-		// HP gain.
-		hp := hpPerLevel[h.Class]
+		// Stat gain: +1 to each primary stat for the class.
+		// Applied before HP so the CON modifier reflects the new value.
+		for _, stat := range primaryStats[h.Class] {
+			addStat(&h.Stats, stat, 1)
+			result.StatGain[stat]++
+		}
+
+		// HP gain: base class amount + CON modifier.
+		hp := hpPerLevel[h.Class] + StatModifier(h.Stats.CON)
+		if hp < 1 {
+			hp = 1 // always gain at least 1 HP
+		}
 		h.MaxHP += hp
 		h.HP += hp
 		result.HPGain += hp
@@ -104,15 +114,16 @@ func (e *Engine) CheckLevelUp(state *model.GameState) LevelUpResult {
 			h.MP += mp
 			result.MPGain += mp
 		}
-
-		// Stat gain: +1 to each primary stat for the class.
-		for _, stat := range primaryStats[h.Class] {
-			addStat(&h.Stats, stat, 1)
-			result.StatGain[stat]++
-		}
 	}
 
 	return result
+}
+
+// StatModifier returns the ability modifier for a given stat value.
+// Formula: (stat - 10) / 2, rounded down (integer division truncates toward zero).
+// Examples: CON 10 → +0, CON 12 → +1, CON 14 → +2, CON 8 → -1.
+func StatModifier(stat int) int {
+	return (stat - 10) / 2
 }
 
 // addStat increments the named stat by delta.
