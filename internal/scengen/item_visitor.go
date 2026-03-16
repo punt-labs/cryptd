@@ -3,6 +3,7 @@ package scengen
 import (
 	"fmt"
 	"math/rand"
+	"sort"
 
 	"github.com/punt-labs/cryptd/internal/scenario"
 )
@@ -124,7 +125,7 @@ func (v *ItemVisitor) Visit(g *Graph, content *ScenarioContent) error {
 
 	maxDist := g.MaxDistance()
 
-	// Classify nodes by distance tier.
+	// Classify nodes by distance tier, sorted for deterministic output.
 	type nodeInfo struct {
 		id       string
 		distance int
@@ -134,6 +135,9 @@ func (v *ItemVisitor) Visit(g *Graph, content *ScenarioContent) error {
 	var nodes []nodeInfo
 	for id, node := range g.Nodes {
 		dist := g.Distance(id)
+		if dist < 0 {
+			continue // skip unreachable nodes
+		}
 		isHub := node.Meta != nil && node.Meta["hub"] == "true"
 		nodes = append(nodes, nodeInfo{
 			id:       id,
@@ -142,6 +146,12 @@ func (v *ItemVisitor) Visit(g *Graph, content *ScenarioContent) error {
 			isHub:    isHub,
 		})
 	}
+	sort.Slice(nodes, func(i, j int) bool {
+		if nodes[i].distance != nodes[j].distance {
+			return nodes[i].distance < nodes[j].distance
+		}
+		return nodes[i].id < nodes[j].id
+	})
 
 	// Place starter weapon in the first non-start room (distance 1).
 	starterPlaced := false

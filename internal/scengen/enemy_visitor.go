@@ -34,7 +34,8 @@ type EnemyVisitor struct {
 	Tiers []EnemyTier
 	Rng   *rand.Rand // if nil, uses default source
 	// SpawnRate is the probability (0.0-1.0) that a non-start, non-hub
-	// room gets an enemy. Default: 0.6.
+	// room gets an enemy. Negative means use default (0.4). Zero means
+	// no enemies (catalog still registered).
 	SpawnRate float64
 }
 
@@ -46,8 +47,8 @@ func (v *EnemyVisitor) Visit(g *Graph, content *ScenarioContent) error {
 		tiers = DefaultEnemyTiers()
 	}
 	spawnRate := v.SpawnRate
-	if spawnRate <= 0 {
-		spawnRate = 0.4 // 40% of non-start, non-hub rooms get enemies
+	if spawnRate < 0 {
+		spawnRate = 0.4 // default: 40% of non-start, non-hub rooms get enemies
 	}
 
 	// Register all enemy templates in the content catalog.
@@ -68,8 +69,8 @@ func (v *EnemyVisitor) Visit(g *Graph, content *ScenarioContent) error {
 	for id, node := range g.Nodes {
 		dist := g.Distance(id)
 
-		// Skip start room and hub corridors.
-		if dist == 0 {
+		// Skip start room, unreachable nodes, and hub corridors.
+		if dist <= 0 {
 			continue
 		}
 		if node.Meta != nil && node.Meta["hub"] == "true" {

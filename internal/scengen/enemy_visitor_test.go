@@ -90,6 +90,28 @@ func TestEnemyVisitor_DifficultyScales(t *testing.T) {
 	}
 }
 
+func TestEnemyVisitor_UnreachableNode(t *testing.T) {
+	// Graph with an unreachable node — visitor must not panic.
+	g := NewGraph("a")
+	require.NoError(t, g.AddNode("a", nil))
+	require.NoError(t, g.AddNode("b", nil))
+	require.NoError(t, g.AddNode("island", nil)) // unreachable
+	require.NoError(t, g.AddEdge("a", "b", North, "open"))
+
+	content := NewScenarioContent()
+	v := &EnemyVisitor{
+		Rng:       rand.New(rand.NewSource(42)),
+		SpawnRate: 1.0,
+	}
+	// Should not panic on island node with Distance() == -1.
+	require.NoError(t, v.Visit(g, content))
+
+	// Island should have no enemies.
+	if rc, ok := content.Rooms["island"]; ok {
+		assert.Empty(t, rc.Enemies, "unreachable node should have no enemies")
+	}
+}
+
 func TestEnemyVisitor_SpawnRateZero(t *testing.T) {
 	g := makeLinearGraph(t, 5)
 
