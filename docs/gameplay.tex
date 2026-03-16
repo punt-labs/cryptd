@@ -181,6 +181,13 @@ Stat validation is enforced by \texttt{engine.ValidateStats()} and
 \texttt{engine.NewCharacter()}. The daemon's \texttt{new\_game} RPC
 accepts an optional \texttt{stats} field; if omitted, defaults are used.
 
+In interactive mode (\cmd{cryptd serve -t}), a character creation prompt
+asks for name, class, and stat allocation before the game begins. The
+player enters 6 numbers representing points to add to each stat (e.g.\
+\texttt{4 0 2 0 2 0} for STR~14, CON~12, DEX~12). Pressing Enter without
+input uses the defaults. Scripted mode (\cmd{--script}) skips the prompt
+and uses defaults or CLI flags.
+
 % -------------------------------------------------------------------
 \subsection{Starting State}
 % -------------------------------------------------------------------
