@@ -114,14 +114,9 @@ func runSession(s *scenario.Scenario, class string, seed int64, maxMoves int) (S
 	// selection uses a per-session *rand.Rand for reproducible strategy.
 	// Use --workers 1 for fully deterministic sessions.
 
-	hero := model.Character{
-		ID: "hero", Name: "Monkey", Class: class,
-		Level: 1, HP: 20, MaxHP: 20,
-		Stats: model.Stats{STR: 14, DEX: 12, CON: 12, INT: 10, WIS: 10, CHA: 10},
-	}
-	if class == "mage" || class == "priest" {
-		hero.MP = 10
-		hero.MaxMP = 10
+	hero, err := engine.NewCharacter("Monkey", class, classStats(class))
+	if err != nil {
+		return SessionMetrics{}, fmt.Errorf("create character: %w", err)
 	}
 
 	eng := engine.New(s)
@@ -141,6 +136,23 @@ func runSession(s *scenario.Scenario, class string, seed int64, maxMoves int) (S
 	}
 
 	return monkey.Metrics(), nil
+}
+
+// classStats returns a class-optimal stat allocation for the monkey tester.
+// Each uses the same 8-point pool but distributes to class primary stats.
+func classStats(class string) *model.Stats {
+	switch class {
+	case "fighter":
+		return &model.Stats{STR: 14, DEX: 10, CON: 14, INT: 10, WIS: 10, CHA: 10}
+	case "mage":
+		return &model.Stats{STR: 10, DEX: 12, CON: 10, INT: 14, WIS: 12, CHA: 10}
+	case "priest":
+		return &model.Stats{STR: 10, DEX: 12, CON: 12, INT: 10, WIS: 14, CHA: 10}
+	case "thief":
+		return &model.Stats{STR: 12, DEX: 14, CON: 12, INT: 10, WIS: 10, CHA: 10}
+	default:
+		return nil // use defaults
+	}
 }
 
 // loadScenario loads a scenario from a directory, trying directory format first.

@@ -15,7 +15,6 @@ import (
 	"github.com/punt-labs/cryptd/internal/game"
 	"github.com/punt-labs/cryptd/internal/inference"
 	"github.com/punt-labs/cryptd/internal/interpreter"
-	"github.com/punt-labs/cryptd/internal/model"
 	"github.com/punt-labs/cryptd/internal/narrator"
 	"github.com/punt-labs/cryptd/internal/renderer"
 	"github.com/punt-labs/cryptd/internal/scenariodir"
@@ -128,14 +127,10 @@ func runTestingMode(scenarioID, charName, charClass, scriptFile string, jsonMode
 		os.Exit(1)
 	}
 
-	hero := model.Character{
-		ID: "hero", Name: charName, Class: charClass,
-		Level: 1, HP: 20, MaxHP: 20,
-		Stats: model.Stats{STR: 14, DEX: 12, CON: 12, INT: 10, WIS: 10, CHA: 10},
-	}
-	if charClass == "mage" || charClass == "priest" {
-		hero.MP = 10
-		hero.MaxMP = 10
+	hero, err := engine.NewCharacter(charName, charClass, nil)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error creating character: %v\n", err)
+		os.Exit(1)
 	}
 
 	eng := engine.New(s)

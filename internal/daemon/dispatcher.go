@@ -64,9 +64,10 @@ func (s *Server) dispatch(name string, args json.RawMessage) (any, *RPCError) {
 // --- new_game ---
 
 type newGameArgs struct {
-	ScenarioID     string `json:"scenario_id"`
-	CharacterName  string `json:"character_name"`
-	CharacterClass string `json:"character_class"`
+	ScenarioID     string       `json:"scenario_id"`
+	CharacterName  string       `json:"character_name"`
+	CharacterClass string       `json:"character_class"`
+	Stats          *model.Stats `json:"stats,omitempty"`
 }
 
 func (s *Server) dispatchNewGame(raw json.RawMessage) (any, *RPCError) {
@@ -77,26 +78,18 @@ func (s *Server) dispatchNewGame(raw json.RawMessage) (any, *RPCError) {
 	if a.ScenarioID == "" || a.CharacterName == "" || a.CharacterClass == "" {
 		return nil, &RPCError{Code: CodeInvalidParams, Message: "scenario_id, character_name, and character_class are required"}
 	}
-	validClasses := map[string]bool{"fighter": true, "mage": true, "priest": true, "thief": true}
-	if !validClasses[a.CharacterClass] {
-		return nil, &RPCError{Code: CodeInvalidParams, Message: "character_class must be one of: fighter, mage, priest, thief"}
-	}
 
 	sc, err := scenariodir.Load(s.scenarioDir, a.ScenarioID)
 	if err != nil {
 		return nil, &RPCError{Code: CodeInvalidParams, Message: err.Error()}
 	}
 
+	hero, err := engine.NewCharacter(a.CharacterName, a.CharacterClass, a.Stats)
+	if err != nil {
+		return nil, &RPCError{Code: CodeInvalidParams, Message: err.Error()}
+	}
+
 	eng := engine.New(sc)
-	hero := model.Character{
-		ID: "hero", Name: a.CharacterName, Class: a.CharacterClass,
-		Level: 1, HP: 20, MaxHP: 20,
-		Stats: model.Stats{STR: 14, DEX: 12, CON: 12, INT: 10, WIS: 10, CHA: 10},
-	}
-	if a.CharacterClass == "mage" || a.CharacterClass == "priest" {
-		hero.MP = 10
-		hero.MaxMP = 10
-	}
 
 	state, err := eng.NewGame(hero)
 	if err != nil {

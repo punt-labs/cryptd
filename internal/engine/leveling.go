@@ -1,6 +1,97 @@
 package engine
 
-import "github.com/punt-labs/cryptd/internal/model"
+import (
+	"fmt"
+
+	"github.com/punt-labs/cryptd/internal/model"
+)
+
+// BaseStatValue is the starting value for each attribute before point-buy.
+const BaseStatValue = 10
+
+// PointBuyPool is the total number of points a player can distribute.
+const PointBuyPool = 8
+
+// ValidClasses lists the four playable classes.
+var ValidClasses = map[string]bool{
+	"fighter": true, "mage": true, "priest": true, "thief": true,
+}
+
+// InvalidStatsError is returned when stat allocation violates constraints.
+type InvalidStatsError struct {
+	Reason string
+}
+
+func (e *InvalidStatsError) Error() string {
+	return fmt.Sprintf("invalid stats: %s", e.Reason)
+}
+
+// NewCharacter creates a level-1 character with validated point-buy stats.
+// If stats is nil, default allocation is used (STR 14, DEX 12, CON 12, others 10).
+// Stats must each be >= BaseStatValue and the total points above base must equal PointBuyPool.
+func NewCharacter(name, class string, stats *model.Stats) (model.Character, error) {
+	if !ValidClasses[class] {
+		return model.Character{}, &InvalidStatsError{
+			Reason: fmt.Sprintf("unknown class %q; must be fighter, mage, priest, or thief", class),
+		}
+	}
+
+	var s model.Stats
+	if stats != nil {
+		s = *stats
+	} else {
+		s = DefaultStats()
+	}
+
+	if err := ValidateStats(s); err != nil {
+		return model.Character{}, err
+	}
+
+	hero := model.Character{
+		ID: "hero", Name: name, Class: class,
+		Level: 1, HP: 20, MaxHP: 20,
+		Stats: s,
+	}
+	if class == "mage" || class == "priest" {
+		hero.MP = 10
+		hero.MaxMP = 10
+	}
+	return hero, nil
+}
+
+// DefaultStats returns the default stat allocation: STR 14, DEX 12, CON 12, rest 10.
+func DefaultStats() model.Stats {
+	return model.Stats{STR: 14, DEX: 12, CON: 12, INT: 10, WIS: 10, CHA: 10}
+}
+
+// ValidateStats checks that all stats are >= BaseStatValue and the total
+// points allocated above base equals PointBuyPool.
+func ValidateStats(s model.Stats) error {
+	stats := []struct {
+		name  string
+		value int
+	}{
+		{"STR", s.STR}, {"DEX", s.DEX}, {"CON", s.CON},
+		{"INT", s.INT}, {"WIS", s.WIS}, {"CHA", s.CHA},
+	}
+
+	total := 0
+	for _, st := range stats {
+		if st.value < BaseStatValue {
+			return &InvalidStatsError{
+				Reason: fmt.Sprintf("%s is %d, minimum is %d", st.name, st.value, BaseStatValue),
+			}
+		}
+		total += st.value - BaseStatValue
+	}
+
+	if total != PointBuyPool {
+		return &InvalidStatsError{
+			Reason: fmt.Sprintf("allocated %d points, must be exactly %d", total, PointBuyPool),
+		}
+	}
+	return nil
+}
 
 // LevelUpResult holds the outcome of a level-up check.
 type LevelUpResult struct {
