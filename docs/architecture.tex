@@ -38,11 +38,11 @@
 
 \begin{document}
 
-\title{Dungeon: Technical Architecture Specification}
+\title{Crypt: Technical Architecture Specification}
 \author{LLM-Directed Text Adventure with Go Game Engine}
-\date{March 2026 --- v0.2 (design-stage)}
+\date{March 2026 --- v0.3}
 \hypersetup{
-  pdftitle={Dungeon: Technical Architecture Specification},
+  pdftitle={Crypt: Technical Architecture Specification},
   pdfauthor={Punt Labs},
   pdfsubject={Architecture},
   pdfcreator={pdflatex}
@@ -56,7 +56,7 @@
 \section{Overview}
 % ===================================================================
 
-Dungeon is a text adventure game for Claude Code.  In its current
+Crypt is a text adventure game for Claude Code.  In its current
 form the entire engine --- parser, rules, narrator, state machine ---
 is a single LLM skill prompt.  This specification describes the
 evolved architecture: a deterministic Go game engine that handles
@@ -69,6 +69,15 @@ A play mode is a named combination of three swappable Go interfaces:
 All modes share the same engine, the same save files, and the same
 scenario format.  Switching modes mid-adventure --- save in
 \mode{dm}, resume in \mode{solo} --- is explicitly supported.
+
+\paragraph{Note on companion documents.}
+Three binaries now exist: \cmd{cryptd} (server), \cmd{crypt} (client),
+and \cmd{crypt-admin} (scenario authoring).  The authoritative reference
+for implemented game mechanics (combat formulas, damage reduction, leveling
+tables, point-buy stats, consumables) is \texttt{docs/gameplay.tex}.
+This architecture document describes the system-level design; some
+mechanics sections below reflect design-stage aspirations that differ
+from the current implementation.
 
 \subsection{Mechanics Reference}
 
@@ -189,26 +198,42 @@ Game engine
 \iface{Renderer}
   & Go interface
   & Presents game state to the player (Lux HUD or ANSI CLI). \\
-MCP server
-  & Go binary (\cmd{crypt serve})
-  & Exposes game engine as MCP tools; NDJSON over Unix socket in
-    daemon mode; stdio in embedded mode. \\
+\cmd{cryptd} server
+  & Go binary
+  & JSON-RPC 2.0 daemon; exposes 15 MCP tools over Unix socket or TCP.
+    Normal mode (SLM narrator) and passthrough mode (raw MCP). \\
+\cmd{crypt} client
+  & Go binary
+  & Thin CLI client; connects to \cmd{cryptd serve}, sends text, displays
+    game with readline and HP/MP bars. Auto-starts server. \\
+\cmd{crypt-admin}
+  & Go binary
+  & Scenario authoring; graph-first generation, validation, SQLite
+    working format, YAML directory export (DES-027). \\
+\cmd{eval-balance}
+  & Go binary
+  & Monkey test harness; parallel game sessions with weighted-random
+    actions, JSON aggregate reports for balance tuning. \\
+\pkg{internal/monkeytest}
+  & Go package
+  & \texttt{MonkeyRenderer}, \texttt{SessionMetrics}, parallel runner.
+    Plugs into the game loop via the Renderer interface. \\
+\pkg{internal/scengen}
+  & Go package
+  & Graph types, topology sources, visitors, YAML exporter, SQLite store.
+    Used by \cmd{crypt-admin}; SQLite not linked into server or client. \\
 SKILL.md
   & Prompt (L4)
   & DM role instructions for Claude; narration, scenario generation,
     lore, examination responses. \\
-mcp-proxy
-  & Go shim (design-stage)
-  & Bridges Claude Code stdio MCP to shared daemon; injects session
-    identity; enables multi-player push. \\
 Lux
   & Python / ImGui
   & Native display surface; receives element trees from
     \texttt{LuxRenderer} via MCP tools. \\
 ollama
   & External service
-  & Serves SLM for \texttt{SLMInterpreter} and \texttt{SLMNarrator}
-    in \mode{solo}/\mode{headless} modes. \\
+  & Serves SLM for \texttt{SLMInterpreter} and \texttt{SLMNarrator}.
+    Auto-detected in interactive \cmd{-t} mode; not required for CI. \\
 \bottomrule
 \end{tabular}
 \end{center}
