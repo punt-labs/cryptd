@@ -140,6 +140,7 @@ func (r *FrameReader) Drain() ([]map[string]any, error) {
 			return msgs, nil
 		}
 		if err != nil {
+			r.buf = rest // advance past corrupt frame
 			return msgs, err
 		}
 		msgs = append(msgs, msg)

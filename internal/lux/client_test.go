@@ -20,7 +20,6 @@ type miniServer struct {
 	listener net.Listener
 	sockPath string
 	conn     net.Conn
-	done     chan struct{}
 }
 
 func newMiniServer(t *testing.T) *miniServer {
@@ -38,7 +37,6 @@ func newMiniServer(t *testing.T) *miniServer {
 		t:        t,
 		listener: ln,
 		sockPath: sock,
-		done:     make(chan struct{}),
 	}
 }
 

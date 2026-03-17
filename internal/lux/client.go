@@ -19,6 +19,11 @@ var ErrAckTimeout = errors.New("ack timeout")
 // After Connect(), a background reader goroutine demultiplexes incoming
 // messages: AckMessages go to an internal ack channel, InteractionMessages
 // go to an interaction channel, and everything else is discarded.
+//
+// Show and Update are not safe for concurrent use — the game loop calls
+// them sequentially. If concurrent callers are needed, ack routing must
+// be redesigned to correlate acks with requests (per-call channels or
+// request IDs).
 type Client struct {
 	socketPath     string
 	name           string
@@ -28,7 +33,6 @@ type Client struct {
 	mu           sync.Mutex
 	conn         net.Conn
 	ready        *ReadyMessage
-	closed       bool
 	acks         chan *AckMessage
 	interactions chan *InteractionMessage
 	readerDone   chan struct{}
@@ -58,11 +62,17 @@ func WithRecvTimeout(d time.Duration) Option {
 	return func(c *Client) { c.recvTimeout = d }
 }
 
-// NewClient creates a Client with the given options.
+// NewClient creates a Client with the given options. Channels are
+// initialized eagerly so Interactions() is safe to select on before
+// Connect() is called (the channel is simply empty until the reader
+// goroutine starts).
 func NewClient(opts ...Option) *Client {
 	c := &Client{
 		connectTimeout: 5 * time.Second,
 		recvTimeout:    5 * time.Second,
+		acks:           make(chan *AckMessage, 16),
+		interactions:   make(chan *InteractionMessage, 64),
+		readerDone:     make(chan struct{}),
 	}
 	for _, o := range opts {
 		o(c)
@@ -118,9 +128,6 @@ func (c *Client) Connect() error {
 	c.mu.Lock()
 	c.conn = conn
 	c.ready = readyMsg
-	c.acks = make(chan *AckMessage, 16)
-	c.interactions = make(chan *InteractionMessage, 64)
-	c.readerDone = make(chan struct{})
 	c.readerErr = nil
 	c.mu.Unlock()
 
@@ -204,15 +211,19 @@ func (c *Client) readLoop() {
 			parsed := ParseInbound(raw)
 			switch msg := parsed.(type) {
 			case *AckMessage:
-				// Block until consumed — never drop acks.
-				c.acks <- msg
+				select {
+				case c.acks <- msg:
+				default:
+					// Ack channel full — drain oldest to prevent readLoop
+					// deadlock when a waitAck caller has timed out.
+					<-c.acks
+					c.acks <- msg
+				}
 			case *InteractionMessage:
 				select {
 				case c.interactions <- msg:
 				default:
 					// Interaction channel full — drop oldest to make room.
-					// This is less dangerous than dropping acks; interactions
-					// are user input and the player can re-click.
 					<-c.interactions
 					c.interactions <- msg
 				}
@@ -224,7 +235,6 @@ func (c *Client) readLoop() {
 // Close shuts down the connection and waits for the reader to exit.
 func (c *Client) Close() error {
 	c.mu.Lock()
-	c.closed = true
 	conn := c.conn
 	readerDone := c.readerDone
 	c.conn = nil
@@ -249,6 +259,7 @@ func (c *Client) IsConnected() bool {
 
 // Interactions returns the channel of InteractionMessages from the display.
 // Used by Display.eventLoop to select directly without polling.
+// Safe to call before Connect — the channel exists but is empty.
 func (c *Client) Interactions() <-chan *InteractionMessage {
 	return c.interactions
 }
