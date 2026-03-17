@@ -12,11 +12,12 @@ import (
 	"github.com/punt-labs/cryptd/internal/model"
 	"github.com/punt-labs/cryptd/internal/narrator"
 	"github.com/punt-labs/cryptd/internal/renderer"
+	"github.com/punt-labs/cryptd/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func newLuxElementLoop(t *testing.T, display *renderer.LuxElementDisplay) (*game.Loop, model.GameState) {
+func newLuxElementLoop(t *testing.T, display *testutil.FakeLuxElementDisplay) (*game.Loop, model.GameState) {
 	t.Helper()
 	s := loadScenario(t)
 	eng := engine.New(s)
@@ -30,7 +31,7 @@ func newLuxElementLoop(t *testing.T, display *renderer.LuxElementDisplay) (*game
 // TestLuxElement_BidirectionalRoundTrip proves the full Lux round trip:
 // game state → element tree (outbound) and Lux interaction → game input (inbound).
 func TestLuxElement_BidirectionalRoundTrip(t *testing.T) {
-	display := renderer.NewLuxElementDisplay()
+	display := testutil.NewFakeLuxElementDisplay()
 
 	// Inject a Lux button click: "act_south" → InputEvent{Type: "input", Payload: "south"}.
 	display.InjectInteraction(map[string]any{
@@ -85,7 +86,7 @@ func TestLuxElement_BidirectionalRoundTrip(t *testing.T) {
 // TestLuxElement_UpdatePatchStructure verifies that same-room actions produce
 // update patches (not full show calls) targeting correct element IDs.
 func TestLuxElement_UpdatePatchStructure(t *testing.T) {
-	display := renderer.NewLuxElementDisplay()
+	display := testutil.NewFakeLuxElementDisplay()
 
 	display.InjectEvent(model.InputEvent{Type: "input", Payload: "look"})
 	display.InjectEvent(model.InputEvent{Type: "input", Payload: "look"})

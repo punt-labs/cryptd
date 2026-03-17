@@ -21,7 +21,9 @@ func SceneToElements(scene LuxScene) []map[string]any {
 		"style":   "heading",
 	})
 
-	// Party HP — grouped in columns.
+	// Party HP — grouped in columns. Note: SceneToElements renders all party
+	// members, but UpdateToPatches only patches hero_0 because LuxUpdate carries
+	// a single Hero pointer. Multi-hero updates require a LuxUpdate schema change.
 	if len(scene.Party) > 0 {
 		var children []map[string]any
 		for i, hero := range scene.Party {
@@ -87,11 +89,11 @@ func UpdateToPatches(update LuxUpdate) []map[string]any {
 		})
 	}
 
-	// Enemy HP patches.
-	for i, enemy := range update.Enemies {
+	// Enemy HP patches — use name-based IDs to match scene elements.
+	for _, enemy := range update.Enemies {
 		fraction := hpFraction(enemy.HP, enemy.MaxHP)
 		patches = append(patches, map[string]any{
-			"id": fmt.Sprintf("enemy_%d_hp", i),
+			"id": enemyElementID(enemy.Name),
 			"set": map[string]any{
 				"fraction": fraction,
 				"label":    hpLabel(enemy.Name, enemy.HP, enemy.MaxHP),
@@ -121,6 +123,9 @@ func TranslateLuxEvent(luxEvent map[string]any) (model.InputEvent, bool) {
 	}
 
 	command := strings.TrimPrefix(elementID, "act_")
+	if command == "" {
+		return model.InputEvent{}, false
+	}
 	return model.InputEvent{Type: "input", Payload: command}, true
 }
 
@@ -135,13 +140,20 @@ func heroProgressElement(index int, hero LuxHero) map[string]any {
 }
 
 // enemyProgressElement builds a progress bar element for an enemy.
-func enemyProgressElement(index int, enemy LuxEnemy) map[string]any {
+// Uses name-based IDs (not positional indices) so patches target the correct
+// element even after enemies die and the live-enemy list shrinks.
+func enemyProgressElement(_ int, enemy LuxEnemy) map[string]any {
 	return map[string]any{
 		"kind":     "progress",
-		"id":       fmt.Sprintf("enemy_%d_hp", index),
+		"id":       enemyElementID(enemy.Name),
 		"fraction": hpFraction(enemy.HP, enemy.MaxHP),
 		"label":    hpLabel(enemy.Name, enemy.HP, enemy.MaxHP),
 	}
+}
+
+// enemyElementID returns a stable element ID for an enemy based on its name.
+func enemyElementID(name string) string {
+	return "enemy_" + strings.ToLower(strings.ReplaceAll(name, " ", "_")) + "_hp"
 }
 
 // hpFraction returns HP/MaxHP as a float64, clamped to [0, 1].

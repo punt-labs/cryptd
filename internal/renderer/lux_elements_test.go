@@ -100,7 +100,7 @@ func TestSceneToElements_CombatEnemies(t *testing.T) {
 
 	var enemyBar map[string]any
 	for _, el := range elements {
-		if el["id"] == "enemy_0_hp" {
+		if el["id"] == "enemy_goblin_hp" {
 			enemyBar = el
 			break
 		}
@@ -163,6 +163,7 @@ func TestTranslateLuxEvent_UnknownID(t *testing.T) {
 	}{
 		{"no act_ prefix", map[string]any{"element_id": "room_header", "action": "clicked"}},
 		{"not clicked", map[string]any{"element_id": "act_south", "action": "hovered"}},
+		{"empty command", map[string]any{"element_id": "act_", "action": "clicked"}},
 		{"empty map", map[string]any{}},
 	}
 	for _, tt := range tests {
