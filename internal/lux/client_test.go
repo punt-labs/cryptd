@@ -6,7 +6,6 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"sync"
 	"testing"
 	"time"
 
@@ -20,8 +19,6 @@ type miniServer struct {
 	t        *testing.T
 	listener net.Listener
 	sockPath string
-	received []map[string]any
-	mu       sync.Mutex
 	conn     net.Conn
 	done     chan struct{}
 }
