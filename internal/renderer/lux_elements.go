@@ -89,11 +89,11 @@ func UpdateToPatches(update LuxUpdate) []map[string]any {
 		})
 	}
 
-	// Enemy HP patches — use name-based IDs to match scene elements.
-	for _, enemy := range update.Enemies {
+	// Enemy HP patches — use name+index IDs to match scene elements.
+	for i, enemy := range update.Enemies {
 		fraction := hpFraction(enemy.HP, enemy.MaxHP)
 		patches = append(patches, map[string]any{
-			"id": enemyElementID(enemy.Name),
+			"id": enemyElementID(enemy.Name, i),
 			"set": map[string]any{
 				"fraction": fraction,
 				"label":    hpLabel(enemy.Name, enemy.HP, enemy.MaxHP),
@@ -140,20 +140,21 @@ func heroProgressElement(index int, hero LuxHero) map[string]any {
 }
 
 // enemyProgressElement builds a progress bar element for an enemy.
-// Uses name-based IDs (not positional indices) so patches target the correct
-// element even after enemies die and the live-enemy list shrinks.
-func enemyProgressElement(_ int, enemy LuxEnemy) map[string]any {
+// Uses name+index IDs so that (a) same-named enemies get distinct IDs and
+// (b) IDs are stable across show/update cycles within the same combat
+// encounter (both buildScene and buildUpdate iterate the same filtered list).
+func enemyProgressElement(index int, enemy LuxEnemy) map[string]any {
 	return map[string]any{
 		"kind":     "progress",
-		"id":       enemyElementID(enemy.Name),
+		"id":       enemyElementID(enemy.Name, index),
 		"fraction": hpFraction(enemy.HP, enemy.MaxHP),
 		"label":    hpLabel(enemy.Name, enemy.HP, enemy.MaxHP),
 	}
 }
 
-// enemyElementID returns a stable element ID for an enemy based on its name.
-func enemyElementID(name string) string {
-	return "enemy_" + strings.ToLower(strings.ReplaceAll(name, " ", "_")) + "_hp"
+// enemyElementID returns a stable element ID for an enemy based on name + index.
+func enemyElementID(name string, index int) string {
+	return fmt.Sprintf("enemy_%s_%d_hp", strings.ToLower(strings.ReplaceAll(name, " ", "_")), index)
 }
 
 // hpFraction returns HP/MaxHP as a float64, clamped to [0, 1].

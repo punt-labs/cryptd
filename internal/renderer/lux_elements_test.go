@@ -100,7 +100,7 @@ func TestSceneToElements_CombatEnemies(t *testing.T) {
 
 	var enemyBar map[string]any
 	for _, el := range elements {
-		if el["id"] == "enemy_goblin_hp" {
+		if el["id"] == "enemy_goblin_0_hp" {
 			enemyBar = el
 			break
 		}
