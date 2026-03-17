@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **Lux wire protocol client** (`internal/lux`): Go `Client` that connects to a running Lux display over Unix domain socket using the length-prefixed JSON wire protocol (port of the Python `LuxClient`). `Display` adapter wires `Client` + `SceneToElements`/`UpdateToPatches` into the `LuxDisplay` interface, enabling the game engine to render to a real Lux ImGui window.
 - **Lux element tree builder:** pure-function translation layer (`SceneToElements`, `UpdateToPatches`, `TranslateLuxEvent`) converts `LuxScene`/`LuxUpdate` Go structs into Lux-native element dicts (`[]map[string]any`). Bidirectional: button click events translate back to `InputEvent`.
 - **`LuxElementDisplay`:** test double that wires translation + recording + event injection, proving the full Lux round trip (game state → elements → display, interaction → input → engine).
 
