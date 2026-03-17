@@ -82,11 +82,18 @@ play: build-server build-client            ## Play the game (client connects to 
 	./crypt --scenario minimal; \
 	kill $$CRYPTD_PID 2>/dev/null; wait $$CRYPTD_PID 2>/dev/null
 
-play-unix: build-server build-client       ## Play the UNIX Catacombs scenario
+play-unix: build-server build-client       ## Play the UNIX Catacombs scenario (9 rooms)
 	@CRYPT_SCENARIO_DIR=scenarios ./cryptd serve -f --scenario unix-catacombs &\
 	CRYPTD_PID=$$!; \
 	sleep 0.5; \
 	./crypt --scenario unix-catacombs; \
+	kill $$CRYPTD_PID 2>/dev/null; wait $$CRYPTD_PID 2>/dev/null
+
+play-mega: build-server build-client       ## Play the UNIX Megadungeon (53 rooms)
+	@CRYPT_SCENARIO_DIR=scenarios ./cryptd serve -f --scenario unix-megadungeon &\
+	CRYPTD_PID=$$!; \
+	sleep 0.5; \
+	./crypt --scenario unix-megadungeon; \
 	kill $$CRYPTD_PID 2>/dev/null; wait $$CRYPTD_PID 2>/dev/null
 
 ##@ Demos — Scripted Playthroughs

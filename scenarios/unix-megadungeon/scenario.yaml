@@ -1,0 +1,373 @@
+title: The UNIX Megadungeon
+starting_room: system
+death: respawn
+regions:
+    - regions/default.yaml
+items:
+    chain_mail_15:
+        name: Chain Mail
+        type: armor
+        defense: 2
+        weight: 8
+        value: 40
+        description: Interlocking rings of steel.
+    chain_mail_17:
+        name: Chain Mail
+        type: armor
+        defense: 2
+        weight: 8
+        value: 40
+        description: Interlocking rings of steel.
+    greater_healing_potion_7:
+        name: Greater Healing Potion
+        type: consumable
+        power: 3d6
+        effect: heal
+        weight: 0.5
+        value: 25
+        description: A glowing crimson vial.
+    greater_healing_potion_8:
+        name: Greater Healing Potion
+        type: consumable
+        power: 3d6
+        effect: heal
+        weight: 0.5
+        value: 25
+        description: A glowing crimson vial.
+    greater_healing_potion_9:
+        name: Greater Healing Potion
+        type: consumable
+        power: 3d6
+        effect: heal
+        weight: 0.5
+        value: 25
+        description: A glowing crimson vial.
+    greater_healing_potion_10:
+        name: Greater Healing Potion
+        type: consumable
+        power: 3d6
+        effect: heal
+        weight: 0.5
+        value: 25
+        description: A glowing crimson vial.
+    greater_healing_potion_11:
+        name: Greater Healing Potion
+        type: consumable
+        power: 3d6
+        effect: heal
+        weight: 0.5
+        value: 25
+        description: A glowing crimson vial.
+    greater_healing_potion_13:
+        name: Greater Healing Potion
+        type: consumable
+        power: 3d6
+        effect: heal
+        weight: 0.5
+        value: 25
+        description: A glowing crimson vial.
+    greater_healing_potion_16:
+        name: Greater Healing Potion
+        type: consumable
+        power: 3d6
+        effect: heal
+        weight: 0.5
+        value: 25
+        description: A glowing crimson vial.
+    greater_healing_potion_18:
+        name: Greater Healing Potion
+        type: consumable
+        power: 3d6
+        effect: heal
+        weight: 0.5
+        value: 25
+        description: A glowing crimson vial.
+    greater_healing_potion_19:
+        name: Greater Healing Potion
+        type: consumable
+        power: 3d6
+        effect: heal
+        weight: 0.5
+        value: 25
+        description: A glowing crimson vial.
+    greater_healing_potion_20:
+        name: Greater Healing Potion
+        type: consumable
+        power: 3d6
+        effect: heal
+        weight: 0.5
+        value: 25
+        description: A glowing crimson vial.
+    greater_healing_potion_21:
+        name: Greater Healing Potion
+        type: consumable
+        power: 3d6
+        effect: heal
+        weight: 0.5
+        value: 25
+        description: A glowing crimson vial.
+    healing_potion_3:
+        name: Healing Potion
+        type: consumable
+        power: 2d6
+        effect: heal
+        weight: 0.5
+        value: 15
+        description: A shimmering red vial.
+    healing_potion_4:
+        name: Healing Potion
+        type: consumable
+        power: 2d6
+        effect: heal
+        weight: 0.5
+        value: 15
+        description: A shimmering red vial.
+    healing_potion_5:
+        name: Healing Potion
+        type: consumable
+        power: 2d6
+        effect: heal
+        weight: 0.5
+        value: 15
+        description: A shimmering red vial.
+    healing_potion_6:
+        name: Healing Potion
+        type: consumable
+        power: 2d6
+        effect: heal
+        weight: 0.5
+        value: 15
+        description: A shimmering red vial.
+    longsword_12:
+        name: Longsword
+        type: weapon
+        damage: 1d8
+        weight: 4
+        value: 30
+        description: A well-balanced two-handed blade.
+    longsword_14:
+        name: Longsword
+        type: weapon
+        damage: 1d8
+        weight: 4
+        value: 30
+        description: A well-balanced two-handed blade.
+    minor_healing_potion_2:
+        name: Minor Healing Potion
+        type: consumable
+        power: 1d6
+        effect: heal
+        weight: 0.3
+        value: 5
+        description: A small vial of red liquid.
+    plate_armor_30:
+        name: Plate Armor
+        type: armor
+        defense: 3
+        weight: 12
+        value: 60
+        description: Full plate, forged in fire.
+    plate_armor_31:
+        name: Plate Armor
+        type: armor
+        defense: 3
+        weight: 12
+        value: 60
+        description: Full plate, forged in fire.
+    plate_armor_33:
+        name: Plate Armor
+        type: armor
+        defense: 3
+        weight: 12
+        value: 60
+        description: Full plate, forged in fire.
+    plate_armor_36:
+        name: Plate Armor
+        type: armor
+        defense: 3
+        weight: 12
+        value: 60
+        description: Full plate, forged in fire.
+    rusty_dagger_1:
+        name: Rusty Dagger
+        type: weapon
+        damage: 1d4
+        weight: 1.5
+        value: 5
+        description: A pitted blade, but better than bare fists.
+    superior_healing_potion_23:
+        name: Superior Healing Potion
+        type: consumable
+        power: 4d6
+        effect: heal
+        weight: 0.5
+        value: 40
+        description: Liquid gold with a crimson swirl.
+    superior_healing_potion_25:
+        name: Superior Healing Potion
+        type: consumable
+        power: 4d6
+        effect: heal
+        weight: 0.5
+        value: 40
+        description: Liquid gold with a crimson swirl.
+    superior_healing_potion_28:
+        name: Superior Healing Potion
+        type: consumable
+        power: 4d6
+        effect: heal
+        weight: 0.5
+        value: 40
+        description: Liquid gold with a crimson swirl.
+    superior_healing_potion_34:
+        name: Superior Healing Potion
+        type: consumable
+        power: 4d6
+        effect: heal
+        weight: 0.5
+        value: 40
+        description: Liquid gold with a crimson swirl.
+    superior_healing_potion_35:
+        name: Superior Healing Potion
+        type: consumable
+        power: 4d6
+        effect: heal
+        weight: 0.5
+        value: 40
+        description: Liquid gold with a crimson swirl.
+    superior_healing_potion_38:
+        name: Superior Healing Potion
+        type: consumable
+        power: 4d6
+        effect: heal
+        weight: 0.5
+        value: 40
+        description: Liquid gold with a crimson swirl.
+    superior_healing_potion_40:
+        name: Superior Healing Potion
+        type: consumable
+        power: 4d6
+        effect: heal
+        weight: 0.5
+        value: 40
+        description: Liquid gold with a crimson swirl.
+    war_axe_22:
+        name: War Axe
+        type: weapon
+        damage: 1d10
+        weight: 5
+        value: 50
+        description: A heavy, brutal weapon.
+    war_axe_24:
+        name: War Axe
+        type: weapon
+        damage: 1d10
+        weight: 5
+        value: 50
+        description: A heavy, brutal weapon.
+    war_axe_26:
+        name: War Axe
+        type: weapon
+        damage: 1d10
+        weight: 5
+        value: 50
+        description: A heavy, brutal weapon.
+    war_axe_27:
+        name: War Axe
+        type: weapon
+        damage: 1d10
+        weight: 5
+        value: 50
+        description: A heavy, brutal weapon.
+    war_axe_29:
+        name: War Axe
+        type: weapon
+        damage: 1d10
+        weight: 5
+        value: 50
+        description: A heavy, brutal weapon.
+    war_axe_32:
+        name: War Axe
+        type: weapon
+        damage: 1d10
+        weight: 5
+        value: 50
+        description: A heavy, brutal weapon.
+    war_axe_37:
+        name: War Axe
+        type: weapon
+        damage: 1d10
+        weight: 5
+        value: 50
+        description: A heavy, brutal weapon.
+    war_axe_39:
+        name: War Axe
+        type: weapon
+        damage: 1d10
+        weight: 5
+        value: 50
+        description: A heavy, brutal weapon.
+    war_axe_41:
+        name: War Axe
+        type: weapon
+        damage: 1d10
+        weight: 5
+        value: 50
+        description: A heavy, brutal weapon.
+enemies:
+    dragon:
+        name: Elder Dragon
+        hp: 25
+        attack: 1d8+2
+        ai: aggressive
+    goblin:
+        name: Goblin
+        hp: 6
+        attack: 1d3
+        ai: aggressive
+    rat:
+        name: Giant Rat
+        hp: 3
+        attack: 1d2
+        ai: cautious
+    skeleton:
+        name: Skeleton Warrior
+        hp: 10
+        attack: 1d4
+        ai: aggressive
+    troll:
+        name: Cave Troll
+        hp: 15
+        attack: 1d6
+        ai: aggressive
+spells:
+    blessing:
+        name: Blessing
+        mp: 3
+        effect: heal
+        power: 2d6+3
+        classes:
+            - priest
+    fireball:
+        name: Fireball
+        mp: 3
+        effect: damage
+        power: 2d6
+        classes:
+            - mage
+            - priest
+    heal:
+        name: Heal
+        mp: 2
+        effect: heal
+        power: 1d6+2
+        classes:
+            - priest
+            - mage
+    lightning:
+        name: Lightning Bolt
+        mp: 5
+        effect: damage
+        power: 3d6
+        classes:
+            - mage

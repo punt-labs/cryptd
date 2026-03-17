@@ -1,0 +1,638 @@
+rooms:
+    filesystem:
+        name: filesystem
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/filesystem.
+        connections:
+            down:
+                room: filesystem_var_logs
+                type: open
+            east:
+                room: filesystem_etc_configs
+                type: open
+            north:
+                room: filesystem_dev_devices
+                type: open
+            south:
+                room: system
+                type: open
+            up:
+                room: filesystem_tmp_wasteland
+                type: open
+            west:
+                room: filesystem_home_directory
+                type: open
+        items:
+            - rusty_dagger_1
+            - healing_potion_3
+    filesystem_dev_devices:
+        name: dev_devices
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/filesystem/dev_devices.
+        connections:
+            east:
+                room: filesystem_dev_devices_dev_random_oracle
+                type: open
+            north:
+                room: filesystem_dev_devices_dev_null_void
+                type: open
+            south:
+                room: filesystem
+                type: open
+        items:
+            - greater_healing_potion_7
+    filesystem_dev_devices_dev_null_void:
+        name: dev_null_void
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/filesystem/dev_devices/dev_null_void.
+        connections:
+            south:
+                room: filesystem_dev_devices
+                type: open
+    filesystem_dev_devices_dev_random_oracle:
+        name: dev_random_oracle
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/filesystem/dev_devices/dev_random_oracle.
+        connections:
+            west:
+                room: filesystem_dev_devices
+                type: open
+        items:
+            - war_axe_22
+    filesystem_etc_configs:
+        name: etc_configs
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/filesystem/etc_configs.
+        connections:
+            east:
+                room: filesystem_etc_configs_passwd_ledger
+                type: open
+            north:
+                room: filesystem_etc_configs_forbidden_crontab
+                type: open
+            south:
+                room: filesystem_etc_configs_shadow_archive
+                type: open
+            west:
+                room: filesystem
+                type: open
+        items:
+            - greater_healing_potion_8
+    filesystem_etc_configs_forbidden_crontab:
+        name: forbidden_crontab
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/filesystem/etc_configs/forbidden_crontab.
+        connections:
+            south:
+                room: filesystem_etc_configs
+                type: open
+    filesystem_etc_configs_passwd_ledger:
+        name: passwd_ledger
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/filesystem/etc_configs/passwd_ledger.
+        connections:
+            west:
+                room: filesystem_etc_configs
+                type: open
+        items:
+            - superior_healing_potion_23
+        enemies:
+            - skeleton
+    filesystem_etc_configs_shadow_archive:
+        name: shadow_archive
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/filesystem/etc_configs/shadow_archive.
+        connections:
+            north:
+                room: filesystem_etc_configs
+                type: open
+        enemies:
+            - troll
+    filesystem_home_directory:
+        name: home_directory
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/filesystem/home_directory.
+        connections:
+            east:
+                room: filesystem
+                type: open
+            north:
+                room: filesystem_home_directory_admin_sanctum
+                type: open
+            south:
+                room: filesystem_home_directory_dotfiles_vault
+                type: open
+            west:
+                room: filesystem_home_directory_guest_quarters
+                type: open
+        items:
+            - greater_healing_potion_9
+    filesystem_home_directory_admin_sanctum:
+        name: admin_sanctum
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/filesystem/home_directory/admin_sanctum.
+        connections:
+            south:
+                room: filesystem_home_directory
+                type: open
+        items:
+            - war_axe_24
+            - superior_healing_potion_25
+        enemies:
+            - troll
+    filesystem_home_directory_dotfiles_vault:
+        name: dotfiles_vault
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/filesystem/home_directory/dotfiles_vault.
+        connections:
+            north:
+                room: filesystem_home_directory
+                type: open
+        enemies:
+            - skeleton
+    filesystem_home_directory_guest_quarters:
+        name: guest_quarters
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/filesystem/home_directory/guest_quarters.
+        connections:
+            east:
+                room: filesystem_home_directory
+                type: open
+    filesystem_tmp_wasteland:
+        name: tmp_wasteland
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/filesystem/tmp_wasteland.
+        connections:
+            down:
+                room: filesystem
+                type: open
+            east:
+                room: filesystem_tmp_wasteland_stale_lockfiles
+                type: open
+            north:
+                room: filesystem_tmp_wasteland_orphaned_sockets
+                type: open
+        items:
+            - greater_healing_potion_10
+        enemies:
+            - troll
+    filesystem_tmp_wasteland_orphaned_sockets:
+        name: orphaned_sockets
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/filesystem/tmp_wasteland/orphaned_sockets.
+        connections:
+            south:
+                room: filesystem_tmp_wasteland
+                type: open
+    filesystem_tmp_wasteland_stale_lockfiles:
+        name: stale_lockfiles
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/filesystem/tmp_wasteland/stale_lockfiles.
+        connections:
+            west:
+                room: filesystem_tmp_wasteland
+                type: open
+        items:
+            - war_axe_26
+    filesystem_var_logs:
+        name: var_logs
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/filesystem/var_logs.
+        connections:
+            east:
+                room: filesystem_var_logs_error_graveyard
+                type: open
+            north:
+                room: filesystem_var_logs_auth_log_chamber
+                type: open
+            south:
+                room: filesystem_var_logs_syslog_river
+                type: open
+            up:
+                room: filesystem
+                type: open
+        items:
+            - greater_healing_potion_11
+    filesystem_var_logs_auth_log_chamber:
+        name: auth_log_chamber
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/filesystem/var_logs/auth_log_chamber.
+        connections:
+            south:
+                room: filesystem_var_logs
+                type: open
+        items:
+            - war_axe_27
+            - superior_healing_potion_28
+        enemies:
+            - dragon
+    filesystem_var_logs_error_graveyard:
+        name: error_graveyard
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/filesystem/var_logs/error_graveyard.
+        connections:
+            west:
+                room: filesystem_var_logs
+                type: open
+    filesystem_var_logs_syslog_river:
+        name: syslog_river
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/filesystem/var_logs/syslog_river.
+        connections:
+            north:
+                room: filesystem_var_logs
+                type: open
+        items:
+            - war_axe_29
+    kernel_depths:
+        name: kernel_depths
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/kernel_depths.
+        connections:
+            east:
+                room: kernel_depths_proc_interface
+                type: open
+            north:
+                room: kernel_depths_memory_map
+                type: open
+            south:
+                room: kernel_depths_syscall_gate
+                type: open
+            up:
+                room: kernel_depths_thread_maze
+                type: open
+            west:
+                room: system
+                type: open
+        items:
+            - healing_potion_4
+    kernel_depths_memory_map:
+        name: memory_map
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/kernel_depths/memory_map.
+        connections:
+            south:
+                room: kernel_depths
+                type: open
+    kernel_depths_proc_interface:
+        name: proc_interface
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/kernel_depths/proc_interface.
+        connections:
+            west:
+                room: kernel_depths
+                type: open
+        items:
+            - longsword_12
+    kernel_depths_syscall_gate:
+        name: syscall_gate
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/kernel_depths/syscall_gate.
+        connections:
+            east:
+                room: kernel_depths_syscall_gate_ring_zero
+                type: open
+            north:
+                room: kernel_depths
+                type: open
+            south:
+                room: kernel_depths_syscall_gate_the_deadlock
+                type: open
+        items:
+            - greater_healing_potion_13
+    kernel_depths_syscall_gate_ring_zero:
+        name: ring_zero
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/kernel_depths/syscall_gate/ring_zero.
+        connections:
+            west:
+                room: kernel_depths_syscall_gate
+                type: open
+        items:
+            - plate_armor_30
+    kernel_depths_syscall_gate_the_deadlock:
+        name: the_deadlock
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/kernel_depths/syscall_gate/the_deadlock.
+        connections:
+            north:
+                room: kernel_depths_syscall_gate
+                type: open
+        items:
+            - plate_armor_31
+    kernel_depths_thread_maze:
+        name: thread_maze
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/kernel_depths/thread_maze.
+        connections:
+            down:
+                room: kernel_depths
+                type: open
+        items:
+            - longsword_14
+            - chain_mail_15
+    source_code:
+        name: source_code
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/source_code.
+        connections:
+            east:
+                room: source_code_library_wing
+                type: open
+            north:
+                room: system
+                type: open
+            south:
+                room: source_code_main_module
+                type: open
+            west:
+                room: source_code_test_arena
+                type: open
+        items:
+            - healing_potion_5
+    source_code_library_wing:
+        name: library_wing
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/source_code/library_wing.
+        connections:
+            east:
+                room: source_code_library_wing_parser_chamber
+                type: open
+            north:
+                room: source_code_library_wing_compiler_forge
+                type: open
+            south:
+                room: source_code_library_wing_runtime_engine
+                type: open
+            west:
+                room: source_code
+                type: open
+        items:
+            - greater_healing_potion_16
+    source_code_library_wing_compiler_forge:
+        name: compiler_forge
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/source_code/library_wing/compiler_forge.
+        connections:
+            south:
+                room: source_code_library_wing
+                type: open
+    source_code_library_wing_parser_chamber:
+        name: parser_chamber
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/source_code/library_wing/parser_chamber.
+        connections:
+            west:
+                room: source_code_library_wing
+                type: open
+        enemies:
+            - skeleton
+    source_code_library_wing_runtime_engine:
+        name: runtime_engine
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/source_code/library_wing/runtime_engine.
+        connections:
+            north:
+                room: source_code_library_wing
+                type: open
+        items:
+            - war_axe_32
+    source_code_main_module:
+        name: main_module
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/source_code/main_module.
+        connections:
+            north:
+                room: source_code
+                type: open
+        items:
+            - chain_mail_17
+    source_code_test_arena:
+        name: test_arena
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/source_code/test_arena.
+        connections:
+            east:
+                room: source_code
+                type: open
+            north:
+                room: source_code_test_arena_the_memory_leak
+                type: open
+            south:
+                room: source_code_test_arena_the_race_condition
+                type: open
+            west:
+                room: source_code_test_arena_the_segfault
+                type: open
+        items:
+            - greater_healing_potion_18
+    source_code_test_arena_the_memory_leak:
+        name: the_memory_leak
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/source_code/test_arena/the_memory_leak.
+        connections:
+            south:
+                room: source_code_test_arena
+                type: open
+        items:
+            - plate_armor_33
+    source_code_test_arena_the_race_condition:
+        name: the_race_condition
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/source_code/test_arena/the_race_condition.
+        connections:
+            north:
+                room: source_code_test_arena
+                type: open
+    source_code_test_arena_the_segfault:
+        name: the_segfault
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/source_code/test_arena/the_segfault.
+        connections:
+            east:
+                room: source_code_test_arena
+                type: open
+        items:
+            - superior_healing_potion_34
+        enemies:
+            - troll
+    ssh_gateway:
+        name: ssh_gateway
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/ssh_gateway.
+        connections:
+            east:
+                room: system
+                type: open
+            north:
+                room: ssh_gateway_build_server
+                type: open
+            south:
+                room: ssh_gateway_database
+                type: open
+            west:
+                room: ssh_gateway_webserver
+                type: open
+        items:
+            - healing_potion_6
+    ssh_gateway_build_server:
+        name: build_server
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/ssh_gateway/build_server.
+        connections:
+            east:
+                room: ssh_gateway_build_server_ci_pipeline
+                type: open
+            north:
+                room: ssh_gateway_build_server_artifact_repository
+                type: open
+            south:
+                room: ssh_gateway
+                type: open
+            up:
+                room: ssh_gateway_build_server_docker_shipyard
+                type: open
+            west:
+                room: ssh_gateway_build_server_container_graveyard
+                type: open
+        items:
+            - greater_healing_potion_19
+    ssh_gateway_build_server_artifact_repository:
+        name: artifact_repository
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/ssh_gateway/build_server/artifact_repository.
+        connections:
+            south:
+                room: ssh_gateway_build_server
+                type: open
+        items:
+            - superior_healing_potion_35
+        enemies:
+            - troll
+    ssh_gateway_build_server_ci_pipeline:
+        name: ci_pipeline
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/ssh_gateway/build_server/ci_pipeline.
+        connections:
+            west:
+                room: ssh_gateway_build_server
+                type: open
+        items:
+            - plate_armor_36
+    ssh_gateway_build_server_container_graveyard:
+        name: container_graveyard
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/ssh_gateway/build_server/container_graveyard.
+        connections:
+            east:
+                room: ssh_gateway_build_server
+                type: open
+        enemies:
+            - dragon
+    ssh_gateway_build_server_docker_shipyard:
+        name: docker_shipyard
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/ssh_gateway/build_server/docker_shipyard.
+        connections:
+            down:
+                room: ssh_gateway_build_server
+                type: open
+    ssh_gateway_database:
+        name: database
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/ssh_gateway/database.
+        connections:
+            east:
+                room: ssh_gateway_database_corrupted_index
+                type: open
+            north:
+                room: ssh_gateway
+                type: open
+            south:
+                room: ssh_gateway_database_postgres_vault
+                type: open
+            up:
+                room: ssh_gateway_database_wal_archive
+                type: open
+            west:
+                room: ssh_gateway_database_redis_chambers
+                type: open
+        items:
+            - greater_healing_potion_20
+        enemies:
+            - goblin
+    ssh_gateway_database_corrupted_index:
+        name: corrupted_index
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/ssh_gateway/database/corrupted_index.
+        connections:
+            west:
+                room: ssh_gateway_database
+                type: open
+        items:
+            - war_axe_37
+            - superior_healing_potion_38
+        enemies:
+            - dragon
+    ssh_gateway_database_postgres_vault:
+        name: postgres_vault
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/ssh_gateway/database/postgres_vault.
+        connections:
+            north:
+                room: ssh_gateway_database
+                type: open
+        items:
+            - war_axe_39
+        enemies:
+            - troll
+    ssh_gateway_database_redis_chambers:
+        name: redis_chambers
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/ssh_gateway/database/redis_chambers.
+        connections:
+            east:
+                room: ssh_gateway_database
+                type: open
+        enemies:
+            - troll
+    ssh_gateway_database_wal_archive:
+        name: wal_archive
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/ssh_gateway/database/wal_archive.
+        connections:
+            down:
+                room: ssh_gateway_database
+                type: open
+    ssh_gateway_webserver:
+        name: webserver
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/ssh_gateway/webserver.
+        connections:
+            east:
+                room: ssh_gateway
+                type: open
+            north:
+                room: ssh_gateway_webserver_access_log_tower
+                type: open
+            south:
+                room: ssh_gateway_webserver_cache_catacombs
+                type: open
+            up:
+                room: ssh_gateway_webserver_request_queue
+                type: open
+            west:
+                room: ssh_gateway_webserver_nginx_fortress
+                type: open
+        items:
+            - greater_healing_potion_21
+    ssh_gateway_webserver_access_log_tower:
+        name: access_log_tower
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/ssh_gateway/webserver/access_log_tower.
+        connections:
+            south:
+                room: ssh_gateway_webserver
+                type: open
+        items:
+            - superior_healing_potion_40
+        enemies:
+            - troll
+    ssh_gateway_webserver_cache_catacombs:
+        name: cache_catacombs
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/ssh_gateway/webserver/cache_catacombs.
+        connections:
+            north:
+                room: ssh_gateway_webserver
+                type: open
+        enemies:
+            - troll
+    ssh_gateway_webserver_nginx_fortress:
+        name: nginx_fortress
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/ssh_gateway/webserver/nginx_fortress.
+        connections:
+            east:
+                room: ssh_gateway_webserver
+                type: open
+        enemies:
+            - skeleton
+    ssh_gateway_webserver_request_queue:
+        name: request_queue
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system/ssh_gateway/webserver/request_queue.
+        connections:
+            down:
+                room: ssh_gateway_webserver
+                type: open
+        items:
+            - war_axe_41
+        enemies:
+            - troll
+    system:
+        name: system
+        description_seed: You find yourself in /Users/jfreeman/Coding/punt-labs/cryptd/.tmp/megadungeon-tree/system.
+        connections:
+            east:
+                room: kernel_depths
+                type: open
+            north:
+                room: filesystem
+                type: open
+            south:
+                room: source_code
+                type: open
+            west:
+                room: ssh_gateway
+                type: open
+        items:
+            - minor_healing_potion_2
