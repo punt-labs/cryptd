@@ -11,6 +11,9 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **Lux element tree builder:** pure-function translation layer (`SceneToElements`, `UpdateToPatches`, `TranslateLuxEvent`) converts `LuxScene`/`LuxUpdate` Go structs into Lux-native element dicts (`[]map[string]any`). Bidirectional: button click events translate back to `InputEvent`.
+- **`LuxElementDisplay`:** test double that wires translation + recording + event injection, proving the full Lux round trip (game state → elements → display, interaction → input → engine).
+
 - **EnemyVisitor:** distance-based enemy placement with 5-tier progression (rat→goblin→skeleton→troll→dragon). 40% spawn rate, hub skipping, ±1 tier jitter for variety.
 - **ItemVisitor:** distance-based item placement with 5-tier weapons (dagger→sword→longsword→axe→vorpal blade), matching armor tiers (leather→chain→plate→dragon scale), and scaling health potions. Starter weapon at distance 1, starter potion at start, potions at hub rest stops.
 - **DefaultSpells():** standard spell catalog (fireball, heal, lightning, blessing) added to generated scenarios.
