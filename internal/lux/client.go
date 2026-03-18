@@ -264,6 +264,11 @@ func (c *Client) Interactions() <-chan *InteractionMessage {
 	return c.interactions
 }
 
+// ReaderDone returns a channel that is closed when the reader goroutine exits.
+func (c *Client) ReaderDone() <-chan struct{} {
+	return c.readerDone
+}
+
 // ReaderErr returns the terminal error from the reader goroutine, if any.
 func (c *Client) ReaderErr() error {
 	c.mu.Lock()

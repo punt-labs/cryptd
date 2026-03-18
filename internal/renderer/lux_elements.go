@@ -8,8 +8,8 @@ import (
 )
 
 // SceneToElements converts a LuxScene into Lux-native element dicts suitable
-// for a show() call. The element tree follows a Wizardry I layout: room header,
-// party HP bars, enemy HP bars (combat), narration markdown, action buttons.
+// for a show() call. Layout: room header, party HP bars, separator, narration
+// markdown, separator, quick-action buttons (horizontal), text input + send.
 func SceneToElements(scene LuxScene) []map[string]any {
 	var elements []map[string]any
 
@@ -21,9 +21,7 @@ func SceneToElements(scene LuxScene) []map[string]any {
 		"style":   "heading",
 	})
 
-	// Party HP — grouped in columns. Note: SceneToElements renders all party
-	// members, but UpdateToPatches only patches hero_0 because LuxUpdate carries
-	// a single Hero pointer. Multi-hero updates require a LuxUpdate schema change.
+	// Party HP — grouped in columns.
 	if len(scene.Party) > 0 {
 		var children []map[string]any
 		for i, hero := range scene.Party {
@@ -44,6 +42,12 @@ func SceneToElements(scene LuxScene) []map[string]any {
 		}
 	}
 
+	// Separator before narration.
+	elements = append(elements, map[string]any{
+		"kind": "separator",
+		"id":   "sep_narration",
+	})
+
 	// Narration.
 	elements = append(elements, map[string]any{
 		"kind":    "markdown",
@@ -51,14 +55,50 @@ func SceneToElements(scene LuxScene) []map[string]any {
 		"content": scene.Narration,
 	})
 
-	// Action buttons.
-	for _, action := range scene.Actions {
+	// Separator before controls.
+	elements = append(elements, map[string]any{
+		"kind": "separator",
+		"id":   "sep_controls",
+	})
+
+	// Quick-action buttons in a horizontal row.
+	if len(scene.Actions) > 0 {
+		var buttons []map[string]any
+		for _, action := range scene.Actions {
+			buttons = append(buttons, map[string]any{
+				"kind":  "button",
+				"id":    "act_" + action,
+				"label": action,
+			})
+		}
 		elements = append(elements, map[string]any{
-			"kind":  "button",
-			"id":    "act_" + action,
-			"label": action,
+			"kind":     "group",
+			"id":       "actions",
+			"layout":   "columns",
+			"children": buttons,
 		})
 	}
+
+	// Free-form text input + send button.
+	elements = append(elements, map[string]any{
+		"kind":     "group",
+		"id":       "input_row",
+		"layout":   "columns",
+		"children": []map[string]any{
+			{
+				"kind":  "input_text",
+				"id":    "cmd_input",
+				"label": "",
+				"hint":  "Type a command...",
+				"value": "",
+			},
+			{
+				"kind":  "button",
+				"id":    "act_send",
+				"label": "Send",
+			},
+		},
+	})
 
 	return elements
 }
@@ -114,11 +154,18 @@ func UpdateToPatches(update LuxUpdate) []map[string]any {
 
 // TranslateLuxEvent converts a Lux interaction event map into an InputEvent.
 // Button IDs follow the "act_<action>" convention; unknown IDs return false.
+// TranslateLuxEvent converts a Lux interaction event map into an InputEvent.
+// Accepts button clicks on act_<command> elements. Lux sends button
+// interactions with action set to the element ID or "clicked"; both are
+// accepted. Other actions (hover, focus) are rejected.
 func TranslateLuxEvent(luxEvent map[string]any) (model.InputEvent, bool) {
 	elementID, _ := luxEvent["element_id"].(string)
 	action, _ := luxEvent["action"].(string)
 
-	if action != "clicked" || !strings.HasPrefix(elementID, "act_") {
+	if !strings.HasPrefix(elementID, "act_") {
+		return model.InputEvent{}, false
+	}
+	if action != "clicked" && action != elementID {
 		return model.InputEvent{}, false
 	}
 
@@ -127,6 +174,18 @@ func TranslateLuxEvent(luxEvent map[string]any) (model.InputEvent, bool) {
 		return model.InputEvent{}, false
 	}
 	return model.InputEvent{Type: "input", Payload: command}, true
+}
+
+// TranslateLuxTextInput extracts the text value from a cmd_input "changed"
+// interaction. Returns the text and true if this is a text input event.
+func TranslateLuxTextInput(luxEvent map[string]any) (string, bool) {
+	elementID, _ := luxEvent["element_id"].(string)
+	action, _ := luxEvent["action"].(string)
+	if elementID == "cmd_input" && action == "changed" {
+		val, ok := luxEvent["value"].(string)
+		return val, ok
+	}
+	return "", false
 }
 
 // heroProgressElement builds a progress bar element for a party member.

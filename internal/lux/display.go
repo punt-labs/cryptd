@@ -99,13 +99,21 @@ func (d *Display) setWriteErr(err error) {
 	}
 }
 
-// eventLoop selects on the client's interaction channel and the done signal.
-// Translates InteractionMessages to InputEvents via TranslateLuxEvent.
-// No polling — blocks until a message arrives or the display is closed.
+// eventLoop selects on the client's interaction channel, the reader-done
+// signal, and the display-done signal. Translates InteractionMessages to
+// InputEvents via TranslateLuxEvent. Buffers text input and submits on
+// Send button click.
 func (d *Display) eventLoop() {
+	defer close(d.events)
+	var pendingText string
 	for {
 		select {
 		case <-d.done:
+			return
+		case <-d.client.ReaderDone():
+			if err := d.client.ReaderErr(); err != nil {
+				d.setWriteErr(fmt.Errorf("lux connection lost: %w", err))
+			}
 			return
 		case inter, ok := <-d.client.Interactions():
 			if !ok {
@@ -118,6 +126,29 @@ func (d *Display) eventLoop() {
 			if inter.Value != nil {
 				luxEvent["value"] = inter.Value
 			}
+
+			// Buffer text input changes.
+			if text, ok := renderer.TranslateLuxTextInput(luxEvent); ok {
+				pendingText = text
+				continue
+			}
+
+			// Send button submits buffered text (skip if empty).
+			if inter.ElementID == "act_send" {
+				if pendingText == "" {
+					continue
+				}
+				input := model.InputEvent{Type: "input", Payload: pendingText}
+				pendingText = ""
+				select {
+				case d.events <- input:
+				case <-d.done:
+					return
+				}
+				continue
+			}
+
+			// Other button clicks.
 			if input, ok := renderer.TranslateLuxEvent(luxEvent); ok {
 				select {
 				case d.events <- input:
