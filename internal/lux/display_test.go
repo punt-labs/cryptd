@@ -120,6 +120,78 @@ func TestDisplay_EventsTranslateInteractions(t *testing.T) {
 	}
 }
 
+func TestDisplay_TextInputBuffering(t *testing.T) {
+	srv := newMiniServer(t)
+	defer srv.close()
+
+	c := NewClient(
+		WithSocketPath(srv.sockPath),
+		WithRecvTimeout(2*time.Second),
+	)
+
+	go srv.acceptAndHandshake()
+	require.NoError(t, c.Connect())
+
+	display := NewDisplay(c, "test-scene", nil)
+	defer display.Close()
+
+	// Send text input "changed" event followed by Send button click.
+	srv.sendFrame(InteractionMessage{
+		Type:      "interaction",
+		ElementID: "cmd_input",
+		Action:    "changed",
+		Value:     "go north",
+	})
+	srv.sendFrame(InteractionMessage{
+		Type:      "interaction",
+		ElementID: "act_send",
+		Action:    "act_send",
+	})
+
+	select {
+	case evt := <-display.Events():
+		assert.Equal(t, model.InputEvent{Type: "input", Payload: "go north"}, evt)
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for text input event")
+	}
+}
+
+func TestDisplay_EmptySendIgnored(t *testing.T) {
+	srv := newMiniServer(t)
+	defer srv.close()
+
+	c := NewClient(
+		WithSocketPath(srv.sockPath),
+		WithRecvTimeout(2*time.Second),
+	)
+
+	go srv.acceptAndHandshake()
+	require.NoError(t, c.Connect())
+
+	display := NewDisplay(c, "test-scene", nil)
+	defer display.Close()
+
+	// Send button click without prior text input — should be ignored.
+	srv.sendFrame(InteractionMessage{
+		Type:      "interaction",
+		ElementID: "act_send",
+		Action:    "act_send",
+	})
+	// Then send a regular button click to verify the channel isn't blocked.
+	srv.sendFrame(InteractionMessage{
+		Type:      "interaction",
+		ElementID: "act_look",
+		Action:    "act_look",
+	})
+
+	select {
+	case evt := <-display.Events():
+		assert.Equal(t, model.InputEvent{Type: "input", Payload: "look"}, evt)
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out — empty send may have produced garbage event")
+	}
+}
+
 func TestDisplay_WriteErrReportsAckError(t *testing.T) {
 	srv := newMiniServer(t)
 	defer srv.close()

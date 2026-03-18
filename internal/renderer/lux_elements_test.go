@@ -56,17 +56,22 @@ func TestSceneToElements_ActionButtons(t *testing.T) {
 	}
 	elements := SceneToElements(scene)
 
-	var buttons []map[string]any
+	// Action buttons are inside a group with id "actions".
+	var actionsGroup map[string]any
 	for _, el := range elements {
-		if el["kind"] == "button" {
-			buttons = append(buttons, el)
+		if el["id"] == "actions" {
+			actionsGroup = el
+			break
 		}
 	}
-	require.Len(t, buttons, 3)
-	assert.Equal(t, "act_south", buttons[0]["id"])
-	assert.Equal(t, "south", buttons[0]["label"])
-	assert.Equal(t, "act_look", buttons[1]["id"])
-	assert.Equal(t, "act_inventory", buttons[2]["id"])
+	require.NotNil(t, actionsGroup, "actions group not found")
+	children, ok := actionsGroup["children"].([]map[string]any)
+	require.True(t, ok)
+	require.Len(t, children, 3)
+	assert.Equal(t, "act_south", children[0]["id"])
+	assert.Equal(t, "south", children[0]["label"])
+	assert.Equal(t, "act_look", children[1]["id"])
+	assert.Equal(t, "act_inventory", children[2]["id"])
 }
 
 func TestSceneToElements_Narration(t *testing.T) {
