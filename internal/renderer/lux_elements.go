@@ -153,8 +153,6 @@ func UpdateToPatches(update LuxUpdate) []map[string]any {
 }
 
 // TranslateLuxEvent converts a Lux interaction event map into an InputEvent.
-// Button IDs follow the "act_<action>" convention; unknown IDs return false.
-// TranslateLuxEvent converts a Lux interaction event map into an InputEvent.
 // Accepts button clicks on act_<command> elements. Lux sends button
 // interactions with action set to the element ID or "clicked"; both are
 // accepted. Other actions (hover, focus) are rejected.

@@ -133,8 +133,8 @@ func (d *Display) eventLoop() {
 				continue
 			}
 
-			// Send button submits buffered text (skip if empty).
-			if inter.ElementID == "act_send" {
+			// Send button submits buffered text (skip if empty or non-click action).
+			if inter.ElementID == "act_send" && (inter.Action == "clicked" || inter.Action == "act_send") {
 				if pendingText == "" {
 					continue
 				}
