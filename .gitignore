@@ -31,3 +31,5 @@ copilot-session-*.md
 
 # Local Claude tool settings
 .claude/settings.local.json
+.biff.local
+.envrc.local
