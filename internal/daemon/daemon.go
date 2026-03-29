@@ -197,7 +197,7 @@ func (s *Server) Serve(ln net.Listener) error {
 	var (
 		wg      sync.WaitGroup
 		connsMu sync.Mutex
-		conns   []net.Conn
+		conns   = make(map[net.Conn]struct{})
 	)
 
 	// shutdown cancels the server context, closes all active connections
@@ -205,7 +205,7 @@ func (s *Server) Serve(ln net.Listener) error {
 	shutdown := func() {
 		s.cancel()
 		connsMu.Lock()
-		for _, c := range conns {
+		for c := range conns {
 			c.Close()
 		}
 		connsMu.Unlock()
@@ -225,7 +225,7 @@ func (s *Server) Serve(ln net.Listener) error {
 		log.Println("daemon: client connected")
 
 		connsMu.Lock()
-		conns = append(conns, conn)
+		conns[conn] = struct{}{}
 		connsMu.Unlock()
 
 		wg.Add(1)
@@ -235,6 +235,9 @@ func (s *Server) Serve(ln net.Listener) error {
 				if r := recover(); r != nil {
 					log.Printf("daemon: connection handler panicked: %v", r)
 				}
+				connsMu.Lock()
+				delete(conns, c)
+				connsMu.Unlock()
 				if err := c.Close(); err != nil {
 					log.Printf("daemon: conn close: %v", err)
 				}
@@ -266,7 +269,7 @@ func (s *Server) getOrCreateSession(id string) *Session {
 
 // createAndStartGame creates a new Game, starts its goroutine, and stores it in the registry.
 func (s *Server) createAndStartGame() (*Game, error) {
-	id, err := generateGameID()
+	id, err := generateID()
 	if err != nil {
 		return nil, err
 	}

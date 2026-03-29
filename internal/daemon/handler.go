@@ -148,7 +148,7 @@ func (s *Server) handleRequest(req Request, sess **Session) Response {
 			sid = id
 		} else {
 			var err error
-			sid, err = generateSessionID()
+			sid, err = generateID()
 			if err != nil {
 				return Response{
 					JSONRPC: "2.0",
@@ -301,7 +301,7 @@ func (s *Server) handleNewGamePassthrough(req Request, params ToolCallParams, se
 	}
 	s.mu.Unlock()
 	if oldGame != nil {
-		oldGame.Stop()
+		go oldGame.Stop() // async: may block if RunLoop is active on another connection
 	}
 
 	g, err := s.createAndStartGame()
@@ -316,6 +316,7 @@ func (s *Server) handleNewGamePassthrough(req Request, params ToolCallParams, se
 	result, rpcErr := g.Send(s.ctx, "new_game", params.Arguments)
 	if rpcErr != nil {
 		s.removeGame(g.id)
+		g.Stop()
 		return s.toolErrorResponse(req.ID, rpcErr)
 	}
 

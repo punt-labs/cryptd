@@ -39,20 +39,11 @@ func sanitizeSessionID(id string) string {
 	return clean
 }
 
-// generateSessionID returns a 32-character hex string from crypto/rand.
-func generateSessionID() (string, error) {
+// generateID returns a 32-character hex string from crypto/rand.
+func generateID() (string, error) {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
-		return "", fmt.Errorf("generate session ID: %w", err)
-	}
-	return hex.EncodeToString(b), nil
-}
-
-// generateGameID returns a 32-character hex string from crypto/rand.
-func generateGameID() (string, error) {
-	b := make([]byte, 16)
-	if _, err := rand.Read(b); err != nil {
-		return "", fmt.Errorf("generate game ID: %w", err)
+		return "", fmt.Errorf("generate ID: %w", err)
 	}
 	return hex.EncodeToString(b), nil
 }

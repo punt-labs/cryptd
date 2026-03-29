@@ -59,7 +59,7 @@ func (s *Server) handleNewGamePlay(req Request, sess **Session) Response {
 	}
 	s.mu.Unlock()
 	if oldGame != nil {
-		oldGame.Stop()
+		go oldGame.Stop() // async: may block if RunLoop is active on another connection
 	}
 
 	g, err := s.createAndStartGame()
@@ -74,6 +74,7 @@ func (s *Server) handleNewGamePlay(req Request, sess **Session) Response {
 	_, rpcErr := g.Send(s.ctx, "new_game", params.Arguments)
 	if rpcErr != nil {
 		s.removeGame(g.id)
+		g.Stop()
 		return Response{
 			JSONRPC: "2.0",
 			ID:      req.ID,
