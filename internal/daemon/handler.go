@@ -2,13 +2,11 @@ package daemon
 
 import (
 	"bufio"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 
-	"github.com/punt-labs/cryptd/internal/game"
 	"github.com/punt-labs/cryptd/internal/protocol"
 )
 
@@ -61,16 +59,17 @@ var toolRegistry = []ToolInfo{
 //
 // In normal mode, the handshake phase (initialize, tools/list, new_game)
 // runs as request-response. After new_game, the game loop takes over via
-// RPCRenderer and blocks until the player quits or the connection closes.
+// the game goroutine's RunLoop and blocks until the player quits or the
+// connection closes.
 //
-// In passthrough mode, every request goes through the dispatcher — there is
-// no game loop or RPCRenderer.
+// In passthrough mode, every request goes through the game goroutine's
+// command channel — there is no game loop or RPCRenderer.
 func (s *Server) handleConnection(r io.Reader, w io.Writer) {
 	scanner := bufio.NewScanner(r)
 	// Allow up to 1 MB per line (generous for JSON-RPC).
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 
-	conn := &connState{}
+	var sess *Session
 
 	for scanner.Scan() {
 		line := scanner.Bytes()
@@ -97,7 +96,7 @@ func (s *Server) handleConnection(r io.Reader, w io.Writer) {
 			continue
 		}
 
-		resp := s.safeHandleRequest(req, conn)
+		resp := s.safeHandleRequest(req, &sess)
 
 		// JSON-RPC 2.0: requests without an ID are notifications — no response.
 		if req.ID == nil {
@@ -106,9 +105,10 @@ func (s *Server) handleConnection(r io.Reader, w io.Writer) {
 		s.writeResponse(w, resp)
 
 		// In normal mode, after a successful new_game, hand the connection
-		// to the game loop via RPCRenderer. The loop blocks until quit/death/EOF.
-		if !s.passthrough && s.isNewGameSuccess(req, resp) {
-			s.runGameLoop(scanner, w)
+		// to the game loop via the game goroutine's RunLoop. The loop blocks
+		// until quit/death/EOF.
+		if !s.passthrough && sess != nil && s.isNewGameSuccess(req, resp) {
+			s.runGameLoop(scanner, w, sess)
 			return
 		}
 	}
@@ -120,7 +120,7 @@ func (s *Server) handleConnection(r io.Reader, w io.Writer) {
 
 // safeHandleRequest wraps handleRequest with panic recovery so one bad request
 // does not crash the daemon or drop the connection.
-func (s *Server) safeHandleRequest(req Request, conn *connState) (resp Response) {
+func (s *Server) safeHandleRequest(req Request, sess **Session) (resp Response) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("daemon: panic handling %s: %v", req.Method, r)
@@ -131,11 +131,11 @@ func (s *Server) safeHandleRequest(req Request, conn *connState) (resp Response)
 			}
 		}
 	}()
-	return s.handleRequest(req, conn)
+	return s.handleRequest(req, sess)
 }
 
 // handleRequest routes a single JSON-RPC request to the appropriate handler.
-func (s *Server) handleRequest(req Request, conn *connState) Response {
+func (s *Server) handleRequest(req Request, sess **Session) Response {
 	switch req.Method {
 	case "initialize":
 		var params protocol.InitializeParams
@@ -157,7 +157,8 @@ func (s *Server) handleRequest(req Request, conn *connState) Response {
 				}
 			}
 		}
-		conn.sessionID = sid
+
+		*sess = s.getOrCreateSession(sid)
 		log.Printf("daemon: session %s established", sid)
 
 		return Response{
@@ -189,7 +190,7 @@ func (s *Server) handleRequest(req Request, conn *connState) Response {
 				}
 			}
 			if params.Name == "new_game" {
-				return s.handleNewGamePlay(req)
+				return s.handleNewGamePlay(req, sess)
 			}
 			return Response{
 				JSONRPC: "2.0",
@@ -197,7 +198,7 @@ func (s *Server) handleRequest(req Request, conn *connState) Response {
 				Error:   &RPCError{Code: CodeMethodNotFound, Message: "only new_game is available before the game loop starts — use play for text input"},
 			}
 		}
-		return s.handleToolCall(req)
+		return s.handleToolCall(req, *sess)
 
 	default:
 		return Response{
@@ -222,54 +223,28 @@ func (s *Server) isNewGameSuccess(req Request, resp Response) bool {
 	return false
 }
 
-// runGameLoop creates an RPCRenderer from the existing scanner and writer,
-// then runs the game loop. The loop drives the renderer: Render() writes
+// runGameLoop sends a RunLoop command to the game goroutine, which runs the
+// game loop internally. The loop drives the RPCRenderer: Render() writes
 // PlayResponse NDJSON, Events() reads play requests. Blocks until quit/death/EOF.
-func (s *Server) runGameLoop(scanner *bufio.Scanner, w io.Writer) {
-	rend := NewRPCRenderer(scanner, w)
-	rend.skipInitialRender = true // handleNewGamePlay already sent the initial room
-
-	s.mu.Lock()
-	loop := game.NewLoop(s.eng, s.interp, s.narr, rend)
-	s.mu.Unlock()
-
-	ctx := context.Background()
-	rend.StartReader(ctx)
-
-	s.mu.Lock()
-	state := s.state
-	s.mu.Unlock()
-
-	if err := loop.Run(ctx, state); err != nil {
-		log.Printf("daemon: game loop error: %v", err)
+func (s *Server) runGameLoop(scanner *bufio.Scanner, w io.Writer, sess *Session) {
+	g, rpcErr := s.gameForSession(sess)
+	if rpcErr != nil {
+		log.Printf("daemon: runGameLoop: %s", rpcErr.Message)
 		return
 	}
 
-	// The game loop exited cleanly (quit or hero died). Send a final
-	// PlayResponse with the terminal flag so the client exits cleanly.
-	s.mu.Lock()
-	dead := len(state.Party) > 0 && state.Party[0].HP <= 0
-	s.mu.Unlock()
-
-	finalResp := protocol.Response{
-		JSONRPC: "2.0",
-		ID:      rend.getLastID(),
-		Result: protocol.PlayResponse{
-			Quit: !dead,
-			Dead: dead,
-		},
+	if rpcErr = g.RunLoop(s.ctx, &RunLoopRequest{
+		Scanner: scanner,
+		Writer:  w,
+		Interp:  s.interp,
+		Narr:    s.narr,
+	}); rpcErr != nil {
+		log.Printf("daemon: game loop error: %s", rpcErr.Message)
 	}
-	data, err := json.Marshal(finalResp)
-	if err != nil {
-		log.Printf("daemon: marshal final response: %v", err)
-		return
-	}
-	data = append(data, '\n')
-	w.Write(data)
 }
 
-// handleToolCall processes a tools/call request by dispatching to the engine.
-func (s *Server) handleToolCall(req Request) Response {
+// handleToolCall processes a tools/call request by dispatching to the game goroutine.
+func (s *Server) handleToolCall(req Request, sess *Session) Response {
 	var params ToolCallParams
 	if err := json.Unmarshal(req.Params, &params); err != nil {
 		return Response{
@@ -279,40 +254,109 @@ func (s *Server) handleToolCall(req Request) Response {
 		}
 	}
 
-	result, rpcErr := s.dispatch(params.Name, params.Arguments)
-	if rpcErr != nil {
-		// MCP convention: tool execution errors are returned as ToolResult
-		// with isError=true (not JSON-RPC errors). This lets MCP clients
-		// distinguish protocol failures from game-logic errors.
-		// Serialize the full RPCError so clients can use error codes.
-		errJSON, merr := json.Marshal(rpcErr)
-		errText := rpcErr.Message
-		if merr == nil {
-			errText = string(errJSON)
-		}
+	// new_game is special: it creates a game if there isn't one.
+	if params.Name == "new_game" {
+		return s.handleNewGamePassthrough(req, params, sess)
+	}
+
+	if sess == nil {
 		return Response{
 			JSONRPC: "2.0",
 			ID:      req.ID,
-			Result: ToolResult{
-				IsError: true,
-				Content: []ToolContent{{Type: "text", Text: errText}},
-			},
+			Error:   &RPCError{Code: CodeInvalidRequest, Message: "call initialize first"},
 		}
 	}
 
-	// Marshal the result to JSON text for the MCP content array.
-	data, err := json.Marshal(result)
+	g, rpcErr := s.gameForSession(sess)
+	if rpcErr != nil {
+		return s.toolErrorResponse(req.ID, rpcErr)
+	}
+
+	result, rpcErr := g.Send(s.ctx, params.Name, params.Arguments)
+	if rpcErr != nil {
+		return s.toolErrorResponse(req.ID, rpcErr)
+	}
+
+	return s.toolSuccessResponse(req.ID, result)
+}
+
+// handleNewGamePassthrough creates a game (if needed) and sends new_game to it.
+func (s *Server) handleNewGamePassthrough(req Request, params ToolCallParams, sess *Session) Response {
+	if sess == nil {
+		return Response{
+			JSONRPC: "2.0",
+			ID:      req.ID,
+			Error:   &RPCError{Code: CodeInvalidRequest, Message: "call initialize first"},
+		}
+	}
+
+	// Clean up any existing game for this session.
+	var oldGame *Game
+	s.mu.Lock()
+	if sess.gameID != "" {
+		if old, ok := s.games[sess.gameID]; ok {
+			delete(s.games, sess.gameID)
+			oldGame = old
+		}
+	}
+	s.mu.Unlock()
+	if oldGame != nil {
+		oldGame.Stop()
+	}
+
+	g, err := s.createAndStartGame()
 	if err != nil {
 		return Response{
 			JSONRPC: "2.0",
 			ID:      req.ID,
-			Error:   &RPCError{Code: CodeInternalError, Message: "marshal result: " + err.Error()},
+			Error:   &RPCError{Code: CodeInternalError, Message: err.Error()},
 		}
 	}
 
+	result, rpcErr := g.Send(s.ctx, "new_game", params.Arguments)
+	if rpcErr != nil {
+		s.removeGame(g.id)
+		return s.toolErrorResponse(req.ID, rpcErr)
+	}
+
+	// Bind the session to this game.
+	s.mu.Lock()
+	sess.gameID = g.id
+	s.mu.Unlock()
+
+	return s.toolSuccessResponse(req.ID, result)
+}
+
+// toolErrorResponse wraps an RPCError as a ToolResult with isError=true.
+func (s *Server) toolErrorResponse(id json.RawMessage, rpcErr *RPCError) Response {
+	errJSON, merr := json.Marshal(rpcErr)
+	errText := rpcErr.Message
+	if merr == nil {
+		errText = string(errJSON)
+	}
 	return Response{
 		JSONRPC: "2.0",
-		ID:      req.ID,
+		ID:      id,
+		Result: ToolResult{
+			IsError: true,
+			Content: []ToolContent{{Type: "text", Text: errText}},
+		},
+	}
+}
+
+// toolSuccessResponse wraps a result as a ToolResult.
+func (s *Server) toolSuccessResponse(id json.RawMessage, result any) Response {
+	data, err := json.Marshal(result)
+	if err != nil {
+		return Response{
+			JSONRPC: "2.0",
+			ID:      id,
+			Error:   &RPCError{Code: CodeInternalError, Message: "marshal result: " + err.Error()},
+		}
+	}
+	return Response{
+		JSONRPC: "2.0",
+		ID:      id,
 		Result: ToolResult{
 			Content: []ToolContent{{Type: "text", Text: string(data)}},
 		},
@@ -320,7 +364,6 @@ func (s *Server) handleToolCall(req Request) Response {
 }
 
 // writeResponse serialises a Response as a single NDJSON line.
-// Not concurrency-safe: callers must serialize writes or add a per-connection mutex (M10).
 func (s *Server) writeResponse(w io.Writer, resp Response) {
 	data, err := json.Marshal(resp)
 	if err != nil {

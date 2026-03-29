@@ -132,22 +132,33 @@ func TestNormalMode_PlayBeforeNewGame(t *testing.T) {
 	srv := testNormalServer(t)
 
 	// Before new_game, "play" method is unknown (game loop not started).
-	resp := roundTrip(t, srv, Request{
-		JSONRPC: "2.0",
-		ID:      json.RawMessage(`1`),
-		Method:  "play",
-		Params:  json.RawMessage(`{"text":"look"}`),
-	})
-	require.NotNil(t, resp.Error)
-	assert.Equal(t, CodeMethodNotFound, resp.Error.Code)
+	// Need to initialize first, then try play.
+	reqs := []Request{
+		initRequest(0),
+		{
+			JSONRPC: "2.0",
+			ID:      json.RawMessage(`1`),
+			Method:  "play",
+			Params:  json.RawMessage(`{"text":"look"}`),
+		},
+	}
+	resps := multiRoundTrip(t, srv, reqs)
+	require.Len(t, resps, 2)
+	require.NotNil(t, resps[1].Error)
+	assert.Equal(t, CodeMethodNotFound, resps[1].Error.Code)
 }
 
 func TestNormalMode_NonNewGameToolCallBlocked(t *testing.T) {
 	srv := testNormalServer(t)
 
 	// In normal mode, non-new_game tool calls are blocked.
-	resp := roundTrip(t, srv, toolCall(1, "look", map[string]any{}))
-	require.NotNil(t, resp.Error)
-	assert.Equal(t, CodeMethodNotFound, resp.Error.Code)
-	assert.True(t, strings.Contains(resp.Error.Message, "new_game"), resp.Error.Message)
+	reqs := []Request{
+		initRequest(0),
+		toolCall(1, "look", map[string]any{}),
+	}
+	resps := multiRoundTrip(t, srv, reqs)
+	require.Len(t, resps, 2)
+	require.NotNil(t, resps[1].Error)
+	assert.Equal(t, CodeMethodNotFound, resps[1].Error.Code)
+	assert.True(t, strings.Contains(resps[1].Error.Message, "new_game"), resps[1].Error.Message)
 }

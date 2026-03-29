@@ -1,63 +1,279 @@
 package daemon
 
 import (
+	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 
 	"github.com/punt-labs/cryptd/internal/engine"
+	"github.com/punt-labs/cryptd/internal/game"
 	"github.com/punt-labs/cryptd/internal/model"
 	"github.com/punt-labs/cryptd/internal/scenariodir"
 )
 
-// dispatch routes a tool call to the appropriate engine method and returns
-// the result as a JSON-serialisable value. Errors are returned as *RPCError
-// with appropriate JSON-RPC codes.
-func (s *Server) dispatch(name string, args json.RawMessage) (any, *RPCError) {
-	if name == "new_game" {
-		return s.dispatchNewGame(args)
+// CommandResult holds the result of a command executed inside the game goroutine.
+type CommandResult struct {
+	Result any
+	Err    *RPCError
+}
+
+// Command represents a request sent to the game goroutine via its command channel.
+type Command struct {
+	// Type is "tool", "run_loop", or "inspect".
+	Type string
+
+	// Tool command fields.
+	Name string
+	Args json.RawMessage
+
+	// RunLoop command fields (normal mode).
+	LoopReq *RunLoopRequest
+
+	// Inspect command field (test-only).
+	InspectFn func(*engine.Engine, *model.GameState)
+
+	// Reply receives the command result. Buffered 1.
+	Reply chan<- CommandResult
+}
+
+// RunLoopRequest carries the dependencies for running the game loop inside the
+// game goroutine (normal mode).
+type RunLoopRequest struct {
+	Scanner *bufio.Scanner
+	Writer  io.Writer
+	Interp  model.CommandInterpreter
+	Narr    model.Narrator
+}
+
+// Game represents a running game instance. Each Game is a goroutine that
+// exclusively owns its *engine.Engine and *model.GameState. No mutex needed —
+// serialization by construction.
+type Game struct {
+	id       string
+	commands chan Command
+	done     chan struct{} // closed when the game goroutine exits
+}
+
+// newGame creates a Game and starts its goroutine. The goroutine runs until ctx
+// is cancelled or the commands channel is closed.
+func newGame(ctx context.Context, id, scenarioDir, defaultScenario string) *Game {
+	g := &Game{
+		id:       id,
+		commands: make(chan Command, 1),
+		done:     make(chan struct{}),
 	}
+	go g.run(ctx, scenarioDir, defaultScenario)
+	return g
+}
 
-	// All other tools require an active game.
-	s.mu.Lock()
-	defer s.mu.Unlock()
+// run is the game goroutine. It exclusively owns eng and state.
+// No other goroutine may touch these.
+func (g *Game) run(ctx context.Context, scenarioDir, defaultScenario string) {
+	var eng *engine.Engine
+	var state *model.GameState
+	defer close(g.done)
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("daemon: game %s panicked: %v", g.id, r)
+		}
+	}()
 
-	if s.eng == nil || s.state == nil {
-		return nil, &RPCError{Code: CodeNoActiveGame, Message: "no active game — call new_game first"}
+	for {
+		select {
+		case cmd, ok := <-g.commands:
+			if !ok {
+				return // channel closed, game over
+			}
+
+			switch cmd.Type {
+			case "tool":
+				if cmd.Name == "new_game" {
+					newEng, newState, result, rpcErr := dispatchNewGame(cmd.Args, scenarioDir, defaultScenario)
+					if rpcErr == nil {
+						eng = newEng
+						state = newState
+					}
+					cmd.Reply <- CommandResult{Result: result, Err: rpcErr}
+					continue
+				}
+				if eng == nil || state == nil {
+					cmd.Reply <- CommandResult{Err: &RPCError{Code: CodeNoActiveGame, Message: "no active game — call new_game first"}}
+					continue
+				}
+				result, rpcErr := dispatch(eng, state, cmd.Name, cmd.Args)
+				cmd.Reply <- CommandResult{Result: result, Err: rpcErr}
+
+			case "run_loop":
+				if eng == nil || state == nil {
+					cmd.Reply <- CommandResult{Err: &RPCError{Code: CodeNoActiveGame, Message: "no active game — call new_game first"}}
+					continue
+				}
+				lr := cmd.LoopReq
+				loopCtx, loopCancel := context.WithCancel(ctx)
+				rend := NewRPCRenderer(lr.Scanner, lr.Writer)
+				rend.skipInitialRender = true // caller already sent initial room
+
+				loop := game.NewLoop(eng, lr.Interp, lr.Narr, rend)
+				rend.StartReader(loopCtx)
+
+				var loopErr *RPCError
+				if err := loop.Run(loopCtx, state); err != nil {
+					log.Printf("daemon: game loop error: %v", err)
+					loopErr = &RPCError{Code: CodeInternalError, Message: err.Error()}
+				}
+				loopCancel() // stop readLoop goroutine
+
+				// Send the final PlayResponse with terminal flags.
+				dead := len(state.Party) > 0 && state.Party[0].HP <= 0
+				finalResp := Response{
+					JSONRPC: "2.0",
+					ID:      rend.getLastID(),
+					Result: PlayResponse{
+						Quit: !dead,
+						Dead: dead,
+					},
+				}
+				data, err := json.Marshal(finalResp)
+				if err != nil {
+					log.Printf("daemon: marshal final response: %v", err)
+				} else {
+					data = append(data, '\n')
+					if _, err := lr.Writer.Write(data); err != nil {
+						log.Printf("daemon: game %s: write final response: %v", g.id, err)
+					}
+				}
+
+				cmd.Reply <- CommandResult{Err: loopErr}
+
+			case "inspect":
+				// eng and state may be nil if new_game hasn't been called yet.
+				// InspectFn callers must handle nil values or ensure new_game preceded Inspect.
+				cmd.InspectFn(eng, state)
+				cmd.Reply <- CommandResult{}
+
+			default:
+				cmd.Reply <- CommandResult{Err: &RPCError{Code: CodeInternalError, Message: fmt.Sprintf("unknown command type %q", cmd.Type)}}
+			}
+
+		case <-ctx.Done():
+			return
+		}
 	}
+}
 
+// Stop signals the game goroutine to exit by closing the commands channel,
+// then waits for it to finish.
+func (g *Game) Stop() {
+	close(g.commands)
+	<-g.done
+}
+
+// Send sends a tool command to the game goroutine and waits for the result.
+// Safe to call from any goroutine.
+func (g *Game) Send(ctx context.Context, name string, args json.RawMessage) (any, *RPCError) {
+	reply := make(chan CommandResult, 1)
+	cmd := Command{Type: "tool", Name: name, Args: args, Reply: reply}
+	select {
+	case g.commands <- cmd:
+	case <-ctx.Done():
+		return nil, &RPCError{Code: CodeInternalError, Message: "context cancelled"}
+	case <-g.done:
+		return nil, &RPCError{Code: CodeInternalError, Message: "game terminated"}
+	}
+	select {
+	case res := <-reply:
+		return res.Result, res.Err
+	case <-ctx.Done():
+		return nil, &RPCError{Code: CodeInternalError, Message: "context cancelled"}
+	case <-g.done:
+		return nil, &RPCError{Code: CodeInternalError, Message: "game terminated"}
+	}
+}
+
+// RunLoop sends a run_loop command that makes the game goroutine run the full
+// game loop internally (normal mode). Blocks until the loop exits.
+func (g *Game) RunLoop(ctx context.Context, req *RunLoopRequest) *RPCError {
+	reply := make(chan CommandResult, 1)
+	cmd := Command{Type: "run_loop", LoopReq: req, Reply: reply}
+	select {
+	case g.commands <- cmd:
+	case <-ctx.Done():
+		return &RPCError{Code: CodeInternalError, Message: "context cancelled"}
+	case <-g.done:
+		return &RPCError{Code: CodeInternalError, Message: "game terminated"}
+	}
+	select {
+	case res := <-reply:
+		return res.Err
+	case <-ctx.Done():
+		return &RPCError{Code: CodeInternalError, Message: "context cancelled"}
+	case <-g.done:
+		return &RPCError{Code: CodeInternalError, Message: "game terminated"}
+	}
+}
+
+// Inspect runs fn inside the game goroutine with exclusive access to eng and
+// state. The function executes synchronously — the game goroutine blocks until
+// fn returns. Used for safe state inspection from handler code and tests.
+func (g *Game) Inspect(ctx context.Context, fn func(*engine.Engine, *model.GameState)) error {
+	reply := make(chan CommandResult, 1)
+	cmd := Command{Type: "inspect", InspectFn: fn, Reply: reply}
+	select {
+	case g.commands <- cmd:
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-g.done:
+		return fmt.Errorf("game terminated")
+	}
+	select {
+	case <-reply:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-g.done:
+		return fmt.Errorf("game terminated")
+	}
+}
+
+// --- dispatch (free functions, called only from inside the game goroutine) ---
+
+// dispatch routes a tool call to the appropriate engine method.
+func dispatch(eng *engine.Engine, state *model.GameState, name string, args json.RawMessage) (any, *RPCError) {
 	switch name {
 	case "move":
-		return s.dispatchMove(args)
+		return dispatchMove(eng, state, args)
 	case "look":
-		return s.dispatchLook()
+		return dispatchLook(eng, state)
 	case "pick_up":
-		return s.dispatchPickUp(args)
+		return dispatchPickUp(eng, state, args)
 	case "drop":
-		return s.dispatchDrop(args)
+		return dispatchDrop(eng, state, args)
 	case "equip":
-		return s.dispatchEquip(args)
+		return dispatchEquip(eng, state, args)
 	case "unequip":
-		return s.dispatchUnequip(args)
+		return dispatchUnequip(eng, state, args)
 	case "examine":
-		return s.dispatchExamine(args)
+		return dispatchExamine(eng, state, args)
 	case "inventory":
-		return s.dispatchInventory()
+		return dispatchInventory(eng, state)
 	case "attack":
-		return s.dispatchAttack(args)
+		return dispatchAttack(eng, state, args)
 	case "defend":
-		return s.dispatchDefend()
+		return dispatchDefend(eng, state)
 	case "flee":
-		return s.dispatchFlee()
+		return dispatchFlee(eng, state)
 	case "cast_spell":
-		return s.dispatchCastSpell(args)
+		return dispatchCastSpell(eng, state, args)
 	case "use_item":
-		return s.dispatchUseItem(args)
+		return dispatchUseItem(eng, state, args)
 	case "save_game":
-		return s.dispatchSaveGame(args)
+		return dispatchSaveGame(eng, state, args)
 	case "load_game":
-		return s.dispatchLoadGame(args)
+		return dispatchLoadGame(eng, state, args)
 	default:
 		return nil, &RPCError{Code: CodeInvalidParams, Message: fmt.Sprintf("unknown tool %q", name)}
 	}
@@ -72,52 +288,50 @@ type newGameArgs struct {
 	Stats          *model.Stats `json:"stats,omitempty"`
 }
 
-func (s *Server) dispatchNewGame(raw json.RawMessage) (any, *RPCError) {
+// dispatchNewGame creates a new engine and state. Returns them alongside the
+// result so the game goroutine can replace its locals.
+func dispatchNewGame(raw json.RawMessage, scenarioDir, defaultScenario string) (*engine.Engine, *model.GameState, any, *RPCError) {
 	var a newGameArgs
 	if err := json.Unmarshal(raw, &a); err != nil {
-		return nil, &RPCError{Code: CodeInvalidParams, Message: "invalid arguments: " + err.Error()}
+		return nil, nil, nil, &RPCError{Code: CodeInvalidParams, Message: "invalid arguments: " + err.Error()}
 	}
-	// Fall back to server default scenario if not specified by client.
 	if a.ScenarioID == "" {
-		a.ScenarioID = s.defaultScenario
+		a.ScenarioID = defaultScenario
 	}
 	if a.ScenarioID == "" || a.CharacterName == "" || a.CharacterClass == "" {
-		return nil, &RPCError{Code: CodeInvalidParams, Message: "scenario_id, character_name, and character_class are required"}
+		return nil, nil, nil, &RPCError{Code: CodeInvalidParams, Message: "scenario_id, character_name, and character_class are required"}
 	}
 
-	sc, err := scenariodir.Load(s.scenarioDir, a.ScenarioID)
+	sc, err := scenariodir.Load(scenarioDir, a.ScenarioID)
 	if err != nil {
-		return nil, &RPCError{Code: CodeInvalidParams, Message: err.Error()}
+		return nil, nil, nil, &RPCError{Code: CodeInvalidParams, Message: err.Error()}
 	}
 
 	hero, err := engine.NewCharacter(a.CharacterName, a.CharacterClass, a.Stats)
 	if err != nil {
-		return nil, &RPCError{Code: CodeInvalidParams, Message: err.Error()}
+		return nil, nil, nil, &RPCError{Code: CodeInvalidParams, Message: err.Error()}
 	}
 
 	eng := engine.New(sc)
-
-	state, err := eng.NewGame(hero)
+	gs, err := eng.NewGame(hero)
 	if err != nil {
-		return nil, &RPCError{Code: CodeInternalError, Message: err.Error()}
+		return nil, nil, nil, &RPCError{Code: CodeInternalError, Message: err.Error()}
 	}
-	// PlayMode is a client-side concept (DES-025). The server does not set it.
 
-	s.mu.Lock()
-	s.eng = eng
-	s.state = &state
-	look := eng.Look(s.state)
-	hs := heroSummary(s.state)
-	s.mu.Unlock()
+	state := &gs
+	look := eng.Look(state)
+	hs := heroSummary(state)
 
-	return map[string]any{
+	result := map[string]any{
 		"room":        look.Room,
 		"name":        look.Name,
 		"description": look.Description,
 		"exits":       look.Exits,
 		"items":       look.Items,
 		"hero":        hs,
-	}, nil
+	}
+
+	return eng, state, result, nil
 }
 
 // --- move ---
@@ -126,8 +340,8 @@ type moveArgs struct {
 	Direction string `json:"direction"`
 }
 
-func (s *Server) dispatchMove(raw json.RawMessage) (any, *RPCError) {
-	if s.state.Dungeon.Combat.Active {
+func dispatchMove(eng *engine.Engine, state *model.GameState, raw json.RawMessage) (any, *RPCError) {
+	if state.Dungeon.Combat.Active {
 		return nil, &RPCError{Code: CodeStateBlocked, Message: "cannot move during combat"}
 	}
 
@@ -139,12 +353,12 @@ func (s *Server) dispatchMove(raw json.RawMessage) (any, *RPCError) {
 		return nil, &RPCError{Code: CodeInvalidParams, Message: "direction is required"}
 	}
 
-	result, err := s.eng.Move(s.state, a.Direction)
+	result, err := eng.Move(state, a.Direction)
 	if err != nil {
 		return nil, engineError(err)
 	}
 
-	look := s.eng.Look(s.state)
+	look := eng.Look(state)
 
 	response := map[string]any{
 		"room":        result.NewRoom,
@@ -154,14 +368,12 @@ func (s *Server) dispatchMove(raw json.RawMessage) (any, *RPCError) {
 		"items":       look.Items,
 	}
 
-	// Auto-start combat if the room has enemies.
-	combatResult, combatErr := s.eng.StartCombat(s.state)
+	combatResult, combatErr := eng.StartCombat(state)
 	switch {
 	case combatErr == nil:
-		response["combat"] = combatSummary(combatResult, s.state)
-		// If enemies go first, process their turns.
-		if s.state.Dungeon.Combat.Active && !isHeroTurn(s.state) {
-			response["enemy_turns"] = s.processEnemyTurns()
+		response["combat"] = combatSummary(combatResult, state)
+		if state.Dungeon.Combat.Active && !isHeroTurn(state) {
+			response["enemy_turns"] = processEnemyTurns(eng, state)
 		}
 	case errors.As(combatErr, new(*engine.NoEnemiesError)),
 		errors.As(combatErr, new(*engine.AlreadyInCombatError)):
@@ -176,8 +388,8 @@ func (s *Server) dispatchMove(raw json.RawMessage) (any, *RPCError) {
 
 // --- look ---
 
-func (s *Server) dispatchLook() (any, *RPCError) {
-	look := s.eng.Look(s.state)
+func dispatchLook(eng *engine.Engine, state *model.GameState) (any, *RPCError) {
+	look := eng.Look(state)
 	result := map[string]any{
 		"room":        look.Room,
 		"name":        look.Name,
@@ -185,8 +397,8 @@ func (s *Server) dispatchLook() (any, *RPCError) {
 		"exits":       look.Exits,
 		"items":       look.Items,
 	}
-	if s.state.Dungeon.Combat.Active {
-		result["combat"] = currentCombatState(s.state)
+	if state.Dungeon.Combat.Active {
+		result["combat"] = currentCombatState(state)
 	}
 	return result, nil
 }
@@ -201,8 +413,8 @@ type slotArgs struct {
 	Slot string `json:"slot"`
 }
 
-func (s *Server) dispatchPickUp(raw json.RawMessage) (any, *RPCError) {
-	if s.state.Dungeon.Combat.Active {
+func dispatchPickUp(eng *engine.Engine, state *model.GameState, raw json.RawMessage) (any, *RPCError) {
+	if state.Dungeon.Combat.Active {
 		return nil, &RPCError{Code: CodeStateBlocked, Message: "cannot pick up items during combat"}
 	}
 	var a itemArgs
@@ -212,18 +424,18 @@ func (s *Server) dispatchPickUp(raw json.RawMessage) (any, *RPCError) {
 	if a.ItemID == "" {
 		return nil, &RPCError{Code: CodeInvalidParams, Message: "item_id is required"}
 	}
-	result, err := s.eng.PickUp(s.state, a.ItemID)
+	result, err := eng.PickUp(state, a.ItemID)
 	if err != nil {
 		return nil, engineError(err)
 	}
 	return map[string]any{
 		"item": result.Item,
-		"hero": heroSummary(s.state),
+		"hero": heroSummary(state),
 	}, nil
 }
 
-func (s *Server) dispatchDrop(raw json.RawMessage) (any, *RPCError) {
-	if s.state.Dungeon.Combat.Active {
+func dispatchDrop(eng *engine.Engine, state *model.GameState, raw json.RawMessage) (any, *RPCError) {
+	if state.Dungeon.Combat.Active {
 		return nil, &RPCError{Code: CodeStateBlocked, Message: "cannot drop items during combat"}
 	}
 	var a itemArgs
@@ -233,18 +445,18 @@ func (s *Server) dispatchDrop(raw json.RawMessage) (any, *RPCError) {
 	if a.ItemID == "" {
 		return nil, &RPCError{Code: CodeInvalidParams, Message: "item_id is required"}
 	}
-	result, err := s.eng.Drop(s.state, a.ItemID)
+	result, err := eng.Drop(state, a.ItemID)
 	if err != nil {
 		return nil, engineError(err)
 	}
 	return map[string]any{
 		"item": result.Item,
-		"hero": heroSummary(s.state),
+		"hero": heroSummary(state),
 	}, nil
 }
 
-func (s *Server) dispatchEquip(raw json.RawMessage) (any, *RPCError) {
-	if s.state.Dungeon.Combat.Active {
+func dispatchEquip(eng *engine.Engine, state *model.GameState, raw json.RawMessage) (any, *RPCError) {
+	if state.Dungeon.Combat.Active {
 		return nil, &RPCError{Code: CodeStateBlocked, Message: "cannot equip items during combat"}
 	}
 	var a itemArgs
@@ -254,19 +466,19 @@ func (s *Server) dispatchEquip(raw json.RawMessage) (any, *RPCError) {
 	if a.ItemID == "" {
 		return nil, &RPCError{Code: CodeInvalidParams, Message: "item_id is required"}
 	}
-	result, err := s.eng.Equip(s.state, a.ItemID)
+	result, err := eng.Equip(state, a.ItemID)
 	if err != nil {
 		return nil, engineError(err)
 	}
 	return map[string]any{
 		"item": result.Item,
 		"slot": result.Slot,
-		"hero": heroSummary(s.state),
+		"hero": heroSummary(state),
 	}, nil
 }
 
-func (s *Server) dispatchUnequip(raw json.RawMessage) (any, *RPCError) {
-	if s.state.Dungeon.Combat.Active {
+func dispatchUnequip(eng *engine.Engine, state *model.GameState, raw json.RawMessage) (any, *RPCError) {
+	if state.Dungeon.Combat.Active {
 		return nil, &RPCError{Code: CodeStateBlocked, Message: "cannot unequip items during combat"}
 	}
 	var a slotArgs
@@ -276,19 +488,19 @@ func (s *Server) dispatchUnequip(raw json.RawMessage) (any, *RPCError) {
 	if a.Slot == "" {
 		return nil, &RPCError{Code: CodeInvalidParams, Message: "slot is required"}
 	}
-	result, err := s.eng.Unequip(s.state, a.Slot)
+	result, err := eng.Unequip(state, a.Slot)
 	if err != nil {
 		return nil, engineError(err)
 	}
 	return map[string]any{
 		"item": result.Item,
 		"slot": result.Slot,
-		"hero": heroSummary(s.state),
+		"hero": heroSummary(state),
 	}, nil
 }
 
-func (s *Server) dispatchExamine(raw json.RawMessage) (any, *RPCError) {
-	if s.state.Dungeon.Combat.Active {
+func dispatchExamine(eng *engine.Engine, state *model.GameState, raw json.RawMessage) (any, *RPCError) {
+	if state.Dungeon.Combat.Active {
 		return nil, &RPCError{Code: CodeStateBlocked, Message: "cannot examine items during combat"}
 	}
 	var a itemArgs
@@ -298,15 +510,15 @@ func (s *Server) dispatchExamine(raw json.RawMessage) (any, *RPCError) {
 	if a.ItemID == "" {
 		return nil, &RPCError{Code: CodeInvalidParams, Message: "item_id is required"}
 	}
-	result, err := s.eng.Examine(s.state, a.ItemID)
+	result, err := eng.Examine(state, a.ItemID)
 	if err != nil {
 		return nil, engineError(err)
 	}
 	return map[string]any{"item": result.Item}, nil
 }
 
-func (s *Server) dispatchInventory() (any, *RPCError) {
-	result := s.eng.Inventory(s.state)
+func dispatchInventory(eng *engine.Engine, state *model.GameState) (any, *RPCError) {
+	result := eng.Inventory(state)
 	return map[string]any{
 		"items":    result.Items,
 		"equipped": result.Equipped,
@@ -321,8 +533,8 @@ type attackArgs struct {
 	TargetID string `json:"target_id"`
 }
 
-func (s *Server) dispatchAttack(raw json.RawMessage) (any, *RPCError) {
-	if !s.state.Dungeon.Combat.Active {
+func dispatchAttack(eng *engine.Engine, state *model.GameState, raw json.RawMessage) (any, *RPCError) {
+	if !state.Dungeon.Combat.Active {
 		return nil, &RPCError{Code: CodeStateBlocked, Message: "not in combat"}
 	}
 
@@ -334,22 +546,22 @@ func (s *Server) dispatchAttack(raw json.RawMessage) (any, *RPCError) {
 	}
 	targetID := a.TargetID
 	if targetID == "" {
-		targetID = s.eng.FirstAliveEnemy(s.state)
+		targetID = eng.FirstAliveEnemy(state)
 		if targetID == "" {
 			return nil, &RPCError{Code: CodeStateBlocked, Message: "no alive enemies to attack"}
 		}
 	}
 
-	result, err := s.eng.Attack(s.state, targetID)
+	result, err := eng.Attack(state, targetID)
 	if err != nil {
 		return nil, engineError(err)
 	}
 
 	response := map[string]any{
-		"target":   result.Target,
-		"damage":   result.Damage,
-		"killed":   result.Killed,
-		"hero":     heroSummary(s.state),
+		"target": result.Target,
+		"damage": result.Damage,
+		"killed": result.Killed,
+		"hero":   heroSummary(state),
 	}
 
 	if result.Killed {
@@ -358,53 +570,53 @@ func (s *Server) dispatchAttack(raw json.RawMessage) (any, *RPCError) {
 
 	if result.CombatOver {
 		response["combat_over"] = true
-		response["level_up"] = s.checkLevelUp()
-	} else if s.state.Dungeon.Combat.Active && !isHeroTurn(s.state) {
-		response["enemy_turns"] = s.processEnemyTurns()
+		response["level_up"] = checkLevelUp(eng, state)
+	} else if state.Dungeon.Combat.Active && !isHeroTurn(state) {
+		response["enemy_turns"] = processEnemyTurns(eng, state)
 	}
 
 	return response, nil
 }
 
-func (s *Server) dispatchDefend() (any, *RPCError) {
-	if !s.state.Dungeon.Combat.Active {
+func dispatchDefend(eng *engine.Engine, state *model.GameState) (any, *RPCError) {
+	if !state.Dungeon.Combat.Active {
 		return nil, &RPCError{Code: CodeStateBlocked, Message: "not in combat"}
 	}
 
-	_, err := s.eng.Defend(s.state)
+	_, err := eng.Defend(state)
 	if err != nil {
 		return nil, engineError(err)
 	}
 
 	response := map[string]any{
 		"defending": true,
-		"hero":      heroSummary(s.state),
+		"hero":      heroSummary(state),
 	}
 
-	if s.state.Dungeon.Combat.Active && !isHeroTurn(s.state) {
-		response["enemy_turns"] = s.processEnemyTurns()
+	if state.Dungeon.Combat.Active && !isHeroTurn(state) {
+		response["enemy_turns"] = processEnemyTurns(eng, state)
 	}
 
 	return response, nil
 }
 
-func (s *Server) dispatchFlee() (any, *RPCError) {
-	if !s.state.Dungeon.Combat.Active {
+func dispatchFlee(eng *engine.Engine, state *model.GameState) (any, *RPCError) {
+	if !state.Dungeon.Combat.Active {
 		return nil, &RPCError{Code: CodeStateBlocked, Message: "not in combat"}
 	}
 
-	result, err := s.eng.Flee(s.state)
+	result, err := eng.Flee(state)
 	if err != nil {
 		return nil, engineError(err)
 	}
 
 	response := map[string]any{
 		"success": result.Success,
-		"hero":    heroSummary(s.state),
+		"hero":    heroSummary(state),
 	}
 
-	if !result.Success && s.state.Dungeon.Combat.Active && !isHeroTurn(s.state) {
-		response["enemy_turns"] = s.processEnemyTurns()
+	if !result.Success && state.Dungeon.Combat.Active && !isHeroTurn(state) {
+		response["enemy_turns"] = processEnemyTurns(eng, state)
 	}
 
 	return response, nil
@@ -415,7 +627,7 @@ type castSpellArgs struct {
 	TargetID string `json:"target_id"`
 }
 
-func (s *Server) dispatchCastSpell(raw json.RawMessage) (any, *RPCError) {
+func dispatchCastSpell(eng *engine.Engine, state *model.GameState, raw json.RawMessage) (any, *RPCError) {
 	var a castSpellArgs
 	if err := json.Unmarshal(raw, &a); err != nil {
 		return nil, &RPCError{Code: CodeInvalidParams, Message: "invalid arguments: " + err.Error()}
@@ -425,11 +637,11 @@ func (s *Server) dispatchCastSpell(raw json.RawMessage) (any, *RPCError) {
 	}
 
 	targetID := a.TargetID
-	if targetID == "" && s.state.Dungeon.Combat.Active {
-		targetID = s.eng.FirstAliveEnemy(s.state)
+	if targetID == "" && state.Dungeon.Combat.Active {
+		targetID = eng.FirstAliveEnemy(state)
 	}
 
-	result, err := s.eng.CastSpell(s.state, a.SpellID, targetID)
+	result, err := eng.CastSpell(state, a.SpellID, targetID)
 	if err != nil {
 		return nil, engineError(err)
 	}
@@ -439,20 +651,18 @@ func (s *Server) dispatchCastSpell(raw json.RawMessage) (any, *RPCError) {
 		"effect":  result.Effect,
 		"power":   result.Power,
 		"mp_cost": result.MPCost,
-		"hero":    heroSummary(s.state),
+		"hero":    heroSummary(state),
 	}
 
 	if result.Effect == "damage" {
 		response["target"] = result.TargetID
 	}
 
-	// After any spell (damage or heal), check combat state and process enemy turns.
-	if s.state.Dungeon.Combat.Active && !isHeroTurn(s.state) {
-		response["enemy_turns"] = s.processEnemyTurns()
-	} else if result.Effect == "damage" && !s.state.Dungeon.Combat.Active {
-		// Combat ended — spell killed last enemy.
+	if state.Dungeon.Combat.Active && !isHeroTurn(state) {
+		response["enemy_turns"] = processEnemyTurns(eng, state)
+	} else if result.Effect == "damage" && !state.Dungeon.Combat.Active {
 		response["combat_over"] = true
-		response["level_up"] = s.checkLevelUp()
+		response["level_up"] = checkLevelUp(eng, state)
 	}
 
 	return response, nil
@@ -460,7 +670,7 @@ func (s *Server) dispatchCastSpell(raw json.RawMessage) (any, *RPCError) {
 
 // --- use_item ---
 
-func (s *Server) dispatchUseItem(raw json.RawMessage) (any, *RPCError) {
+func dispatchUseItem(eng *engine.Engine, state *model.GameState, raw json.RawMessage) (any, *RPCError) {
 	var a itemArgs
 	if err := json.Unmarshal(raw, &a); err != nil {
 		return nil, &RPCError{Code: CodeInvalidParams, Message: "invalid arguments: " + err.Error()}
@@ -468,7 +678,7 @@ func (s *Server) dispatchUseItem(raw json.RawMessage) (any, *RPCError) {
 	if a.ItemID == "" {
 		return nil, &RPCError{Code: CodeInvalidParams, Message: "item_id is required"}
 	}
-	result, err := s.eng.UseItem(s.state, a.ItemID)
+	result, err := eng.UseItem(state, a.ItemID)
 	if err != nil {
 		return nil, engineError(err)
 	}
@@ -486,33 +696,33 @@ type saveLoadArgs struct {
 	Slot string `json:"slot"`
 }
 
-func (s *Server) dispatchSaveGame(raw json.RawMessage) (any, *RPCError) {
+func dispatchSaveGame(eng *engine.Engine, state *model.GameState, raw json.RawMessage) (any, *RPCError) {
 	var a saveLoadArgs
 	if raw != nil {
 		if err := json.Unmarshal(raw, &a); err != nil {
 			return nil, &RPCError{Code: CodeInvalidParams, Message: "invalid arguments: " + err.Error()}
 		}
 	}
-	result, err := s.eng.SaveGame(s.state, a.Slot)
+	result, err := eng.SaveGame(state, a.Slot)
 	if err != nil {
 		return nil, engineError(err)
 	}
 	return map[string]any{"slot": result.Slot, "path": result.Path}, nil
 }
 
-func (s *Server) dispatchLoadGame(raw json.RawMessage) (any, *RPCError) {
+func dispatchLoadGame(eng *engine.Engine, state *model.GameState, raw json.RawMessage) (any, *RPCError) {
 	var a saveLoadArgs
 	if raw != nil {
 		if err := json.Unmarshal(raw, &a); err != nil {
 			return nil, &RPCError{Code: CodeInvalidParams, Message: "invalid arguments: " + err.Error()}
 		}
 	}
-	loaded, result, err := s.eng.LoadGame(a.Slot)
+	loaded, result, err := eng.LoadGame(a.Slot)
 	if err != nil {
 		return nil, engineError(err)
 	}
-	*s.state = loaded
-	look := s.eng.Look(s.state)
+	*state = loaded
+	look := eng.Look(state)
 	return map[string]any{
 		"slot":        result.Slot,
 		"room":        look.Room,
@@ -520,24 +730,21 @@ func (s *Server) dispatchLoadGame(raw json.RawMessage) (any, *RPCError) {
 		"description": look.Description,
 		"exits":       look.Exits,
 		"items":       look.Items,
-		"hero":        heroSummary(s.state),
+		"hero":        heroSummary(state),
 	}, nil
 }
 
 // --- helpers ---
 
 // processEnemyTurns runs all enemy turns until it's the hero's turn (or combat ends).
-// Returns a slice of per-enemy action summaries.
-func (s *Server) processEnemyTurns() []map[string]any {
+func processEnemyTurns(eng *engine.Engine, state *model.GameState) []map[string]any {
 	var turns []map[string]any
-	// Budget allows for all enemies + skips without premature exit.
-	// Skips don't count against the budget since they don't represent real turns.
-	maxIter := len(s.state.Dungeon.Combat.TurnOrder) * 2
+	maxIter := len(state.Dungeon.Combat.TurnOrder) * 2
 	if maxIter < 1 {
 		maxIter = 1
 	}
-	for i := 0; i < maxIter && s.state.Dungeon.Combat.Active && !isHeroTurn(s.state); i++ {
-		result, err := s.eng.ProcessEnemyTurn(s.state)
+	for i := 0; i < maxIter && state.Dungeon.Combat.Active && !isHeroTurn(state); i++ {
+		result, err := eng.ProcessEnemyTurn(state)
 		if err != nil {
 			log.Printf("daemon: processEnemyTurns: unexpected error: %v", err)
 			break
@@ -562,8 +769,8 @@ func (s *Server) processEnemyTurns() []map[string]any {
 }
 
 // checkLevelUp checks and applies a level-up, returning the result or nil.
-func (s *Server) checkLevelUp() any {
-	result := s.eng.CheckLevelUp(s.state)
+func checkLevelUp(eng *engine.Engine, state *model.GameState) any {
+	result := eng.CheckLevelUp(state)
 	if !result.Leveled {
 		return nil
 	}
@@ -581,14 +788,14 @@ func heroSummary(state *model.GameState) map[string]any {
 	}
 	h := &state.Party[0]
 	return map[string]any{
-		"name":  h.Name,
-		"class": h.Class,
-		"level": h.Level,
-		"hp":    h.HP,
+		"name":   h.Name,
+		"class":  h.Class,
+		"level":  h.Level,
+		"hp":     h.HP,
 		"max_hp": h.MaxHP,
-		"mp":    h.MP,
+		"mp":     h.MP,
 		"max_mp": h.MaxMP,
-		"xp":    h.XP,
+		"xp":     h.XP,
 	}
 }
 
@@ -624,7 +831,7 @@ func currentCombatState(state *model.GameState) map[string]any {
 	}
 }
 
-// isHeroTurn safely checks whether it is the hero's turn, guarding against empty TurnOrder.
+// isHeroTurn safely checks whether it is the hero's turn.
 func isHeroTurn(state *model.GameState) bool {
 	to := state.Dungeon.Combat.TurnOrder
 	idx := state.Dungeon.Combat.CurrentTurn
@@ -636,7 +843,6 @@ func isHeroTurn(state *model.GameState) bool {
 
 // engineError maps typed engine errors to JSON-RPC error codes.
 func engineError(err error) *RPCError {
-	// Invalid params errors (user gave bad input).
 	var noExit *engine.NoExitError
 	var notInRoom *engine.ItemNotInRoomError
 	var notInInv *engine.ItemNotInInventoryError
@@ -652,18 +858,15 @@ func engineError(err error) *RPCError {
 	var invalidSlot *engine.InvalidSlotError
 	var scenarioMismatch *engine.ScenarioMismatchError
 
-	// State-blocked errors.
 	var locked *engine.LockedError
 	var notInCombat *engine.NotInCombatError
 	var notHeroTurn *engine.NotHeroTurnError
 	var alreadyCombat *engine.AlreadyInCombatError
 	var noEnemies *engine.NoEnemiesError
 
-	// Game over.
 	var heroDead *engine.HeroDeadError
 
 	switch {
-	// Invalid params.
 	case errors.As(err, &noExit):
 		return &RPCError{Code: CodeInvalidParams, Message: err.Error()}
 	case errors.As(err, &notInRoom):
@@ -693,7 +896,6 @@ func engineError(err error) *RPCError {
 	case errors.As(err, &scenarioMismatch):
 		return &RPCError{Code: CodeInvalidParams, Message: err.Error()}
 
-	// State blocked.
 	case errors.As(err, &locked):
 		return &RPCError{Code: CodeStateBlocked, Message: err.Error()}
 	case errors.As(err, &notInCombat):
@@ -705,7 +907,6 @@ func engineError(err error) *RPCError {
 	case errors.As(err, &noEnemies):
 		return &RPCError{Code: CodeStateBlocked, Message: err.Error()}
 
-	// Game over.
 	case errors.As(err, &heroDead):
 		return &RPCError{Code: CodeGameOver, Message: err.Error()}
 
@@ -713,4 +914,3 @@ func engineError(err error) *RPCError {
 		return &RPCError{Code: CodeInternalError, Message: err.Error()}
 	}
 }
-
