@@ -22,7 +22,7 @@ var errConnLost = errors.New("connection lost")
 
 // run connects to the server and starts the interactive session.
 // Returns an exit code (0 = clean, 1 = error).
-func run(socketPath, addr, scenario, charName, charClass string) int {
+func run(socketPath, addr, scenario, charName, charClass, sessionID string) int {
 	conn, err := dial(socketPath, addr)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -30,7 +30,7 @@ func run(socketPath, addr, scenario, charName, charClass string) int {
 	}
 	defer conn.Close()
 
-	return session(conn, os.Stdin, os.Stdout, os.Stderr, scenario, charName, charClass)
+	return session(conn, os.Stdin, os.Stdout, os.Stderr, scenario, charName, charClass, sessionID)
 }
 
 // dial connects to the server via TCP or Unix socket.
@@ -107,7 +107,7 @@ func dialOrStart(socketPath string) (net.Conn, error) {
 }
 
 // session runs the interactive REPL on an established connection.
-func session(conn net.Conn, in io.Reader, out, errOut io.Writer, scenario, charName, charClass string) int {
+func session(conn net.Conn, in io.Reader, out, errOut io.Writer, scenario, charName, charClass, resumeSessionID string) int {
 	scanner := bufio.NewScanner(conn)
 	// Match the server's 1 MiB buffer to handle large narrated responses.
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
@@ -155,7 +155,11 @@ func session(conn net.Conn, in io.Reader, out, errOut io.Writer, scenario, charN
 	}
 
 	// MCP initialize handshake.
-	initResult, err := send("initialize", nil)
+	var initParams any
+	if resumeSessionID != "" {
+		initParams = protocol.InitializeParams{SessionID: resumeSessionID}
+	}
+	initResult, err := send("initialize", initParams)
 	if err != nil {
 		fmt.Fprintf(errOut, "error: %v\n", err)
 		return 1
@@ -164,9 +168,10 @@ func session(conn net.Conn, in io.Reader, out, errOut io.Writer, scenario, charN
 	if err := json.Unmarshal(initResult, &initResp); err == nil && initResp.SessionID != "" {
 		fmt.Fprintf(errOut, "crypt: session %s\n", initResp.SessionID)
 	}
+	resuming := resumeSessionID != "" && initResp.SessionID == resumeSessionID
 
-	// Auto-start game if --scenario given.
-	if scenario != "" {
+	// Auto-start game if --scenario given (skip if resuming an existing session).
+	if scenario != "" && !resuming {
 		if err := startGame(send, out, errOut, scenario, charName, charClass); err != nil {
 			if errors.Is(err, errConnLost) {
 				fmt.Fprintf(errOut, "error: %v\n", err)
@@ -323,4 +328,6 @@ const helpText = `commands:
 
 Everything else is sent to the server as natural language.
 The server interprets your commands — try "go north",
-"look around", "pick up the sword", "attack", etc.`
+"look around", "pick up the sword", "attack", etc.
+
+To resume a previous session: crypt --session <id>`
