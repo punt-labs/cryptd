@@ -26,8 +26,13 @@ func runMCP(socketPath, addr string) int {
 
 	proxy := newDaemonProxy(conn)
 
-	// Initialize session with the daemon.
-	initResult, err := proxy.call("session.init", nil)
+	// Initialize session with the daemon in passthrough mode.
+	initParams, err := json.Marshal(protocol.InitializeParams{Mode: "passthrough"})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "crypt mcp: marshal init params: %v\n", err)
+		return 1
+	}
+	initResult, err := proxy.call("session.init", initParams)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "crypt mcp: session init failed: %v\n", err)
 		return 1

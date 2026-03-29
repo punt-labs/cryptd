@@ -9,11 +9,12 @@ import (
 )
 
 // Session tracks per-connection state for a client session.
-// A session persists across reconnects — a client that sends `initialize` with
+// A session persists across reconnects — a client that sends `session.init` with
 // its previous session ID gets the same Session back, with its game intact.
 type Session struct {
-	id     string
-	gameID string // empty until new_game
+	id          string
+	gameID      string // empty until new_game
+	passthrough bool   // true = structured JSON responses, false = interpreted + narrated text
 }
 
 // maxSessionIDLen is the maximum length for a client-provided session ID.

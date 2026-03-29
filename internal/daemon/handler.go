@@ -14,13 +14,9 @@ import (
 // handleConnection reads NDJSON requests from r, processes them, and writes
 // NDJSON responses to w. It runs until r is closed or an I/O error occurs.
 //
-// In normal mode, the handshake phase (session.init, game.new)
-// runs as request-response. After game.new, the game loop takes over via
-// the game goroutine's RunLoop and blocks until the player quits or the
-// connection closes.
-//
-// In passthrough mode, every request goes through the game goroutine's
-// command channel — there is no game loop or RPCRenderer.
+// Session mode is determined per-session during session.init: normal-mode
+// sessions run a game loop after game.new (text play via interpreter + narrator),
+// passthrough sessions dispatch game.* methods directly as request-response.
 func (s *Server) handleConnection(r io.Reader, w io.Writer) {
 	scanner := bufio.NewScanner(r)
 	// Allow up to 1 MB per line (generous for JSON-RPC).
@@ -64,7 +60,10 @@ func (s *Server) handleConnection(r io.Reader, w io.Writer) {
 		// In normal mode, after a successful game.new OR a resumed session
 		// with an active game, hand the connection to the game loop via the
 		// game goroutine's RunLoop. The loop blocks until quit/death/EOF.
-		if !s.passthrough && sess != nil {
+		s.mu.RLock()
+		isPassthrough := sess != nil && sess.passthrough
+		s.mu.RUnlock()
+		if sess != nil && !isPassthrough {
 			if s.isNewGameSuccess(req, resp) {
 				s.runGameLoop(scanner, w, sess)
 				return
@@ -128,11 +127,22 @@ func (s *Server) handleRequest(req Request, sess **Session) Response {
 
 		*sess = s.getOrCreateSession(sid)
 
+		// Set session mode from params. A session that requests passthrough
+		// stays in passthrough for its lifetime. Sessions without a mode
+		// default to normal when the server has an interpreter+narrator,
+		// or passthrough otherwise.
+		s.mu.Lock()
+		(*sess).passthrough = params.Mode == "passthrough" || !s.hasNormalMode()
+		s.mu.Unlock()
+
 		s.mu.RLock()
 		hasGame := (*sess).gameID != ""
 		s.mu.RUnlock()
 
-		log.Printf("daemon: session %s established (has_game=%v)", sid, hasGame)
+		s.mu.RLock()
+		pt := (*sess).passthrough
+		s.mu.RUnlock()
+		log.Printf("daemon: session %s established (has_game=%v, passthrough=%v)", sid, hasGame, pt)
 
 		return Response{
 			JSONRPC: "2.0",
@@ -147,14 +157,20 @@ func (s *Server) handleRequest(req Request, sess **Session) Response {
 		}
 
 	case "game.new":
-		if !s.passthrough {
+		s.mu.RLock()
+		pt := *sess != nil && (*sess).passthrough
+		s.mu.RUnlock()
+		if *sess != nil && !pt {
 			return s.handleNewGamePlay(req, sess)
 		}
 		return s.handleNewGamePassthrough(req, *sess)
 
 	default:
 		// Route game.* methods to the game goroutine in passthrough mode.
-		if s.passthrough && strings.HasPrefix(req.Method, "game.") {
+		s.mu.RLock()
+		isPT := *sess != nil && (*sess).passthrough
+		s.mu.RUnlock()
+		if isPT && strings.HasPrefix(req.Method, "game.") {
 			if req.Method == "game.play" {
 				return Response{
 					JSONRPC: "2.0",

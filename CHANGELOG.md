@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- **Per-session mode replaces server-level `--passthrough` flag.** Session mode (normal vs passthrough) is now set during `session.init` via the `mode` field in `InitializeParams`. The daemon serves both `crypt` (normal) and `crypt mcp` (passthrough) clients simultaneously on the same socket. The `--passthrough` CLI flag is removed.
 - **Protocol: direct JSON-RPC methods replace MCP framing.** Daemon protocol refactored from `tools/call` dispatch to direct named methods: `session.init`, `game.new`, `game.move`, `game.look`, `game.play`, `session.quit`, etc. Response results are direct JSON objects instead of `ToolResult{content:[{text:"..."}]}` wrappers. Error responses use standard JSON-RPC error objects instead of `ToolResult{isError:true}`.
 - **Removed MCP schema infrastructure.** Deleted `cmd/dump-mcp-schema`, `testdata/mcp-schema.json`, and the `mcp-schema` CI job. The daemon is a game server, not an MCP server.
 - **Client updated for new protocol.** `crypt` sends `session.init` instead of `initialize`, `game.new` instead of `tools/call` with `name=new_game`, and `game.play` instead of `play`.

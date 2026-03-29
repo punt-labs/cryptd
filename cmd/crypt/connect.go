@@ -38,11 +38,10 @@ func dial(socketPath, addr string) (net.Conn, error) {
 	return dialWithFlags(socketPath, addr)
 }
 
-// dialMCP connects to the server for MCP mode. If auto-starting, it uses
-// --passthrough because MCP clients send game.* methods that require passthrough
-// dispatch. Normal mode only accepts game.new and game.play.
+// dialMCP connects to the server for MCP mode. Passthrough mode is now set
+// per-session during session.init, so no extra server flags are needed.
 func dialMCP(socketPath, addr string) (net.Conn, error) {
-	return dialWithFlags(socketPath, addr, "--passthrough")
+	return dialWithFlags(socketPath, addr)
 }
 
 // dialWithFlags connects to the server via TCP (if addr is set) or Unix socket,

@@ -16,16 +16,19 @@ import (
 	"golang.org/x/term"
 )
 
-// Server is the game server that exposes MCP tools over a network connection.
+// Server is the game server that exposes game methods over a network connection.
 // It supports both Unix sockets and TCP (DES-025).
 //
-// Two modes (DES-025 revised):
+// Session mode is determined per-session during session.init:
 //   - Normal: interpreter → engine → narrator → display text (for crypt CLI)
-//   - Passthrough: raw MCP tool surface with structured JSON (for Claude Code)
+//   - Passthrough: direct game.* JSON-RPC methods with structured JSON (for crypt mcp)
+//
+// When the server has an interpreter and narrator configured, sessions default
+// to normal mode unless the client sends mode="passthrough" in session.init.
+// When neither is configured, all sessions default to passthrough.
 type Server struct {
 	interp      model.CommandInterpreter
 	narr        model.Narrator
-	passthrough     bool   // true = structured JSON, false = interpreted + narrated text
 	network         string // "unix" or "tcp"
 	address         string // socket path or host:port
 	scenarioDir     string
@@ -44,13 +47,6 @@ type Server struct {
 
 // ServerOption configures a Server.
 type ServerOption func(*Server)
-
-// WithPassthrough enables passthrough mode: raw MCP tool surface with structured
-// JSON responses. When disabled (the default), the server interprets text input
-// and returns narrated display text.
-func WithPassthrough() ServerOption {
-	return func(s *Server) { s.passthrough = true }
-}
 
 // WithInterpreter sets the command interpreter for normal mode.
 func WithInterpreter(interp model.CommandInterpreter) ServerOption {
@@ -84,7 +80,6 @@ func NewServer(socketPath, scenarioDir string, opts ...ServerOption) *Server {
 	for _, o := range opts {
 		o(s)
 	}
-	s.defaultPassthrough()
 	return s
 }
 
@@ -104,16 +99,13 @@ func NewTCPServer(listenAddr, scenarioDir string, opts ...ServerOption) *Server 
 	for _, o := range opts {
 		o(s)
 	}
-	s.defaultPassthrough()
 	return s
 }
 
-// defaultPassthrough enables passthrough mode when neither interpreter nor narrator
-// is configured. Without this, normal mode would panic on nil interp/narr.
-func (s *Server) defaultPassthrough() {
-	if !s.passthrough && (s.interp == nil || s.narr == nil) {
-		s.passthrough = true
-	}
+// hasNormalMode reports whether the server has an interpreter and narrator
+// configured for normal (text play) mode.
+func (s *Server) hasNormalMode() bool {
+	return s.interp != nil && s.narr != nil
 }
 
 // ListenAndServe starts listening and blocks until interrupted by
