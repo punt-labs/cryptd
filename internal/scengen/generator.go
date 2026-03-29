@@ -13,8 +13,8 @@ type GenerateOptions struct {
 	Visitors []Visitor
 }
 
-// Generate runs the full pipeline: topology → direction assignment → visitors → Scenario.
-func Generate(source TopologySource, opts GenerateOptions) (*scenario.Scenario, error) {
+// Generate runs the full pipeline: topology → direction assignment → visitors → scenario.Spec.
+func Generate(source TopologySource, opts GenerateOptions) (*scenario.Spec, error) {
 	rawNodes, rawEdges, start, err := source.Generate()
 	if err != nil {
 		return nil, fmt.Errorf("topology source: %w", err)
@@ -140,8 +140,8 @@ func assignDirections(rawNodes []RawNode, rawEdges []RawEdge, start string) (*Gr
 	return g, nil
 }
 
-// toScenario converts a Graph + ScenarioContent into a scenario.Scenario.
-func toScenario(g *Graph, content *ScenarioContent) *scenario.Scenario {
+// toScenario converts a Graph + ScenarioContent into a scenario.Spec.
+func toScenario(g *Graph, content *ScenarioContent) *scenario.Spec {
 	rooms := make(map[string]*scenario.Room, len(g.Nodes))
 
 	// Initialize all rooms from graph nodes.
@@ -174,7 +174,7 @@ func toScenario(g *Graph, content *ScenarioContent) *scenario.Scenario {
 		}
 	}
 
-	s := &scenario.Scenario{
+	s := &scenario.Spec{
 		Title:        content.Title,
 		StartingRoom: g.Start,
 		Death:        content.Death,
@@ -185,7 +185,7 @@ func toScenario(g *Graph, content *ScenarioContent) *scenario.Scenario {
 	}
 
 	if s.Items == nil {
-		s.Items = make(map[string]*scenario.ScenarioItem)
+		s.Items = make(map[string]*scenario.Item)
 	}
 	if s.Enemies == nil {
 		s.Enemies = make(map[string]*scenario.EnemyTemplate)

@@ -15,6 +15,10 @@ import (
 )
 
 // Role constants for chat messages.
+//
+// RoleAssistant is defined for API completeness (system/user/assistant
+// is the standard OpenAI role triple) even though the current codebase
+// only uses system and user roles.
 const (
 	RoleSystem    = "system"
 	RoleUser      = "user"

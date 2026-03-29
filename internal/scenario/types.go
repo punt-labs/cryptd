@@ -1,8 +1,8 @@
 package scenario
 
-// Scenario is the top-level structure of a parsed scenario YAML file.
+// Spec is the top-level structure of a parsed scenario YAML file.
 // Field names match the DES-016 YAML schema.
-type Scenario struct {
+type Spec struct {
 	// ID is derived from the filename (without extension).
 	ID    string
 	Title string `yaml:"title"`
@@ -10,7 +10,7 @@ type Scenario struct {
 	StartingRoom string                       `yaml:"starting_room"`
 	Death        string                       `yaml:"death"` // permadeath|respawn
 	Rooms        map[string]*Room             `yaml:"rooms"`
-	Items        map[string]*ScenarioItem     `yaml:"items"`
+	Items        map[string]*Item     `yaml:"items"`
 	Enemies      map[string]*EnemyTemplate    `yaml:"enemies"`
 	Spells       map[string]*SpellTemplate    `yaml:"spells"`
 }
@@ -20,7 +20,7 @@ type Room struct {
 	Name            string                 `yaml:"name"`
 	DescriptionSeed string                 `yaml:"description_seed"`
 	Connections     map[string]*Connection `yaml:"connections"`
-	// Items lists item IDs available in this room (must exist in Scenario.Items).
+	// Items lists item IDs available in this room (must exist in Spec.Items).
 	Items []string `yaml:"items"`
 	// Enemies lists enemy template IDs present in this room.
 	Enemies []string `yaml:"enemies"`
@@ -32,8 +32,8 @@ type Connection struct {
 	Type string `yaml:"type"` // open|locked|stairway|hidden
 }
 
-// ScenarioItem defines a type of item that can appear in the scenario.
-type ScenarioItem struct {
+// Item defines a type of item that can appear in the scenario.
+type Item struct {
 	Name        string  `yaml:"name"`
 	Type        string  `yaml:"type"` // weapon|armor|ring|amulet|consumable|key|misc
 	Damage      string  `yaml:"damage,omitempty"`

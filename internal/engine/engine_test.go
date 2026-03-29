@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func loadMinimal(t *testing.T) *scenario.Scenario {
+func loadMinimal(t *testing.T) *scenario.Spec {
 	t.Helper()
 	s, err := scenario.Load("../../testdata/scenarios/minimal.yaml")
 	require.NoError(t, err)
@@ -149,7 +149,7 @@ func TestMove_UsesInjectedClock(t *testing.T) {
 
 func TestMove_UnknownConnectionType(t *testing.T) {
 	// Build a synthetic scenario with a "bogus" connection type.
-	s := &scenario.Scenario{
+	s := &scenario.Spec{
 		ID:           "synthetic",
 		StartingRoom: "start",
 		Rooms: map[string]*scenario.Room{
@@ -217,13 +217,13 @@ func TestPickUp_ItemNotInRoom(t *testing.T) {
 }
 
 func TestPickUp_TooHeavy(t *testing.T) {
-	s := &scenario.Scenario{
+	s := &scenario.Spec{
 		ID:           "heavy",
 		StartingRoom: "room",
 		Rooms: map[string]*scenario.Room{
 			"room": {Name: "Room", Items: []string{"boulder"}},
 		},
-		Items: map[string]*scenario.ScenarioItem{
+		Items: map[string]*scenario.Item{
 			"boulder": {Name: "Boulder", Type: "misc", Weight: model.MaxCarryWeight + 1},
 		},
 	}
@@ -296,13 +296,13 @@ func TestEquip_NotEquippable(t *testing.T) {
 }
 
 func TestEquip_SlotOccupied(t *testing.T) {
-	s := &scenario.Scenario{
+	s := &scenario.Spec{
 		ID:           "two-weapons",
 		StartingRoom: "room",
 		Rooms: map[string]*scenario.Room{
 			"room": {Name: "Room", Items: []string{"sword_a", "sword_b"}},
 		},
-		Items: map[string]*scenario.ScenarioItem{
+		Items: map[string]*scenario.Item{
 			"sword_a": {Name: "Sword A", Type: "weapon", Damage: "1d6", Weight: 3},
 			"sword_b": {Name: "Sword B", Type: "weapon", Damage: "1d8", Weight: 4},
 		},
@@ -461,13 +461,13 @@ func TestWeight_IncludesEquipped(t *testing.T) {
 }
 
 func TestPickUp_WeightCheckDoesNotCorruptRoom(t *testing.T) {
-	s := &scenario.Scenario{
+	s := &scenario.Spec{
 		ID:           "heavy-room",
 		StartingRoom: "room",
 		Rooms: map[string]*scenario.Room{
 			"room": {Name: "Room", Items: []string{"light", "heavy"}},
 		},
-		Items: map[string]*scenario.ScenarioItem{
+		Items: map[string]*scenario.Item{
 			"light": {Name: "Feather", Type: "misc", Weight: 1},
 			"heavy": {Name: "Boulder", Type: "misc", Weight: model.MaxCarryWeight + 1},
 		},
@@ -519,13 +519,13 @@ func TestEnsureRoomState_NilMap(t *testing.T) {
 }
 
 func TestGetSlot_AllTypes(t *testing.T) {
-	s := &scenario.Scenario{
+	s := &scenario.Spec{
 		ID:           "all-slots",
 		StartingRoom: "room",
 		Rooms: map[string]*scenario.Room{
 			"room": {Name: "Room", Items: []string{"w", "a", "r", "am"}},
 		},
-		Items: map[string]*scenario.ScenarioItem{
+		Items: map[string]*scenario.Item{
 			"w":  {Name: "Sword", Type: "weapon", Damage: "1d6", Weight: 1},
 			"a":  {Name: "Plate", Type: "armor", Weight: 5},
 			"r":  {Name: "Band", Type: "ring", Weight: 0.1},

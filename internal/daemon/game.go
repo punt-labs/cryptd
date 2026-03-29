@@ -43,10 +43,11 @@ type Command struct {
 // RunLoopRequest carries the dependencies for running the game loop inside the
 // game goroutine (normal mode).
 type RunLoopRequest struct {
-	Scanner *bufio.Scanner
-	Writer  io.Writer
-	Interp  model.CommandInterpreter
-	Narr    model.Narrator
+	Scanner            *bufio.Scanner
+	Writer             io.Writer
+	Interp             model.CommandInterpreter
+	Narr               model.Narrator
+	SkipInitialRender  bool // true when caller already sent the initial room (new_game path)
 }
 
 // Game represents a running game instance. Each Game is a goroutine that
@@ -115,7 +116,7 @@ func (g *Game) run(ctx context.Context, scenarioDir, defaultScenario string) {
 				lr := cmd.LoopReq
 				loopCtx, loopCancel := context.WithCancel(ctx)
 				rend := NewRPCRenderer(lr.Scanner, lr.Writer)
-				rend.skipInitialRender = true // caller already sent initial room
+				rend.skipInitialRender = lr.SkipInitialRender
 
 				loop := game.NewLoop(eng, lr.Interp, lr.Narr, rend)
 				rend.StartReader(loopCtx)

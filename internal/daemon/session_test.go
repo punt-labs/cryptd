@@ -36,6 +36,7 @@ func TestInitialize_AssignsSessionID(t *testing.T) {
 
 	assert.NotEmpty(t, init.SessionID, "server should assign a session ID")
 	assert.Len(t, init.SessionID, 32, "server-assigned session ID should be 32 hex chars")
+	assert.False(t, init.HasGame, "fresh session should have has_game=false")
 }
 
 func TestSanitizeSessionID(t *testing.T) {

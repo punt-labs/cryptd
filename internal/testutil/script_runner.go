@@ -32,23 +32,3 @@ func LoadScript(path string) (*Script, error) {
 	return &s, nil
 }
 
-// ScriptRunner executes a Script against the game engine.
-// Full execution is implemented in Milestone 2; this skeleton only loads
-// the script and returns the step list.
-type ScriptRunner struct {
-	Script *Script
-}
-
-// NewScriptRunner loads a script file and returns a ScriptRunner.
-func NewScriptRunner(path string) (*ScriptRunner, error) {
-	s, err := LoadScript(path)
-	if err != nil {
-		return nil, err
-	}
-	return &ScriptRunner{Script: s}, nil
-}
-
-// Steps returns the loaded steps (no execution yet — M2).
-func (r *ScriptRunner) Steps() []ScriptStep {
-	return r.Script.Steps
-}

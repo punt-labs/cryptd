@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/punt-labs/cryptd/internal/interpreter"
+	"github.com/punt-labs/cryptd/internal/narrator"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -371,8 +373,8 @@ func TestIntegration_TCPGameSession(t *testing.T) {
 	var ngResp Response
 	require.NoError(t, json.Unmarshal(scanner1.Bytes(), &ngResp))
 	require.Nil(t, ngResp.Error)
-	result := extractResult(t, ngResp)
-	assert.Equal(t, "entrance", result["room"])
+	ngResult := extractResult(t, ngResp)
+	assert.Equal(t, "entrance", ngResult["room"])
 	conn1.Close()
 
 	// Second TCP connection with same session ID — state persists.
@@ -406,8 +408,8 @@ func TestIntegration_SocketMultipleConnections(t *testing.T) {
 	defer conn2.Close()
 
 	params, _ := json.Marshal(InitializeParams{SessionID: sid})
-	initReq := Request{JSONRPC: "2.0", ID: json.RawMessage(`0`), Method: "initialize", Params: params}
-	data, _ = json.Marshal(initReq)
+	initReq2 := Request{JSONRPC: "2.0", ID: json.RawMessage(`0`), Method: "initialize", Params: params}
+	data, _ = json.Marshal(initReq2)
 	data = append(data, '\n')
 	conn2.Write(data)
 
@@ -421,11 +423,11 @@ func TestIntegration_SocketMultipleConnections(t *testing.T) {
 	require.True(t, scanner2.Scan())
 	// Read look response.
 	require.True(t, scanner2.Scan())
-	var lookResp Response
-	require.NoError(t, json.Unmarshal(scanner2.Bytes(), &lookResp))
-	require.Nil(t, lookResp.Error)
-	result := extractResult(t, lookResp)
-	assert.Equal(t, "entrance", result["room"])
+	var multiLookResp Response
+	require.NoError(t, json.Unmarshal(scanner2.Bytes(), &multiLookResp))
+	require.Nil(t, multiLookResp.Error)
+	multiResult := extractResult(t, multiLookResp)
+	assert.Equal(t, "entrance", multiResult["room"])
 }
 
 func TestIntegration_ConcurrentSessionIsolation(t *testing.T) {
@@ -589,8 +591,8 @@ func TestIntegration_SessionIsolation(t *testing.T) {
 	require.NoError(t, err)
 	defer conn3.Close()
 	params, _ := json.Marshal(InitializeParams{SessionID: sidA})
-	initReq := Request{JSONRPC: "2.0", ID: json.RawMessage(`0`), Method: "initialize", Params: params}
-	data, _ = json.Marshal(initReq)
+	initReq3 := Request{JSONRPC: "2.0", ID: json.RawMessage(`0`), Method: "initialize", Params: params}
+	data, _ = json.Marshal(initReq3)
 	data = append(data, '\n')
 	conn3.Write(data)
 	lookReq := toolCall(2, "look", nil)
@@ -600,9 +602,215 @@ func TestIntegration_SessionIsolation(t *testing.T) {
 	scanner3 := bufio.NewScanner(conn3)
 	require.True(t, scanner3.Scan()) // initialize
 	require.True(t, scanner3.Scan()) // look
-	var lookResp Response
-	require.NoError(t, json.Unmarshal(scanner3.Bytes(), &lookResp))
-	require.Nil(t, lookResp.Error)
-	result := extractResult(t, lookResp)
-	assert.Equal(t, "entrance", result["room"])
+	var isoLookResp Response
+	require.NoError(t, json.Unmarshal(scanner3.Bytes(), &isoLookResp))
+	require.Nil(t, isoLookResp.Error)
+	isoResult := extractResult(t, isoLookResp)
+	assert.Equal(t, "entrance", isoResult["room"])
+}
+
+// startTestTCPNormalDaemon launches a normal-mode TCP daemon (with Rules
+// interpreter + Template narrator, no SLM) and returns the address.
+func startTestTCPNormalDaemon(t *testing.T) string {
+	t.Helper()
+	scenarioDir := filepath.Join(repoRoot(t), "testdata", "scenarios")
+
+	rules := interpreter.NewRules()
+	tmpl := narrator.NewTemplate()
+	interp := interpreter.NewSLM(nil, rules)
+	narr := narrator.NewSLM(nil, tmpl)
+
+	srv := NewTCPServer(":0", scenarioDir,
+		WithInterpreter(interp),
+		WithNarrator(narr),
+	)
+
+	ln, err := net.Listen("tcp", ":0")
+	require.NoError(t, err)
+	addr := ln.Addr().String()
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- srv.Serve(ln)
+	}()
+
+	// Poll until accepting connections.
+	ready := false
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		conn, dialErr := net.Dial("tcp", addr)
+		if dialErr == nil {
+			conn.Close()
+			ready = true
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	require.True(t, ready, "TCP normal server at %s not ready within timeout", addr)
+
+	t.Cleanup(func() {
+		ln.Close()
+		<-errCh
+	})
+
+	return addr
+}
+
+func TestIntegration_SessionReconnect_StatePreserved(t *testing.T) {
+	addr := startTestTCPNormalDaemon(t)
+
+	// --- Connection 1: initialize -> new_game -> play "go south" -> disconnect ---
+	conn1, err := net.Dial("tcp", addr)
+	require.NoError(t, err)
+
+	scanner1 := bufio.NewScanner(conn1)
+	scanner1.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+
+	sendAndRead := func(conn net.Conn, s *bufio.Scanner, req Request) Response {
+		t.Helper()
+		data, merr := json.Marshal(req)
+		require.NoError(t, merr)
+		data = append(data, '\n')
+		_, werr := conn.Write(data)
+		require.NoError(t, werr)
+		require.True(t, s.Scan(), "expected response")
+		var resp Response
+		require.NoError(t, json.Unmarshal(s.Bytes(), &resp))
+		return resp
+	}
+
+	// Initialize.
+	reconInitResp := sendAndRead(conn1, scanner1, Request{
+		JSONRPC: "2.0", ID: json.RawMessage(`0`), Method: "initialize",
+	})
+	require.Nil(t, reconInitResp.Error)
+	sessionID := extractSessionID(t, reconInitResp)
+
+	// New game (tools/call in normal mode).
+	argsJSON, _ := json.Marshal(map[string]string{
+		"scenario_id":     "minimal",
+		"character_name":  "ReconnectHero",
+		"character_class": "fighter",
+	})
+	tcParams, _ := json.Marshal(ToolCallParams{Name: "new_game", Arguments: argsJSON})
+	reconNgResp := sendAndRead(conn1, scanner1, Request{
+		JSONRPC: "2.0",
+		ID:      json.RawMessage(`1`),
+		Method:  "tools/call",
+		Params:  tcParams,
+	})
+	require.Nil(t, reconNgResp.Error, "new_game error: %+v", reconNgResp.Error)
+
+	// After new_game, the game loop is running. Send "go south".
+	reconPlayResp := sendAndRead(conn1, scanner1, Request{
+		JSONRPC: "2.0",
+		ID:      json.RawMessage(`2`),
+		Method:  "play",
+		Params:  json.RawMessage(`{"text":"go south"}`),
+	})
+	require.Nil(t, reconPlayResp.Error)
+
+	// Verify we moved to goblin_lair.
+	prData, _ := json.Marshal(reconPlayResp.Result)
+	var pr PlayResponse
+	require.NoError(t, json.Unmarshal(prData, &pr))
+	require.NotNil(t, pr.State)
+	assert.Equal(t, "goblin_lair", pr.State.Dungeon.CurrentRoom)
+
+	// Disconnect.
+	conn1.Close()
+
+	// Wait a moment for the server to process the disconnection.
+	time.Sleep(100 * time.Millisecond)
+
+	// --- Connection 2: initialize with session ID -> read resumed room ---
+	conn2, err := net.Dial("tcp", addr)
+	require.NoError(t, err)
+	defer conn2.Close()
+
+	scanner2 := bufio.NewScanner(conn2)
+	scanner2.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+
+	// Send initialize with session ID.
+	initParams, _ := json.Marshal(InitializeParams{SessionID: sessionID})
+	reconInitResp2 := sendAndRead(conn2, scanner2, Request{
+		JSONRPC: "2.0",
+		ID:      json.RawMessage(`0`),
+		Method:  "initialize",
+		Params:  initParams,
+	})
+	require.Nil(t, reconInitResp2.Error)
+	assert.Equal(t, sessionID, extractSessionID(t, reconInitResp2))
+
+	// Read the initial room render (resumeGameLoop sends it).
+	require.True(t, scanner2.Scan(), "expected initial room render on resume")
+	var roomResp Response
+	require.NoError(t, json.Unmarshal(scanner2.Bytes(), &roomResp))
+
+	roomData, _ := json.Marshal(roomResp.Result)
+	var roomPlay PlayResponse
+	require.NoError(t, json.Unmarshal(roomData, &roomPlay))
+	require.NotNil(t, roomPlay.State, "expected game state in resumed room render")
+	assert.Equal(t, "goblin_lair", roomPlay.State.Dungeon.CurrentRoom,
+		"resumed session should be in goblin_lair")
+
+	// Verify inventory is preserved: the hero should have the same character.
+	require.NotEmpty(t, roomPlay.State.Party)
+	assert.Equal(t, "ReconnectHero", roomPlay.State.Party[0].Name)
+}
+
+func TestIntegration_GracefulShutdown(t *testing.T) {
+	addr := startTestTCPNormalDaemon(t)
+
+	// Connect a client and start a game.
+	conn, err := net.Dial("tcp", addr)
+	require.NoError(t, err)
+
+	scanner := bufio.NewScanner(conn)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+
+	sendReq := func(req Request) {
+		t.Helper()
+		data, merr := json.Marshal(req)
+		require.NoError(t, merr)
+		data = append(data, '\n')
+		_, werr := conn.Write(data)
+		require.NoError(t, werr)
+	}
+
+	readResp := func() Response {
+		t.Helper()
+		require.True(t, scanner.Scan(), "expected response")
+		var resp Response
+		require.NoError(t, json.Unmarshal(scanner.Bytes(), &resp))
+		return resp
+	}
+
+	// Initialize.
+	sendReq(Request{JSONRPC: "2.0", ID: json.RawMessage(`0`), Method: "initialize"})
+	shutdownInitResp := readResp()
+	require.Nil(t, shutdownInitResp.Error)
+
+	// New game.
+	shutdownArgsJSON, _ := json.Marshal(map[string]string{
+		"scenario_id":     "minimal",
+		"character_name":  "ShutdownHero",
+		"character_class": "fighter",
+	})
+	shutdownTcParams, _ := json.Marshal(ToolCallParams{Name: "new_game", Arguments: shutdownArgsJSON})
+	sendReq(Request{
+		JSONRPC: "2.0",
+		ID:      json.RawMessage(`1`),
+		Method:  "tools/call",
+		Params:  shutdownTcParams,
+	})
+	shutdownNgResp := readResp()
+	require.Nil(t, shutdownNgResp.Error)
+
+	// The game loop is now running. Close the connection to simulate shutdown.
+	conn.Close()
+
+	// The test passes if it completes without deadlock. The t.Cleanup from
+	// startTestTCPNormalDaemon closes the listener and waits for Serve to
+	// return. If there's a deadlock, the test will timeout.
 }

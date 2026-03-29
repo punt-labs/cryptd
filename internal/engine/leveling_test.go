@@ -11,15 +11,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func levelScenario() *scenario.Scenario {
-	return &scenario.Scenario{
+func levelScenario() *scenario.Spec {
+	return &scenario.Spec{
 		ID:           "level-test",
 		StartingRoom: "arena",
 		Rooms: map[string]*scenario.Room{
 			"arena": {Name: "Arena"},
 		},
 		Enemies: map[string]*scenario.EnemyTemplate{},
-		Items:   map[string]*scenario.ScenarioItem{},
+		Items:   map[string]*scenario.Item{},
 		Spells:  map[string]*scenario.SpellTemplate{},
 	}
 }

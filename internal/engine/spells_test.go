@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func spellScenario() *scenario.Scenario {
-	return &scenario.Scenario{
+func spellScenario() *scenario.Spec {
+	return &scenario.Spec{
 		ID:           "spell-test",
 		StartingRoom: "arena",
 		Rooms: map[string]*scenario.Room{
@@ -27,7 +27,7 @@ func spellScenario() *scenario.Scenario {
 			"fireball": {Name: "Fireball", MP: 3, Effect: "damage", Power: "2d6", Classes: []string{"mage", "priest"}},
 			"heal":     {Name: "Heal", MP: 2, Effect: "heal", Power: "1d6+2", Classes: []string{"priest", "mage"}},
 		},
-		Items: map[string]*scenario.ScenarioItem{},
+		Items: map[string]*scenario.Item{},
 	}
 }
 

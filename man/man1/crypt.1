@@ -13,6 +13,8 @@ crypt \- thin client for the Crypt text adventure
 .IR name ]
 .RB [ \-\-class
 .IR class ]
+.RB [ \-\-session
+.IR id ]
 .SH DESCRIPTION
 .B crypt
 is the player\-facing CLI client for Crypt.
@@ -64,6 +66,14 @@ Character class:
 .BR thief .
 Default:
 .IR fighter .
+.TP
+.BI \-\-session " id"
+Resume a previous session by its ID. The session ID is printed to
+stderr on each connection. When provided, the client sends the ID
+in the
+.B initialize
+handshake and re\-enters the game loop without calling
+.BR new_game .
 .SH GAME COMMANDS
 .TS
 l l l.

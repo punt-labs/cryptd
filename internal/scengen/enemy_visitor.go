@@ -1,7 +1,6 @@
 package scengen
 
 import (
-	"fmt"
 	"math/rand"
 
 	"github.com/punt-labs/cryptd/internal/scenario"
@@ -161,20 +160,4 @@ func EnemyCount(content *ScenarioContent) int {
 		}
 	}
 	return count
-}
-
-// MaxTierName returns the name of the highest-tier enemy placed.
-func MaxTierName(tiers []EnemyTier, content *ScenarioContent) string {
-	placed := make(map[string]bool)
-	for _, rc := range content.Rooms {
-		for _, id := range rc.Enemies {
-			placed[id] = true
-		}
-	}
-	for i := len(tiers) - 1; i >= 0; i-- {
-		if placed[tiers[i].ID] {
-			return fmt.Sprintf("%s (%d HP)", tiers[i].Name, tiers[i].HP)
-		}
-	}
-	return "none"
 }

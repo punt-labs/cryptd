@@ -56,13 +56,13 @@ func (e *InvalidDiceError) Unwrap() error { return e.Err }
 
 // Load reads a scenario YAML file, sets ID from the filename, and validates it.
 // Returns the first validation error encountered.
-func Load(path string) (*Scenario, error) {
+func Load(path string) (*Spec, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read scenario %s: %w", path, err)
 	}
 
-	var s Scenario
+	var s Spec
 	if err := yaml.Unmarshal(data, &s); err != nil {
 		return nil, fmt.Errorf("parse scenario %s: %w", path, err)
 	}
@@ -76,10 +76,10 @@ func Load(path string) (*Scenario, error) {
 	return &s, nil
 }
 
-// Validate checks the semantic integrity of a parsed Scenario.
+// Validate checks the semantic integrity of a parsed Spec.
 // Returns the first error found, typed as one of MissingFieldError,
 // BrokenRoomRefError, UnknownEnemyError, or InvalidDiceError.
-func Validate(s *Scenario) error {
+func Validate(s *Spec) error {
 	if s.StartingRoom == "" {
 		return &MissingFieldError{Field: "starting_room"}
 	}

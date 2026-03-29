@@ -16,7 +16,7 @@ import (
 // Resolution order:
 //  1. dir/id/scenario.yaml (directory format)
 //  2. dir/id.yaml (legacy single-file format)
-func Load(scenarioDir, id string) (*scenario.Scenario, error) {
+func Load(scenarioDir, id string) (*scenario.Spec, error) {
 	if strings.ContainsAny(id, `/\`) || strings.Contains(id, "..") || filepath.VolumeName(id) != "" {
 		return nil, fmt.Errorf("invalid scenario ID")
 	}

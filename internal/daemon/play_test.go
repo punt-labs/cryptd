@@ -38,15 +38,15 @@ func TestNormalMode_NewGameAndPlay(t *testing.T) {
 	// Simulate a client connection with a pipe.
 	clientR, serverW := io.Pipe()
 	serverR, clientW := io.Pipe()
-	defer clientR.Close()
-	defer clientW.Close()
+	defer func() { _ = clientR.Close() }()
+	defer func() { _ = clientW.Close() }()
 
 	// Run handleConnection in a goroutine.
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		defer serverW.Close()
-		defer serverR.Close()
+		defer func() { _ = serverW.Close() }()
+		defer func() { _ = serverR.Close() }()
 		srv.handleConnection(serverR, serverW)
 	}()
 
@@ -56,11 +56,13 @@ func TestNormalMode_NewGameAndPlay(t *testing.T) {
 	// Helper: send a request and read the response.
 	send := func(method string, params any) protocol.Response {
 		t.Helper()
-		p, _ := json.Marshal(params)
+		p, err := json.Marshal(params)
+		require.NoError(t, err)
 		req := protocol.Request{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: method, Params: p}
-		data, _ := json.Marshal(req)
+		data, err := json.Marshal(req)
+		require.NoError(t, err)
 		data = append(data, '\n')
-		_, err := clientW.Write(data)
+		_, err = clientW.Write(data)
 		require.NoError(t, err)
 
 		require.True(t, clientScanner.Scan(), "expected response")
@@ -104,7 +106,8 @@ func TestNormalMode_NewGameAndPlay(t *testing.T) {
 
 	// Send quit to end the game loop.
 	quitReq := protocol.Request{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "quit"}
-	quitData, _ := json.Marshal(quitReq)
+	quitData, err := json.Marshal(quitReq)
+	require.NoError(t, err)
 	quitData = append(quitData, '\n')
 	_, err = clientW.Write(quitData)
 	require.NoError(t, err)
@@ -118,13 +121,14 @@ func TestNormalMode_NewGameAndPlay(t *testing.T) {
 	require.True(t, clientScanner.Scan(), "expected final terminal response")
 	var finalResp protocol.Response
 	require.NoError(t, json.Unmarshal(clientScanner.Bytes(), &finalResp))
-	finalData, _ := json.Marshal(finalResp.Result)
+	finalData, err := json.Marshal(finalResp.Result)
+	require.NoError(t, err)
 	var finalPlay protocol.PlayResponse
 	require.NoError(t, json.Unmarshal(finalData, &finalPlay))
 	assert.True(t, finalPlay.Quit, "expected Quit flag in final response")
 
 	// Wait for handleConnection to finish.
-	clientW.Close()
+	_ = clientW.Close()
 	<-done
 }
 

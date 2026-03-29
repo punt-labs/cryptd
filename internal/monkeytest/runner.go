@@ -109,7 +109,7 @@ func Run(cfg RunConfig, scenarioDir string, scenarioID string) (AggregateReport,
 }
 
 // runSession executes a single game session and returns its metrics.
-func runSession(s *scenario.Scenario, class string, seed int64, maxMoves int) (SessionMetrics, error) {
+func runSession(s *scenario.Spec, class string, seed int64, maxMoves int) (SessionMetrics, error) {
 	// The engine uses math/rand global functions for combat dice. With parallel
 	// workers, combat outcomes are non-deterministic. The monkey's own action
 	// selection uses a per-session *rand.Rand for reproducible strategy.
@@ -159,6 +159,6 @@ func classStats(class string) *model.Stats {
 
 // loadScenario loads a scenario using scenariodir.Load, which tries
 // directory format first (id/scenario.yaml), then single-file (id.yaml).
-func loadScenario(scenarioDir, id string) (*scenario.Scenario, error) {
+func loadScenario(scenarioDir, id string) (*scenario.Spec, error) {
 	return scenariodir.Load(scenarioDir, id)
 }

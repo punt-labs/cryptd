@@ -17,7 +17,7 @@ type ScenarioContent struct {
 	Title   string
 	Death   string // permadeath|respawn
 	Rooms   map[string]*RoomContent
-	Items   map[string]*scenario.ScenarioItem
+	Items   map[string]*scenario.Item
 	Enemies map[string]*scenario.EnemyTemplate
 	Spells  map[string]*scenario.SpellTemplate
 }
@@ -26,7 +26,7 @@ type ScenarioContent struct {
 func NewScenarioContent() *ScenarioContent {
 	return &ScenarioContent{
 		Rooms:   make(map[string]*RoomContent),
-		Items:   make(map[string]*scenario.ScenarioItem),
+		Items:   make(map[string]*scenario.Item),
 		Enemies: make(map[string]*scenario.EnemyTemplate),
 		Spells:  make(map[string]*scenario.SpellTemplate),
 	}

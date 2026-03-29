@@ -401,6 +401,7 @@ func createLuxRenderer() (model.Renderer, func(), error) {
 		lux.WithRecvTimeout(30*time.Second),
 	)
 	if err := client.Connect(); err != nil {
+		_ = client.Close() // release resources allocated by NewClient
 		return nil, nil, fmt.Errorf("cannot connect to Lux display: %w", err)
 	}
 	fmt.Fprintln(os.Stderr, "cryptd: connected to Lux display")
@@ -415,6 +416,9 @@ func createLuxRenderer() (model.Renderer, func(), error) {
 	cleanup := func() {
 		if err := display.Close(); err != nil {
 			fmt.Fprintf(os.Stderr, "warning: lux display close: %v\n", err)
+		}
+		if err := client.Close(); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: lux client close: %v\n", err)
 		}
 	}
 	return rend, cleanup, nil

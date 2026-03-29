@@ -22,15 +22,15 @@ var errConnLost = errors.New("connection lost")
 
 // run connects to the server and starts the interactive session.
 // Returns an exit code (0 = clean, 1 = error).
-func run(socketPath, addr, scenario, charName, charClass string) int {
+func run(socketPath, addr, scenario, charName, charClass, sessionID string) int {
 	conn, err := dial(socketPath, addr)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
-	return session(conn, os.Stdin, os.Stdout, os.Stderr, scenario, charName, charClass)
+	return session(conn, os.Stdin, os.Stdout, os.Stderr, scenario, charName, charClass, sessionID)
 }
 
 // dial connects to the server via TCP or Unix socket.
@@ -107,7 +107,7 @@ func dialOrStart(socketPath string) (net.Conn, error) {
 }
 
 // session runs the interactive REPL on an established connection.
-func session(conn net.Conn, in io.Reader, out, errOut io.Writer, scenario, charName, charClass string) int {
+func session(conn net.Conn, in io.Reader, out, errOut io.Writer, scenario, charName, charClass, resumeSessionID string) int {
 	scanner := bufio.NewScanner(conn)
 	// Match the server's 1 MiB buffer to handle large narrated responses.
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
@@ -155,7 +155,11 @@ func session(conn net.Conn, in io.Reader, out, errOut io.Writer, scenario, charN
 	}
 
 	// MCP initialize handshake.
-	initResult, err := send("initialize", nil)
+	var initParams any
+	if resumeSessionID != "" {
+		initParams = protocol.InitializeParams{SessionID: resumeSessionID}
+	}
+	initResult, err := send("initialize", initParams)
 	if err != nil {
 		fmt.Fprintf(errOut, "error: %v\n", err)
 		return 1
@@ -164,9 +168,35 @@ func session(conn net.Conn, in io.Reader, out, errOut io.Writer, scenario, charN
 	if err := json.Unmarshal(initResult, &initResp); err == nil && initResp.SessionID != "" {
 		fmt.Fprintf(errOut, "crypt: session %s\n", initResp.SessionID)
 	}
+	resuming := resumeSessionID != "" && initResp.HasGame
 
-	// Auto-start game if --scenario given.
-	if scenario != "" {
+	if resuming {
+		// The server enters RunLoop immediately on resume and sends the current
+		// room as the initial render. Read and display it before entering the REPL.
+		if !scanner.Scan() {
+			fmt.Fprintf(errOut, "error: connection lost during session resume\n")
+			return 1
+		}
+		var resp struct {
+			Result json.RawMessage    `json:"result"`
+			Error  *protocol.RPCError `json:"error"`
+		}
+		if err := json.Unmarshal(scanner.Bytes(), &resp); err != nil {
+			fmt.Fprintf(errOut, "error: invalid response during resume: %v\n", err)
+			return 1
+		}
+		if resp.Error != nil {
+			fmt.Fprintf(errOut, "error: resume failed: %s\n", resp.Error.Message)
+			return 1
+		}
+		var playResp protocol.PlayResponse
+		if err := json.Unmarshal(resp.Result, &playResp); err == nil {
+			displayPlayResponse(out, playResp)
+		}
+	}
+
+	// Auto-start game if --scenario given (skip if resuming an existing session).
+	if scenario != "" && !resuming {
 		if err := startGame(send, out, errOut, scenario, charName, charClass); err != nil {
 			if errors.Is(err, errConnLost) {
 				fmt.Fprintf(errOut, "error: %v\n", err)
@@ -191,7 +221,7 @@ func session(conn net.Conn, in io.Reader, out, errOut io.Writer, scenario, charN
 		// Readline failed (e.g. not a terminal) — fall back to plain scanner.
 		return replScanner(in, out, errOut, send)
 	}
-	defer rl.Close()
+	defer func() { _ = rl.Close() }()
 
 	for {
 		line, err := rl.Readline()
@@ -272,7 +302,7 @@ func handleLine(line string, send func(string, any) (json.RawMessage, error), ou
 func replScanner(in io.Reader, out, errOut io.Writer, send func(string, any) (json.RawMessage, error)) int {
 	inputScanner := bufio.NewScanner(in)
 	for {
-		fmt.Fprint(out, "> ")
+		_, _ = fmt.Fprint(out, "> ") // prompt write failure is non-fatal
 		if !inputScanner.Scan() {
 			break
 		}
@@ -308,8 +338,8 @@ func startGame(send func(string, any) (json.RawMessage, error), out, errOut io.W
 
 	var playResp protocol.PlayResponse
 	if err := json.Unmarshal(result, &playResp); err != nil {
-		// Not a play response — print raw.
-		fmt.Fprintln(out, string(result))
+		// Not a play response — print raw to errOut since this is unexpected.
+		fmt.Fprintf(errOut, "warning: unexpected response format: %s\n", string(result))
 		return nil
 	}
 	displayPlayResponse(out, playResp)
@@ -323,4 +353,6 @@ const helpText = `commands:
 
 Everything else is sent to the server as natural language.
 The server interprets your commands — try "go north",
-"look around", "pick up the sword", "attack", etc.`
+"look around", "pick up the sword", "attack", etc.
+
+To resume a previous session: crypt --session <id>`

@@ -13,6 +13,7 @@ func main() {
 	scenario := fs.String("scenario", "", "auto-start game with this scenario ID")
 	name := fs.String("name", "Adventurer", "character name (used with --scenario)")
 	class := fs.String("class", "fighter", "character class: fighter, mage, priest, thief (used with --scenario)")
+	sessionID := fs.String("session", "", "resume a previous session by ID")
 	if err := fs.Parse(os.Args[1:]); err != nil {
 		os.Exit(1)
 	}
@@ -22,5 +23,5 @@ func main() {
 		os.Exit(1)
 	}
 
-	os.Exit(run(*socketPath, *addr, *scenario, *name, *class))
+	os.Exit(run(*socketPath, *addr, *scenario, *name, *class, *sessionID))
 }

@@ -11,8 +11,8 @@ import (
 )
 
 // combatScenario returns a scenario with a room containing one goblin.
-func combatScenario() *scenario.Scenario {
-	return &scenario.Scenario{
+func combatScenario() *scenario.Spec {
+	return &scenario.Spec{
 		ID:           "combat-test",
 		StartingRoom: "arena",
 		Rooms: map[string]*scenario.Room{
@@ -33,15 +33,15 @@ func combatScenario() *scenario.Scenario {
 		Enemies: map[string]*scenario.EnemyTemplate{
 			"goblin": {Name: "Goblin", HP: 8, Attack: "1d4", AI: "aggressive"},
 		},
-		Items: map[string]*scenario.ScenarioItem{
+		Items: map[string]*scenario.Item{
 			"sword": {Name: "Sword", Type: "weapon", Damage: "1d6", Weight: 3},
 		},
 	}
 }
 
 // multiEnemyScenario returns a scenario with two enemies of different AI types.
-func multiEnemyScenario() *scenario.Scenario {
-	return &scenario.Scenario{
+func multiEnemyScenario() *scenario.Spec {
+	return &scenario.Spec{
 		ID:           "multi-enemy",
 		StartingRoom: "arena",
 		Rooms: map[string]*scenario.Room{
@@ -54,11 +54,11 @@ func multiEnemyScenario() *scenario.Scenario {
 			"goblin": {Name: "Goblin", HP: 8, Attack: "1d4", AI: "aggressive"},
 			"rat":    {Name: "Rat", HP: 3, Attack: "1d2", AI: "cautious"},
 		},
-		Items: map[string]*scenario.ScenarioItem{},
+		Items: map[string]*scenario.Item{},
 	}
 }
 
-func combatGame(t *testing.T, s *scenario.Scenario) (*engine.Engine, model.GameState) {
+func combatGame(t *testing.T, s *scenario.Spec) (*engine.Engine, model.GameState) {
 	t.Helper()
 	e := engine.New(s)
 	char := model.Character{
@@ -99,14 +99,14 @@ func TestStartCombat_AlreadyActive(t *testing.T) {
 }
 
 func TestStartCombat_NoEnemies(t *testing.T) {
-	s := &scenario.Scenario{
+	s := &scenario.Spec{
 		ID:           "empty",
 		StartingRoom: "room",
 		Rooms: map[string]*scenario.Room{
 			"room": {Name: "Room"},
 		},
 		Enemies: map[string]*scenario.EnemyTemplate{},
-		Items:   map[string]*scenario.ScenarioItem{},
+		Items:   map[string]*scenario.Item{},
 	}
 	e, state := combatGame(t, s)
 	_, err := e.StartCombat(&state)
@@ -352,7 +352,7 @@ func TestProcessEnemyTurn_HeroDeath(t *testing.T) {
 }
 
 func TestProcessEnemyTurn_CautiousFlees(t *testing.T) {
-	s := &scenario.Scenario{
+	s := &scenario.Spec{
 		ID:           "cautious-test",
 		StartingRoom: "arena",
 		Rooms: map[string]*scenario.Room{
@@ -361,7 +361,7 @@ func TestProcessEnemyTurn_CautiousFlees(t *testing.T) {
 		Enemies: map[string]*scenario.EnemyTemplate{
 			"rat": {Name: "Rat", HP: 10, Attack: "1d2", AI: "cautious"},
 		},
-		Items: map[string]*scenario.ScenarioItem{},
+		Items: map[string]*scenario.Item{},
 	}
 	e := engine.New(s)
 	char := model.Character{
@@ -388,7 +388,7 @@ func TestProcessEnemyTurn_CautiousFlees(t *testing.T) {
 }
 
 func TestProcessEnemyTurn_CautiousAttacksWhenHealthy(t *testing.T) {
-	s := &scenario.Scenario{
+	s := &scenario.Spec{
 		ID:           "cautious-attack",
 		StartingRoom: "arena",
 		Rooms: map[string]*scenario.Room{
@@ -397,7 +397,7 @@ func TestProcessEnemyTurn_CautiousAttacksWhenHealthy(t *testing.T) {
 		Enemies: map[string]*scenario.EnemyTemplate{
 			"rat": {Name: "Rat", HP: 10, Attack: "1d2", AI: "cautious"},
 		},
-		Items: map[string]*scenario.ScenarioItem{},
+		Items: map[string]*scenario.Item{},
 	}
 	e := engine.New(s)
 	char := model.Character{

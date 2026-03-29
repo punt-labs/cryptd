@@ -104,12 +104,23 @@ func (s *Server) handleConnection(r io.Reader, w io.Writer) {
 		}
 		s.writeResponse(w, resp)
 
-		// In normal mode, after a successful new_game, hand the connection
-		// to the game loop via the game goroutine's RunLoop. The loop blocks
-		// until quit/death/EOF.
-		if !s.passthrough && sess != nil && s.isNewGameSuccess(req, resp) {
-			s.runGameLoop(scanner, w, sess)
-			return
+		// In normal mode, after a successful new_game OR a resumed session
+		// with an active game, hand the connection to the game loop via the
+		// game goroutine's RunLoop. The loop blocks until quit/death/EOF.
+		if !s.passthrough && sess != nil {
+			if s.isNewGameSuccess(req, resp) {
+				s.runGameLoop(scanner, w, sess)
+				return
+			}
+			// Session resume: if initialize found an existing game, send the
+			// current room and enter the game loop.
+			s.mu.RLock()
+			hasGame := sess.gameID != ""
+			s.mu.RUnlock()
+			if req.Method == "initialize" && resp.Error == nil && hasGame {
+				s.resumeGameLoop(scanner, w, sess)
+				return
+			}
 		}
 	}
 
@@ -159,7 +170,12 @@ func (s *Server) handleRequest(req Request, sess **Session) Response {
 		}
 
 		*sess = s.getOrCreateSession(sid)
-		log.Printf("daemon: session %s established", sid)
+
+		s.mu.RLock()
+		hasGame := (*sess).gameID != ""
+		s.mu.RUnlock()
+
+		log.Printf("daemon: session %s established (has_game=%v)", sid, hasGame)
 
 		return Response{
 			JSONRPC: "2.0",
@@ -169,6 +185,7 @@ func (s *Server) handleRequest(req Request, sess **Session) Response {
 				ServerInfo:      ServerInfo{Name: "cryptd", Version: "0.1.0"},
 				Capabilities:    map[string]any{"tools": map[string]any{}},
 				SessionID:       sid,
+				HasGame:         hasGame,
 			},
 		}
 
@@ -234,12 +251,35 @@ func (s *Server) runGameLoop(scanner *bufio.Scanner, w io.Writer, sess *Session)
 	}
 
 	if rpcErr = g.RunLoop(s.ctx, &RunLoopRequest{
+		Scanner:           scanner,
+		Writer:            w,
+		Interp:            s.interp,
+		Narr:              s.narr,
+		SkipInitialRender: true, // handleNewGamePlay already sent the initial room
+	}); rpcErr != nil {
+		log.Printf("daemon: game loop error: %s", rpcErr.Message)
+	}
+}
+
+// resumeGameLoop resumes a normal-mode game loop for a reconnected session
+// that already has an active game. Enters RunLoop without sending new_game —
+// the game state is already initialized from the previous connection.
+func (s *Server) resumeGameLoop(scanner *bufio.Scanner, w io.Writer, sess *Session) {
+	g, rpcErr := s.gameForSession(sess)
+	if rpcErr != nil {
+		log.Printf("daemon: resumeGameLoop: %s", rpcErr.Message)
+		return
+	}
+
+	log.Printf("daemon: resuming game loop for session %s", sess.id)
+
+	if rpcErr = g.RunLoop(s.ctx, &RunLoopRequest{
 		Scanner: scanner,
 		Writer:  w,
 		Interp:  s.interp,
 		Narr:    s.narr,
 	}); rpcErr != nil {
-		log.Printf("daemon: game loop error: %s", rpcErr.Message)
+		log.Printf("daemon: resume game loop error: %s", rpcErr.Message)
 	}
 }
 

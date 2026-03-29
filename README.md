@@ -25,13 +25,13 @@ Two modes:
 
 | Mode | Interpreter | Narrator | Client |
 |------|-------------|----------|--------|
-| **Normal** | SLM → Rules fallback | SLM → Template fallback | `crypt` (CLI) |
+| **Normal** | LLM/SLM → Rules fallback | LLM/SLM → Template fallback | `crypt` (CLI) |
 | **Passthrough** | None (MCP tool names) | None (structured JSON) | Claude Code plugin |
 
-Normal mode auto-detects [ollama](https://ollama.com) for SLM inference and
-falls back to deterministic Rules + Template when no inference server is
-available. Flags: `-f` foreground, `-t` testing on stdin/stdout, `--scenario`
-selects scenario, `--script` feeds commands from a file.
+Three inference tiers: Claude API (`CRYPTD_API_KEY` or `--api-key`), local SLM
+via [ollama](https://ollama.com), or deterministic Rules + Templates. The server
+supports concurrent sessions with per-session game isolation — each connection
+gets its own game instance. Sessions persist across reconnects.
 
 ### crypt (client)
 
@@ -40,11 +40,14 @@ crypt                                  # connect to local server (auto-starts if
 crypt --addr host:9000                 # connect to remote server
 crypt --scenario unix-catacombs        # auto-start with specific scenario
 crypt --name Gandalf --class mage      # set character name and class
+crypt --session <id>                   # resume a previous session
 ```
 
 Connects to `cryptd serve`, sends natural language text via the `play` JSON-RPC
 method, and renders the game with readline input, HP/MP progress bars, and
 combat enemy lists. Auto-starts the server if the local socket is absent.
+Use `--session` to reconnect to a previous game — the session ID is printed
+to stderr on each connection.
 
 ### crypt-admin (author)
 
@@ -125,12 +128,12 @@ linked only into `crypt-admin` — never into `cryptd` or `crypt`.
 | `cmd/eval-slm` | SLM accuracy evaluation harness (65+ inputs, needs ollama) |
 | `cmd/eval-balance` | Monkey test harness for game balance tuning (parallel sessions, JSON reports) |
 | `internal/monkeytest` | MonkeyRenderer, SessionMetrics, AggregateReport, parallel runner |
-| `internal/daemon` | JSON-RPC 2.0 handler, tool dispatcher, Unix socket/TCP listener |
+| `internal/daemon` | JSON-RPC 2.0 handler, game-as-goroutine dispatcher, session registry, Unix socket/TCP listener |
 | `internal/engine` | Deterministic game rules: movement, combat, inventory, spells, leveling, save/load |
 | `internal/game` | Game loop: drives engine + interpreter + narrator + renderer |
 | `internal/inference` | OpenAI-compatible HTTP client for `/v1/chat/completions` |
-| `internal/interpreter` | `RulesInterpreter` (keyword/regex) and `SLM` (inference-backed) |
-| `internal/narrator` | `TemplateNarrator` (fixed templates) and `SLM` (atmospheric narration) |
+| `internal/interpreter` | `RulesInterpreter` (keyword/regex), `SLM` (ollama), `LLM` (Claude API) |
+| `internal/narrator` | `TemplateNarrator` (fixed), `SLM` (ollama), `LLM` (Claude atmospheric narration) |
 | `internal/renderer` | `CLIRenderer` (stdout/stdin), `Lux` (ImGui via MCP), `JSONTransport` |
 | `internal/model` | All data types: `GameState`, `Character`, `EngineAction`, `EngineEvent`, interfaces |
 | `internal/scenario` | YAML parser, validator, directory-format loader (`LoadDir`) |
@@ -262,9 +265,10 @@ make eval-slm       # run 65+ input accuracy eval (needs ollama)
 
 ## Status
 
-M0–M2 (foundation, data contracts, thin E2E) and M8 (server thin slice)
-complete. See [docs/build-plan.md](docs/build-plan.md) for the 14-milestone
-roadmap.
+M0–M2 (foundation, data contracts, thin E2E), M8 (server thin slice), M9 (DM
+thin slice with Claude LLM tier), and M10 session routing (concurrent sessions,
+per-session isolation) complete. See [docs/build-plan.md](docs/build-plan.md)
+for the 14-milestone roadmap.
 
 ## Documentation
 

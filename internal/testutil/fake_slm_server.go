@@ -156,7 +156,7 @@ func (f *FakeSLMServer) Calls() []FakeSLMCall {
 			if m != nil {
 				b := make([]byte, len(m))
 				copy(b, m)
-				msgs[j] = json.RawMessage(b)
+				msgs[j] = b
 			}
 		}
 		var tempCopy *float64

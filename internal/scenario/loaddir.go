@@ -15,7 +15,7 @@ type dirManifest struct {
 	StartingRoom string                       `yaml:"starting_room"`
 	Death        string                       `yaml:"death"`
 	Regions      []string                     `yaml:"regions"`
-	Items        map[string]*ScenarioItem     `yaml:"items"`
+	Items        map[string]*Item     `yaml:"items"`
 	Enemies      map[string]*EnemyTemplate    `yaml:"enemies"`
 	Spells       map[string]*SpellTemplate    `yaml:"spells"`
 }
@@ -27,7 +27,7 @@ type dirRegion struct {
 
 // LoadDir loads a scenario from a directory containing a manifest (scenario.yaml)
 // and region sub-files. The directory ID is derived from the directory name.
-func LoadDir(dir string) (*Scenario, error) {
+func LoadDir(dir string) (*Spec, error) {
 	manifestPath := filepath.Join(dir, "scenario.yaml")
 	data, err := os.ReadFile(manifestPath)
 	if err != nil {
@@ -39,7 +39,7 @@ func LoadDir(dir string) (*Scenario, error) {
 		return nil, fmt.Errorf("parse manifest %s: %w", manifestPath, err)
 	}
 
-	s := &Scenario{
+	s := &Spec{
 		ID:           filepath.Base(dir),
 		Title:        m.Title,
 		StartingRoom: m.StartingRoom,
@@ -51,7 +51,7 @@ func LoadDir(dir string) (*Scenario, error) {
 	}
 
 	if s.Items == nil {
-		s.Items = make(map[string]*ScenarioItem)
+		s.Items = make(map[string]*Item)
 	}
 	if s.Enemies == nil {
 		s.Enemies = make(map[string]*EnemyTemplate)
