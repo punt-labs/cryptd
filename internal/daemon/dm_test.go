@@ -33,9 +33,9 @@ func testDMServer(t *testing.T, interp model.CommandInterpreter, narr model.Narr
 	)
 }
 
-// dmRoundTrip sends all requests on a single connection (initialize + new_game
+// dmRoundTrip sends all requests on a single connection (session.init + game.new
 // first, then play requests) and collects all responses. This exercises the
-// full normal-mode flow: initialize → new_game → game loop via RPCRenderer.
+// full normal-mode flow: session.init → game.new → game loop via RPCRenderer.
 func dmRoundTrip(t *testing.T, srv *Server, reqs []Request) []Response {
 	t.Helper()
 	var input bytes.Buffer
@@ -66,7 +66,7 @@ func playRequest(id int, text string) Request {
 	return Request{
 		JSONRPC: "2.0",
 		ID:      idJSON,
-		Method:  "play",
+		Method:  "game.play",
 		Params:  params,
 	}
 }
@@ -76,7 +76,7 @@ func quitRequest(id int) Request {
 	return Request{
 		JSONRPC: "2.0",
 		ID:      idJSON,
-		Method:  "quit",
+		Method:  "session.quit",
 	}
 }
 
@@ -95,7 +95,7 @@ func TestDMDaemon_NewGameAndPlay(t *testing.T) {
 
 	reqs := []Request{
 		initRequest(0),
-		toolCall(1, "new_game", map[string]any{
+		newGameCall(1, map[string]any{
 			"scenario_id": "minimal", "character_name": "Hero", "character_class": "fighter",
 		}),
 		playRequest(2, "look around"),
@@ -103,10 +103,10 @@ func TestDMDaemon_NewGameAndPlay(t *testing.T) {
 	}
 
 	resps := dmRoundTrip(t, srv, reqs)
-	// initialize + new_game response + play response + quit response.
-	require.GreaterOrEqual(t, len(resps), 3, "expected at least initialize + new_game + quit responses")
+	// session.init + game.new response + play response + quit response.
+	require.GreaterOrEqual(t, len(resps), 3, "expected at least session.init + game.new + quit responses")
 
-	// Second response (index 1) is new_game with narrated text.
+	// Second response (index 1) is game.new with narrated text.
 	data, err := json.Marshal(resps[1].Result)
 	require.NoError(t, err)
 	var playResp PlayResponse
@@ -136,7 +136,7 @@ func TestDMDaemon_PlayMovement(t *testing.T) {
 
 	reqs := []Request{
 		initRequest(0),
-		toolCall(1, "new_game", map[string]any{
+		newGameCall(1, map[string]any{
 			"scenario_id": "minimal", "character_name": "Hero", "character_class": "fighter",
 		}),
 		playRequest(2, "go south"),

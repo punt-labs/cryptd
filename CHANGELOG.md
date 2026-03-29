@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **Protocol: direct JSON-RPC methods replace MCP framing.** Daemon protocol refactored from `tools/call` dispatch to direct named methods: `session.init`, `game.new`, `game.move`, `game.look`, `game.play`, `session.quit`, etc. Response results are direct JSON objects instead of `ToolResult{content:[{text:"..."}]}` wrappers. Error responses use standard JSON-RPC error objects instead of `ToolResult{isError:true}`.
+- **Removed MCP schema infrastructure.** Deleted `cmd/dump-mcp-schema`, `testdata/mcp-schema.json`, and the `mcp-schema` CI job. The daemon is a game server, not an MCP server.
+- **Client updated for new protocol.** `crypt` sends `session.init` instead of `initialize`, `game.new` instead of `tools/call` with `name=new_game`, and `game.play` instead of `play`.
+
 ### Added
 
 - **LLM inference tier (M9):** `LLMInterpreter` and `LLMNarrator` implementations that call Claude's API via the OpenAI-compatible `/v1/chat/completions` endpoint. Same two-tier fallback strategy as the SLM tier: Rules-first for deterministic commands, LLM for ambiguous input; Template fallback for tactical events, LLM for atmospheric narration. Claude-optimized system prompts.
@@ -57,9 +63,6 @@ All notable changes to this project will be documented in this file.
 - `crypt solo`, `crypt headless`, `crypt autoplay`, `crypt connect` subcommands — replaced by plain `crypt` thin client.
 - `cryptd headless` and `cryptd autoplay` subcommands — replaced by `cryptd serve -t` (testing mode on stdin/stdout).
 - E2E acceptance and headless tests — replaced by `cryptd serve -t --script` demos.
-
-### Changed
-
 - `cryptd validate` prints deprecation warning directing users to `crypt-admin validate`.
 - `make build` now builds all three binaries (`cryptd`, `crypt`, `crypt-admin`).
 - `cryptd serve -t` (interactive, no `--script`) now probes for ollama and uses SLM interpreter + narrator when available. Scripted mode retains deterministic rules+templates.

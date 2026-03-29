@@ -31,17 +31,17 @@ func repoRoot(t *testing.T) string {
 	return filepath.Join(wd, "..", "..")
 }
 
-// initRequest returns an initialize request with the given ID.
+// initRequest returns a session.init request with the given ID.
 func initRequest(id int) Request {
 	idJSON, _ := json.Marshal(id)
-	return Request{JSONRPC: "2.0", ID: idJSON, Method: "initialize"}
+	return Request{JSONRPC: "2.0", ID: idJSON, Method: "session.init"}
 }
 
-// initRequestWithSession returns an initialize request that provides a session ID.
+// initRequestWithSession returns a session.init request that provides a session ID.
 func initRequestWithSession(id int, sessionID string) Request {
 	idJSON, _ := json.Marshal(id)
 	params, _ := json.Marshal(InitializeParams{SessionID: sessionID})
-	return Request{JSONRPC: "2.0", ID: idJSON, Method: "initialize", Params: params}
+	return Request{JSONRPC: "2.0", ID: idJSON, Method: "session.init", Params: params}
 }
 
 // roundTrip sends a JSON-RPC request and reads the response.
@@ -78,35 +78,47 @@ func multiRoundTrip(t *testing.T, srv *Server, reqs []Request) []Response {
 	return resps
 }
 
-func toolCall(id int, name string, args any) Request {
-	argsJSON, _ := json.Marshal(args)
-	params, _ := json.Marshal(ToolCallParams{Name: name, Arguments: argsJSON})
+// gameCall builds a direct game.* method request.
+// command is the short name (e.g. "move", "look") which gets prefixed with "game.".
+func gameCall(id int, command string, args any) Request {
+	var params json.RawMessage
+	if args != nil {
+		params, _ = json.Marshal(args)
+	}
 	idJSON, _ := json.Marshal(id)
 	return Request{
 		JSONRPC: "2.0",
 		ID:      idJSON,
-		Method:  "tools/call",
+		Method:  "game." + command,
 		Params:  params,
 	}
 }
 
+// newGameCall builds a game.new request with the standard new-game arguments.
+func newGameCall(id int, args map[string]any) Request {
+	params, _ := json.Marshal(args)
+	idJSON, _ := json.Marshal(id)
+	return Request{
+		JSONRPC: "2.0",
+		ID:      idJSON,
+		Method:  "game.new",
+		Params:  params,
+	}
+}
+
+// extractResult extracts the direct JSON result from a response.
 func extractResult(t *testing.T, resp Response) map[string]any {
 	t.Helper()
 	require.Nil(t, resp.Error, "unexpected RPC error: %+v", resp.Error)
 
-	// Result is a ToolResult with Content[0].Text as JSON.
 	data, err := json.Marshal(resp.Result)
 	require.NoError(t, err)
-	var tr ToolResult
-	require.NoError(t, json.Unmarshal(data, &tr))
-	require.Len(t, tr.Content, 1)
-
 	var result map[string]any
-	require.NoError(t, json.Unmarshal([]byte(tr.Content[0].Text), &result))
+	require.NoError(t, json.Unmarshal(data, &result))
 	return result
 }
 
-// extractSessionID pulls the session ID from an initialize response.
+// extractSessionID pulls the session ID from a session.init response.
 func extractSessionID(t *testing.T, resp Response) string {
 	t.Helper()
 	require.Nil(t, resp.Error)
@@ -132,7 +144,7 @@ func activeGame(t *testing.T, srv *Server) *Game {
 func TestInitialize(t *testing.T) {
 	srv := testServer(t)
 	idJSON, _ := json.Marshal(1)
-	resp := roundTrip(t, srv, Request{JSONRPC: "2.0", ID: idJSON, Method: "initialize"})
+	resp := roundTrip(t, srv, Request{JSONRPC: "2.0", ID: idJSON, Method: "session.init"})
 
 	require.Nil(t, resp.Error)
 	data, _ := json.Marshal(resp.Result)
@@ -142,29 +154,11 @@ func TestInitialize(t *testing.T) {
 	assert.NotEmpty(t, init.ProtocolVersion)
 }
 
-func TestToolsList(t *testing.T) {
-	srv := testServer(t)
-	idJSON, _ := json.Marshal(1)
-	resp := roundTrip(t, srv, Request{JSONRPC: "2.0", ID: idJSON, Method: "tools/list"})
-
-	require.Nil(t, resp.Error)
-	data, _ := json.Marshal(resp.Result)
-	var result struct {
-		Tools []ToolInfo `json:"tools"`
-	}
-	require.NoError(t, json.Unmarshal(data, &result))
-	assert.Len(t, result.Tools, 15)
-
-	// Check first and last tool names.
-	assert.Equal(t, "new_game", result.Tools[0].Name)
-	assert.Equal(t, "load_game", result.Tools[14].Name)
-}
-
 func TestNewGame(t *testing.T) {
 	srv := testServer(t)
 	reqs := []Request{
 		initRequest(0),
-		toolCall(1, "new_game", map[string]any{
+		newGameCall(1, map[string]any{
 			"scenario_id":     "minimal",
 			"character_name":  "Tester",
 			"character_class": "fighter",
@@ -182,40 +176,27 @@ func TestNewGame(t *testing.T) {
 	assert.Equal(t, "fighter", hero["class"])
 }
 
-// extractToolError extracts the error text from a ToolResult with isError=true.
-func extractToolError(t *testing.T, resp Response) string {
-	t.Helper()
-	require.Nil(t, resp.Error, "expected no JSON-RPC error, got: %+v", resp.Error)
-	data, err := json.Marshal(resp.Result)
-	require.NoError(t, err)
-	var tr ToolResult
-	require.NoError(t, json.Unmarshal(data, &tr))
-	require.True(t, tr.IsError, "expected isError=true in ToolResult")
-	require.Len(t, tr.Content, 1)
-	return tr.Content[0].Text
-}
-
 func TestNoActiveGame(t *testing.T) {
 	srv := testServer(t)
 	reqs := []Request{
 		initRequest(0),
-		toolCall(1, "look", nil),
+		gameCall(1, "look", nil),
 	}
 	resps := multiRoundTrip(t, srv, reqs)
 	require.Len(t, resps, 2)
 
-	errText := extractToolError(t, resps[1])
-	assert.Contains(t, errText, "no active game")
+	require.NotNil(t, resps[1].Error)
+	assert.Contains(t, resps[1].Error.Message, "no active game")
 }
 
 func TestLook(t *testing.T) {
 	srv := testServer(t)
 	reqs := []Request{
 		initRequest(0),
-		toolCall(1, "new_game", map[string]any{
+		newGameCall(1, map[string]any{
 			"scenario_id": "minimal", "character_name": "Tester", "character_class": "fighter",
 		}),
-		toolCall(2, "look", nil),
+		gameCall(2, "look", nil),
 	}
 	resps := multiRoundTrip(t, srv, reqs)
 	require.Len(t, resps, 3)
@@ -229,10 +210,10 @@ func TestMove(t *testing.T) {
 	srv := testServer(t)
 	reqs := []Request{
 		initRequest(0),
-		toolCall(1, "new_game", map[string]any{
+		newGameCall(1, map[string]any{
 			"scenario_id": "minimal", "character_name": "Tester", "character_class": "fighter",
 		}),
-		toolCall(2, "move", map[string]any{"direction": "south"}),
+		gameCall(2, "move", map[string]any{"direction": "south"}),
 	}
 	resps := multiRoundTrip(t, srv, reqs)
 	require.Len(t, resps, 3)
@@ -251,27 +232,27 @@ func TestMoveNoExit(t *testing.T) {
 	srv := testServer(t)
 	reqs := []Request{
 		initRequest(0),
-		toolCall(1, "new_game", map[string]any{
+		newGameCall(1, map[string]any{
 			"scenario_id": "minimal", "character_name": "Tester", "character_class": "fighter",
 		}),
-		toolCall(2, "move", map[string]any{"direction": "east"}),
+		gameCall(2, "move", map[string]any{"direction": "east"}),
 	}
 	resps := multiRoundTrip(t, srv, reqs)
 	require.Len(t, resps, 3)
 
-	errText := extractToolError(t, resps[2])
-	assert.Contains(t, errText, "no exit")
+	require.NotNil(t, resps[2].Error)
+	assert.Contains(t, resps[2].Error.Message, "no exit")
 }
 
 func TestPickUpAndDrop(t *testing.T) {
 	srv := testServer(t)
 	reqs := []Request{
 		initRequest(0),
-		toolCall(1, "new_game", map[string]any{
+		newGameCall(1, map[string]any{
 			"scenario_id": "minimal", "character_name": "Tester", "character_class": "fighter",
 		}),
-		toolCall(2, "pick_up", map[string]any{"item_id": "short_sword"}),
-		toolCall(3, "drop", map[string]any{"item_id": "short_sword"}),
+		gameCall(2, "pick_up", map[string]any{"item_id": "short_sword"}),
+		gameCall(3, "drop", map[string]any{"item_id": "short_sword"}),
 	}
 	resps := multiRoundTrip(t, srv, reqs)
 	require.Len(t, resps, 4)
@@ -291,12 +272,12 @@ func TestEquipAndUnequip(t *testing.T) {
 	srv := testServer(t)
 	reqs := []Request{
 		initRequest(0),
-		toolCall(1, "new_game", map[string]any{
+		newGameCall(1, map[string]any{
 			"scenario_id": "minimal", "character_name": "Tester", "character_class": "fighter",
 		}),
-		toolCall(2, "pick_up", map[string]any{"item_id": "short_sword"}),
-		toolCall(3, "equip", map[string]any{"item_id": "short_sword"}),
-		toolCall(4, "unequip", map[string]any{"slot": "weapon"}),
+		gameCall(2, "pick_up", map[string]any{"item_id": "short_sword"}),
+		gameCall(3, "equip", map[string]any{"item_id": "short_sword"}),
+		gameCall(4, "unequip", map[string]any{"slot": "weapon"}),
 	}
 	resps := multiRoundTrip(t, srv, reqs)
 	require.Len(t, resps, 5)
@@ -312,11 +293,11 @@ func TestUseItem(t *testing.T) {
 	srv := testServer(t)
 	reqs := []Request{
 		initRequest(0),
-		toolCall(1, "new_game", map[string]any{
+		newGameCall(1, map[string]any{
 			"scenario_id": "minimal", "character_name": "Tester", "character_class": "fighter",
 		}),
-		toolCall(2, "pick_up", map[string]any{"item_id": "health_potion"}),
-		toolCall(3, "use_item", map[string]any{"item_id": "health_potion"}),
+		gameCall(2, "pick_up", map[string]any{"item_id": "health_potion"}),
+		gameCall(3, "use_item", map[string]any{"item_id": "health_potion"}),
 	}
 	resps := multiRoundTrip(t, srv, reqs)
 	require.Len(t, resps, 4)
@@ -333,28 +314,28 @@ func TestUseItem_NotConsumable(t *testing.T) {
 	srv := testServer(t)
 	reqs := []Request{
 		initRequest(0),
-		toolCall(1, "new_game", map[string]any{
+		newGameCall(1, map[string]any{
 			"scenario_id": "minimal", "character_name": "Tester", "character_class": "fighter",
 		}),
-		toolCall(2, "pick_up", map[string]any{"item_id": "short_sword"}),
-		toolCall(3, "use_item", map[string]any{"item_id": "short_sword"}),
+		gameCall(2, "pick_up", map[string]any{"item_id": "short_sword"}),
+		gameCall(3, "use_item", map[string]any{"item_id": "short_sword"}),
 	}
 	resps := multiRoundTrip(t, srv, reqs)
 	require.Len(t, resps, 4)
 
-	// In passthrough mode, engine errors are ToolResult with isError=true.
-	errText := extractToolError(t, resps[3])
-	assert.Contains(t, errText, "weapon")
+	// Engine errors are now standard JSON-RPC errors.
+	require.NotNil(t, resps[3].Error)
+	assert.Contains(t, resps[3].Error.Message, "weapon")
 }
 
 func TestExamine(t *testing.T) {
 	srv := testServer(t)
 	reqs := []Request{
 		initRequest(0),
-		toolCall(1, "new_game", map[string]any{
+		newGameCall(1, map[string]any{
 			"scenario_id": "minimal", "character_name": "Tester", "character_class": "fighter",
 		}),
-		toolCall(2, "examine", map[string]any{"item_id": "short_sword"}),
+		gameCall(2, "examine", map[string]any{"item_id": "short_sword"}),
 	}
 	resps := multiRoundTrip(t, srv, reqs)
 	require.Len(t, resps, 3)
@@ -369,11 +350,11 @@ func TestInventory(t *testing.T) {
 	srv := testServer(t)
 	reqs := []Request{
 		initRequest(0),
-		toolCall(1, "new_game", map[string]any{
+		newGameCall(1, map[string]any{
 			"scenario_id": "minimal", "character_name": "Tester", "character_class": "fighter",
 		}),
-		toolCall(2, "pick_up", map[string]any{"item_id": "short_sword"}),
-		toolCall(3, "inventory", nil),
+		gameCall(2, "pick_up", map[string]any{"item_id": "short_sword"}),
+		gameCall(3, "inventory", nil),
 	}
 	resps := multiRoundTrip(t, srv, reqs)
 	require.Len(t, resps, 4)
@@ -390,7 +371,7 @@ func TestSaveAndLoad(t *testing.T) {
 
 	reqs := []Request{
 		initRequest(0),
-		toolCall(1, "new_game", map[string]any{
+		newGameCall(1, map[string]any{
 			"scenario_id": "minimal", "character_name": "Tester", "character_class": "fighter",
 		}),
 	}
@@ -409,7 +390,7 @@ func TestSaveAndLoad(t *testing.T) {
 
 	saveResps := multiRoundTrip(t, srv, []Request{
 		initRequestWithSession(0, sid),
-		toolCall(2, "save_game", map[string]any{"slot": "test"}),
+		gameCall(2, "save_game", map[string]any{"slot": "test"}),
 	})
 	require.Len(t, saveResps, 2)
 	saveResult := extractResult(t, saveResps[1])
@@ -417,7 +398,7 @@ func TestSaveAndLoad(t *testing.T) {
 
 	loadResps := multiRoundTrip(t, srv, []Request{
 		initRequestWithSession(0, sid),
-		toolCall(3, "load_game", map[string]any{"slot": "test"}),
+		gameCall(3, "load_game", map[string]any{"slot": "test"}),
 	})
 	require.Len(t, loadResps, 2)
 	loadResult := extractResult(t, loadResps[1])
@@ -429,10 +410,10 @@ func TestCombatBlockedActions(t *testing.T) {
 	srv := testServer(t)
 	reqs := []Request{
 		initRequest(0),
-		toolCall(1, "new_game", map[string]any{
+		newGameCall(1, map[string]any{
 			"scenario_id": "minimal", "character_name": "Tester", "character_class": "fighter",
 		}),
-		toolCall(2, "move", map[string]any{"direction": "south"}), // enters combat
+		gameCall(2, "move", map[string]any{"direction": "south"}), // enters combat
 	}
 	resps := multiRoundTrip(t, srv, reqs)
 	require.Len(t, resps, 3)
@@ -440,9 +421,9 @@ func TestCombatBlockedActions(t *testing.T) {
 	sid := extractSessionID(t, resps[0])
 
 	// Combat should be active — try blocked actions.
-	for _, tool := range []string{"move", "pick_up", "drop", "equip", "unequip", "examine"} {
+	for _, cmd := range []string{"move", "pick_up", "drop", "equip", "unequip", "examine"} {
 		var args map[string]any
-		switch tool {
+		switch cmd {
 		case "move":
 			args = map[string]any{"direction": "north"}
 		case "pick_up", "drop", "equip", "examine":
@@ -452,11 +433,11 @@ func TestCombatBlockedActions(t *testing.T) {
 		}
 		blockResps := multiRoundTrip(t, srv, []Request{
 			initRequestWithSession(0, sid),
-			toolCall(10, tool, args),
+			gameCall(10, cmd, args),
 		})
-		require.Len(t, blockResps, 2, "tool=%s", tool)
-		errText := extractToolError(t, blockResps[1])
-		assert.NotEmpty(t, errText, "expected %s to be blocked during combat", tool)
+		require.Len(t, blockResps, 2, "cmd=%s", cmd)
+		require.NotNil(t, blockResps[1].Error, "expected %s to be blocked during combat", cmd)
+		assert.NotEmpty(t, blockResps[1].Error.Message, "expected %s to have error message", cmd)
 	}
 }
 
@@ -464,10 +445,10 @@ func TestDefend(t *testing.T) {
 	srv := testServer(t)
 	reqs := []Request{
 		initRequest(0),
-		toolCall(1, "new_game", map[string]any{
+		newGameCall(1, map[string]any{
 			"scenario_id": "minimal", "character_name": "Tester", "character_class": "fighter",
 		}),
-		toolCall(2, "move", map[string]any{"direction": "south"}),
+		gameCall(2, "move", map[string]any{"direction": "south"}),
 	}
 	resps := multiRoundTrip(t, srv, reqs)
 	require.Len(t, resps, 3)
@@ -486,44 +467,39 @@ func TestDefend(t *testing.T) {
 
 	defendResps := multiRoundTrip(t, srv, []Request{
 		initRequestWithSession(0, sid),
-		toolCall(3, "defend", nil),
+		gameCall(3, "defend", nil),
 	})
 	require.Len(t, defendResps, 2)
 
 	resp := defendResps[1]
-	// Tool errors now come as ToolResult with isError.
-	data, err := json.Marshal(resp.Result)
-	require.NoError(t, err)
-	var tr ToolResult
-	require.NoError(t, json.Unmarshal(data, &tr))
-	if tr.IsError {
+	if resp.Error != nil {
 		// Hero might be dead from enemy turns — that's a valid game over.
-		assert.Contains(t, tr.Content[0].Text, "dead")
+		assert.Contains(t, resp.Error.Message, "dead")
 	} else {
 		result := extractResult(t, resp)
 		assert.Equal(t, true, result["defending"])
 	}
 }
 
-func TestUnknownTool(t *testing.T) {
+func TestUnknownCommand(t *testing.T) {
 	srv := testServer(t)
 	reqs := []Request{
 		initRequest(0),
-		toolCall(1, "new_game", map[string]any{
+		newGameCall(1, map[string]any{
 			"scenario_id": "minimal", "character_name": "Tester", "character_class": "fighter",
 		}),
-		toolCall(2, "nonexistent_tool", nil),
+		gameCall(2, "nonexistent_command", nil),
 	}
 	resps := multiRoundTrip(t, srv, reqs)
 	require.Len(t, resps, 3)
-	errText := extractToolError(t, resps[2])
-	assert.Contains(t, errText, "unknown tool")
+	require.NotNil(t, resps[2].Error)
+	assert.Contains(t, resps[2].Error.Message, "unknown command")
 }
 
 func TestInvalidJSONRPC(t *testing.T) {
 	srv := testServer(t)
 	idJSON, _ := json.Marshal(1)
-	resp := roundTrip(t, srv, Request{JSONRPC: "1.0", ID: idJSON, Method: "initialize"})
+	resp := roundTrip(t, srv, Request{JSONRPC: "1.0", ID: idJSON, Method: "session.init"})
 	require.NotNil(t, resp.Error)
 	assert.Equal(t, CodeInvalidRequest, resp.Error.Code)
 }
@@ -536,26 +512,26 @@ func TestUnknownMethod(t *testing.T) {
 	assert.Equal(t, CodeMethodNotFound, resp.Error.Code)
 }
 
-func TestToolCallBeforeInitialize(t *testing.T) {
+func TestGameCallBeforeInit(t *testing.T) {
 	srv := testServer(t)
-	// Send tools/call new_game without any prior initialize.
-	resp := roundTrip(t, srv, toolCall(1, "new_game", map[string]any{
+	// Send game.new without any prior session.init.
+	resp := roundTrip(t, srv, newGameCall(1, map[string]any{
 		"scenario_id":     "minimal",
 		"character_name":  "Tester",
 		"character_class": "fighter",
 	}))
 
-	// Should get a JSON-RPC error telling us to initialize first.
+	// Should get a JSON-RPC error telling us to init first.
 	require.NotNil(t, resp.Error)
 	assert.Equal(t, CodeInvalidRequest, resp.Error.Code)
-	assert.Contains(t, resp.Error.Message, "call initialize first")
+	assert.Contains(t, resp.Error.Message, "call session.init first")
 }
 
 func TestRepeatedNewGame_CleansUpOldGame(t *testing.T) {
 	srv := testServer(t)
 	reqs := []Request{
 		initRequest(0),
-		toolCall(1, "new_game", map[string]any{
+		newGameCall(1, map[string]any{
 			"scenario_id": "minimal", "character_name": "First", "character_class": "fighter",
 		}),
 	}
@@ -574,7 +550,7 @@ func TestRepeatedNewGame_CleansUpOldGame(t *testing.T) {
 	// Second new_game on the same session should replace the game.
 	reqs2 := []Request{
 		initRequestWithSession(0, sid),
-		toolCall(2, "new_game", map[string]any{
+		newGameCall(2, map[string]any{
 			"scenario_id": "minimal", "character_name": "Second", "character_class": "mage",
 		}),
 	}
@@ -591,7 +567,7 @@ func TestRepeatedNewGame_CleansUpOldGame(t *testing.T) {
 	// Verify the new game works — look should succeed.
 	reqs3 := []Request{
 		initRequestWithSession(0, sid),
-		toolCall(3, "look", nil),
+		gameCall(3, "look", nil),
 	}
 	resps3 := multiRoundTrip(t, srv, reqs3)
 	require.Len(t, resps3, 2)

@@ -72,30 +72,27 @@ func TestNormalMode_NewGameAndPlay(t *testing.T) {
 	}
 
 	// Initialize.
-	resp := send("initialize", map[string]any{})
+	resp := send("session.init", map[string]any{})
 	require.Nil(t, resp.Error)
 
 	// New game — returns PlayResponse with narrated room.
-	resp = send("tools/call", map[string]any{
-		"name": "new_game",
-		"arguments": map[string]any{
-			"scenario_id":     "minimal",
-			"character_name":  "Tester",
-			"character_class": "fighter",
-		},
+	resp = send("game.new", map[string]any{
+		"scenario_id":     "minimal",
+		"character_name":  "Tester",
+		"character_class": "fighter",
 	})
-	require.Nil(t, resp.Error, "new_game error: %+v", resp.Error)
+	require.Nil(t, resp.Error, "game.new error: %+v", resp.Error)
 
 	var playResp protocol.PlayResponse
 	data, err := json.Marshal(resp.Result)
 	require.NoError(t, err)
 	require.NoError(t, json.Unmarshal(data, &playResp))
-	assert.NotEmpty(t, playResp.Text, "expected narrated text from new_game")
-	require.NotNil(t, playResp.State, "expected game state from new_game")
+	assert.NotEmpty(t, playResp.Text, "expected narrated text from game.new")
+	require.NotNil(t, playResp.State, "expected game state from game.new")
 	assert.NotEmpty(t, playResp.State.Party, "expected party in game state")
 
-	// After new_game, the game loop is running. Send a play request.
-	resp = send("play", protocol.PlayRequest{Text: "look"})
+	// After game.new, the game loop is running. Send a play request.
+	resp = send("game.play", protocol.PlayRequest{Text: "look"})
 	require.Nil(t, resp.Error, "play look error: %+v", resp.Error)
 
 	data, err = json.Marshal(resp.Result)
@@ -105,7 +102,7 @@ func TestNormalMode_NewGameAndPlay(t *testing.T) {
 	assert.NotEmpty(t, lookResp.Text, "expected narrated text from look")
 
 	// Send quit to end the game loop.
-	quitReq := protocol.Request{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "quit"}
+	quitReq := protocol.Request{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "session.quit"}
 	quitData, err := json.Marshal(quitReq)
 	require.NoError(t, err)
 	quitData = append(quitData, '\n')
@@ -135,14 +132,14 @@ func TestNormalMode_NewGameAndPlay(t *testing.T) {
 func TestNormalMode_PlayBeforeNewGame(t *testing.T) {
 	srv := testNormalServer(t)
 
-	// Before new_game, "play" method is unknown (game loop not started).
+	// Before game.new, "game.play" method is unknown (game loop not started).
 	// Need to initialize first, then try play.
 	reqs := []Request{
 		initRequest(0),
 		{
 			JSONRPC: "2.0",
 			ID:      json.RawMessage(`1`),
-			Method:  "play",
+			Method:  "game.play",
 			Params:  json.RawMessage(`{"text":"look"}`),
 		},
 	}
@@ -152,17 +149,17 @@ func TestNormalMode_PlayBeforeNewGame(t *testing.T) {
 	assert.Equal(t, CodeMethodNotFound, resps[1].Error.Code)
 }
 
-func TestNormalMode_NonNewGameToolCallBlocked(t *testing.T) {
+func TestNormalMode_NonNewGameCallBlocked(t *testing.T) {
 	srv := testNormalServer(t)
 
-	// In normal mode, non-new_game tool calls are blocked.
+	// In normal mode, non-game.new calls are blocked.
 	reqs := []Request{
 		initRequest(0),
-		toolCall(1, "look", map[string]any{}),
+		gameCall(1, "look", nil),
 	}
 	resps := multiRoundTrip(t, srv, reqs)
 	require.Len(t, resps, 2)
 	require.NotNil(t, resps[1].Error)
 	assert.Equal(t, CodeMethodNotFound, resps[1].Error.Code)
-	assert.True(t, strings.Contains(resps[1].Error.Message, "new_game"), resps[1].Error.Message)
+	assert.True(t, strings.Contains(resps[1].Error.Message, "unknown method"), resps[1].Error.Message)
 }

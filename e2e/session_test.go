@@ -20,10 +20,10 @@ import (
 // reconnect with the same session ID to resume a game in normal mode.
 //
 // Flow:
-//   1. Start cryptd serve -f --socket <tmp>
-//   2. Client 1: initialize -> new_game -> play "go south" -> disconnect
-//   3. Client 2: initialize with session ID from client 1 -> read initial room
-//      -> assert room is goblin_lair (not entrance)
+//  1. Start cryptd serve -f --socket <tmp>
+//  2. Client 1: session.init -> game.new -> play "go south" -> disconnect
+//  3. Client 2: session.init with session ID from client 1 -> read initial room
+//     -> assert room is goblin_lair (not entrance)
 func TestE2E_SessionReconnect(t *testing.T) {
 	bin := serverBinary(t)
 	root := repoRoot(t)
@@ -66,7 +66,7 @@ func TestE2E_SessionReconnect(t *testing.T) {
 	}
 	require.True(t, ready, "daemon socket %s not ready within timeout", sockPath)
 
-	// --- Client 1: initialize -> new_game -> play "go south" -> disconnect ---
+	// --- Client 1: session.init -> game.new -> play "go south" -> disconnect ---
 	conn1, err := net.Dial("unix", sockPath)
 	require.NoError(t, err)
 
@@ -97,7 +97,7 @@ func TestE2E_SessionReconnect(t *testing.T) {
 	}
 
 	// Initialize.
-	initResp := send(conn1, scanner1, 1, "initialize", nil)
+	initResp := send(conn1, scanner1, 1, "session.init", nil)
 	require.Nil(t, initResp["error"])
 	initResult, ok := initResp["result"].(map[string]any)
 	require.True(t, ok)
@@ -105,20 +105,16 @@ func TestE2E_SessionReconnect(t *testing.T) {
 	require.True(t, ok)
 	require.NotEmpty(t, sessionID)
 
-	// New game via tools/call.
-	argsJSON, _ := json.Marshal(map[string]string{
+	// New game via game.new.
+	ngResp := send(conn1, scanner1, 2, "game.new", map[string]any{
 		"scenario_id":     "minimal",
 		"character_name":  "E2E ReconnectHero",
 		"character_class": "fighter",
 	})
-	ngResp := send(conn1, scanner1, 2, "tools/call", map[string]any{
-		"name":      "new_game",
-		"arguments": json.RawMessage(argsJSON),
-	})
-	require.Nil(t, ngResp["error"], "new_game error: %+v", ngResp["error"])
+	require.Nil(t, ngResp["error"], "game.new error: %+v", ngResp["error"])
 
-	// After new_game, the game loop is running. Send "go south".
-	playResp := send(conn1, scanner1, 3, "play", map[string]string{"text": "go south"})
+	// After game.new, the game loop is running. Send "go south".
+	playResp := send(conn1, scanner1, 3, "game.play", map[string]string{"text": "go south"})
 	require.Nil(t, playResp["error"])
 
 	// Verify the response contains the current room state.
@@ -136,7 +132,7 @@ func TestE2E_SessionReconnect(t *testing.T) {
 	// Wait for the server to process the disconnection.
 	time.Sleep(200 * time.Millisecond)
 
-	// --- Client 2: initialize with session ID -> read resumed room ---
+	// --- Client 2: session.init with session ID -> read resumed room ---
 	conn2, err := net.Dial("unix", sockPath)
 	require.NoError(t, err)
 	defer conn2.Close()
@@ -144,13 +140,13 @@ func TestE2E_SessionReconnect(t *testing.T) {
 	scanner2 := bufio.NewScanner(conn2)
 	scanner2.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 
-	// Send initialize with session ID.
-	initResp2 := send(conn2, scanner2, 1, "initialize", map[string]string{
+	// Send session.init with session ID.
+	initResp2 := send(conn2, scanner2, 1, "session.init", map[string]string{
 		"session_id": sessionID,
 	})
 	require.Nil(t, initResp2["error"])
 
-	// After initialize with an existing game, the server enters resumeGameLoop
+	// After session.init with an existing game, the server enters resumeGameLoop
 	// and sends the current room as the initial render. Read it.
 	require.True(t, scanner2.Scan(), "expected initial room render on resume")
 	var roomResp map[string]any

@@ -62,7 +62,7 @@ func startTestDaemon(t *testing.T) string {
 	return sockPath
 }
 
-// socketSession connects to the socket, sends initialize, and returns the
+// socketSession connects to the socket, sends session.init, and returns the
 // session ID and open connection for further use.
 func socketSession(t *testing.T, sockPath string) (string, net.Conn, *bufio.Scanner) {
 	t.Helper()
@@ -72,16 +72,16 @@ func socketSession(t *testing.T, sockPath string) (string, net.Conn, *bufio.Scan
 	scanner := bufio.NewScanner(conn)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 
-	// Send initialize.
+	// Send session.init.
 	idJSON, _ := json.Marshal(0)
-	req := Request{JSONRPC: "2.0", ID: idJSON, Method: "initialize"}
+	req := Request{JSONRPC: "2.0", ID: idJSON, Method: "session.init"}
 	data, err := json.Marshal(req)
 	require.NoError(t, err)
 	data = append(data, '\n')
 	_, err = conn.Write(data)
 	require.NoError(t, err)
 
-	require.True(t, scanner.Scan(), "expected initialize response")
+	require.True(t, scanner.Scan(), "expected session.init response")
 	var resp Response
 	require.NoError(t, json.Unmarshal(scanner.Bytes(), &resp))
 	require.Nil(t, resp.Error)
@@ -93,15 +93,15 @@ func socketSession(t *testing.T, sockPath string) (string, net.Conn, *bufio.Scan
 	return init.SessionID, conn, scanner
 }
 
-// socketRoundTrip connects, sends initialize + a request, and reads responses.
+// socketRoundTrip connects, sends session.init + a request, and reads responses.
 func socketRoundTrip(t *testing.T, sockPath string, req Request) Response {
 	t.Helper()
 	conn, err := net.Dial("unix", sockPath)
 	require.NoError(t, err)
 	defer conn.Close()
 
-	// Send initialize first.
-	initReq := Request{JSONRPC: "2.0", ID: json.RawMessage(`0`), Method: "initialize"}
+	// Send session.init first.
+	initReq := Request{JSONRPC: "2.0", ID: json.RawMessage(`0`), Method: "session.init"}
 	data, err := json.Marshal(initReq)
 	require.NoError(t, err)
 	data = append(data, '\n')
@@ -116,8 +116,8 @@ func socketRoundTrip(t *testing.T, sockPath string, req Request) Response {
 	require.NoError(t, err)
 
 	scanner := bufio.NewScanner(conn)
-	// Read initialize response.
-	require.True(t, scanner.Scan(), "expected initialize response")
+	// Read session.init response.
+	require.True(t, scanner.Scan(), "expected session.init response")
 	// Read actual response.
 	require.True(t, scanner.Scan(), "expected response")
 
@@ -126,16 +126,16 @@ func socketRoundTrip(t *testing.T, sockPath string, req Request) Response {
 	return resp
 }
 
-// socketMultiRoundTrip sends initialize + multiple requests on one connection.
+// socketMultiRoundTrip sends session.init + multiple requests on one connection.
 func socketMultiRoundTrip(t *testing.T, sockPath string, reqs []Request) []Response {
 	t.Helper()
 	conn, err := net.Dial("unix", sockPath)
 	require.NoError(t, err)
 	defer conn.Close()
 
-	// Prepend initialize.
+	// Prepend session.init.
 	allReqs := append([]Request{
-		{JSONRPC: "2.0", ID: json.RawMessage(`0`), Method: "initialize"},
+		{JSONRPC: "2.0", ID: json.RawMessage(`0`), Method: "session.init"},
 	}, reqs...)
 
 	for _, req := range allReqs {
@@ -158,7 +158,7 @@ func socketMultiRoundTrip(t *testing.T, sockPath string, reqs []Request) []Respo
 		require.NoError(t, json.Unmarshal(scanner.Bytes(), &resp))
 		resps = append(resps, resp)
 	}
-	// Strip the initialize response.
+	// Strip the session.init response.
 	if len(resps) > 0 {
 		resps = resps[1:]
 	}
@@ -170,11 +170,11 @@ func TestIntegration_SocketInitialize(t *testing.T) {
 
 	idJSON, _ := json.Marshal(1)
 	resp := socketRoundTrip(t, sockPath, Request{
-		JSONRPC: "2.0", ID: idJSON, Method: "initialize",
+		JSONRPC: "2.0", ID: idJSON, Method: "session.init",
 	})
 
-	// socketRoundTrip sends its own initialize, then the request is another
-	// initialize — both should succeed. Check the second one.
+	// socketRoundTrip sends its own session.init, then the request is another
+	// session.init — both should succeed. Check the second one.
 	require.Nil(t, resp.Error)
 	data, _ := json.Marshal(resp.Result)
 	var init InitializeResult
@@ -186,12 +186,12 @@ func TestIntegration_SocketGameSession(t *testing.T) {
 	sockPath := startTestDaemon(t)
 
 	reqs := []Request{
-		toolCall(1, "new_game", map[string]any{
+		newGameCall(1, map[string]any{
 			"scenario_id": "minimal", "character_name": "Hero", "character_class": "fighter",
 		}),
-		toolCall(2, "look", nil),
-		toolCall(3, "pick_up", map[string]any{"item_id": "short_sword"}),
-		toolCall(4, "inventory", nil),
+		gameCall(2, "look", nil),
+		gameCall(3, "pick_up", map[string]any{"item_id": "short_sword"}),
+		gameCall(4, "inventory", nil),
 	}
 
 	resps := socketMultiRoundTrip(t, sockPath, reqs)
@@ -256,15 +256,15 @@ func startTestTCPDaemon(t *testing.T) string {
 	return addr
 }
 
-// tcpRoundTrip connects over TCP, sends initialize + a request, and reads responses.
+// tcpRoundTrip connects over TCP, sends session.init + a request, and reads responses.
 func tcpRoundTrip(t *testing.T, addr string, req Request) Response {
 	t.Helper()
 	conn, err := net.Dial("tcp", addr)
 	require.NoError(t, err)
 	defer conn.Close()
 
-	// Send initialize first.
-	initReq := Request{JSONRPC: "2.0", ID: json.RawMessage(`0`), Method: "initialize"}
+	// Send session.init first.
+	initReq := Request{JSONRPC: "2.0", ID: json.RawMessage(`0`), Method: "session.init"}
 	data, err := json.Marshal(initReq)
 	require.NoError(t, err)
 	data = append(data, '\n')
@@ -279,8 +279,8 @@ func tcpRoundTrip(t *testing.T, addr string, req Request) Response {
 	require.NoError(t, err)
 
 	scanner := bufio.NewScanner(conn)
-	// Read initialize response.
-	require.True(t, scanner.Scan(), "expected initialize response")
+	// Read session.init response.
+	require.True(t, scanner.Scan(), "expected session.init response")
 	// Read actual response.
 	require.True(t, scanner.Scan(), "expected response")
 
@@ -296,9 +296,9 @@ func tcpSessionRoundTrip(t *testing.T, addr, sessionID string, req Request) Resp
 	require.NoError(t, err)
 	defer conn.Close()
 
-	// Send initialize with session ID.
+	// Send session.init with session ID.
 	params, _ := json.Marshal(InitializeParams{SessionID: sessionID})
-	initReq := Request{JSONRPC: "2.0", ID: json.RawMessage(`0`), Method: "initialize", Params: params}
+	initReq := Request{JSONRPC: "2.0", ID: json.RawMessage(`0`), Method: "session.init", Params: params}
 	data, err := json.Marshal(initReq)
 	require.NoError(t, err)
 	data = append(data, '\n')
@@ -313,8 +313,8 @@ func tcpSessionRoundTrip(t *testing.T, addr, sessionID string, req Request) Resp
 	require.NoError(t, err)
 
 	scanner := bufio.NewScanner(conn)
-	// Read initialize response.
-	require.True(t, scanner.Scan(), "expected initialize response")
+	// Read session.init response.
+	require.True(t, scanner.Scan(), "expected session.init response")
 	// Read actual response.
 	require.True(t, scanner.Scan(), "expected response")
 
@@ -328,7 +328,7 @@ func TestIntegration_TCPInitialize(t *testing.T) {
 
 	idJSON, _ := json.Marshal(1)
 	resp := tcpRoundTrip(t, addr, Request{
-		JSONRPC: "2.0", ID: idJSON, Method: "initialize",
+		JSONRPC: "2.0", ID: idJSON, Method: "session.init",
 	})
 
 	require.Nil(t, resp.Error)
@@ -349,7 +349,7 @@ func TestIntegration_TCPGameSession(t *testing.T) {
 	scanner1 := bufio.NewScanner(conn1)
 
 	// Initialize.
-	initReq := Request{JSONRPC: "2.0", ID: json.RawMessage(`0`), Method: "initialize"}
+	initReq := Request{JSONRPC: "2.0", ID: json.RawMessage(`0`), Method: "session.init"}
 	data, _ := json.Marshal(initReq)
 	data = append(data, '\n')
 	conn1.Write(data)
@@ -363,7 +363,7 @@ func TestIntegration_TCPGameSession(t *testing.T) {
 	sessionID := init.SessionID
 
 	// Start game.
-	ngReq := toolCall(1, "new_game", map[string]any{
+	ngReq := newGameCall(1, map[string]any{
 		"scenario_id": "minimal", "character_name": "Hero", "character_class": "fighter",
 	})
 	data, _ = json.Marshal(ngReq)
@@ -378,7 +378,7 @@ func TestIntegration_TCPGameSession(t *testing.T) {
 	conn1.Close()
 
 	// Second TCP connection with same session ID — state persists.
-	resp2 := tcpSessionRoundTrip(t, addr, sessionID, toolCall(2, "look", nil))
+	resp2 := tcpSessionRoundTrip(t, addr, sessionID, gameCall(2, "look", nil))
 	require.Nil(t, resp2.Error)
 	lookResult := extractResult(t, resp2)
 	assert.Equal(t, "Entrance Hall", lookResult["name"])
@@ -390,7 +390,7 @@ func TestIntegration_SocketMultipleConnections(t *testing.T) {
 	// First connection: initialize and start game.
 	sid, conn1, scanner1 := socketSession(t, sockPath)
 
-	ngReq := toolCall(1, "new_game", map[string]any{
+	ngReq := newGameCall(1, map[string]any{
 		"scenario_id": "minimal", "character_name": "Hero", "character_class": "fighter",
 	})
 	data, _ := json.Marshal(ngReq)
@@ -408,18 +408,18 @@ func TestIntegration_SocketMultipleConnections(t *testing.T) {
 	defer conn2.Close()
 
 	params, _ := json.Marshal(InitializeParams{SessionID: sid})
-	initReq2 := Request{JSONRPC: "2.0", ID: json.RawMessage(`0`), Method: "initialize", Params: params}
+	initReq2 := Request{JSONRPC: "2.0", ID: json.RawMessage(`0`), Method: "session.init", Params: params}
 	data, _ = json.Marshal(initReq2)
 	data = append(data, '\n')
 	conn2.Write(data)
 
-	lookReq := toolCall(2, "look", nil)
+	lookReq := gameCall(2, "look", nil)
 	data, _ = json.Marshal(lookReq)
 	data = append(data, '\n')
 	conn2.Write(data)
 
 	scanner2 := bufio.NewScanner(conn2)
-	// Read initialize response.
+	// Read session.init response.
 	require.True(t, scanner2.Scan())
 	// Read look response.
 	require.True(t, scanner2.Scan())
@@ -480,10 +480,10 @@ func TestIntegration_ConcurrentSessionIsolation(t *testing.T) {
 			}
 
 			// 1. Initialize.
-			initReq := Request{JSONRPC: "2.0", ID: json.RawMessage(`0`), Method: "initialize"}
+			initReq := Request{JSONRPC: "2.0", ID: json.RawMessage(`0`), Method: "session.init"}
 			initResp, err := sendAndRead(initReq)
 			if err != nil {
-				results[idx] = clientResult{err: fmt.Errorf("initialize: %w", err)}
+				results[idx] = clientResult{err: fmt.Errorf("session.init: %w", err)}
 				return
 			}
 			rdata, _ := json.Marshal(initResp.Result)
@@ -494,48 +494,44 @@ func TestIntegration_ConcurrentSessionIsolation(t *testing.T) {
 			}
 
 			// 2. New game with unique character name.
-			ngReq := toolCall(1, "new_game", map[string]any{
+			ngReq := newGameCall(1, map[string]any{
 				"scenario_id":     "minimal",
 				"character_name":  charName,
 				"character_class": "fighter",
 			})
 			ngResp, err := sendAndRead(ngReq)
 			if err != nil {
-				results[idx] = clientResult{err: fmt.Errorf("new_game: %w", err)}
+				results[idx] = clientResult{err: fmt.Errorf("game.new: %w", err)}
 				return
 			}
 			if ngResp.Error != nil {
-				results[idx] = clientResult{err: fmt.Errorf("new_game rpc error: %s", ngResp.Error.Message)}
+				results[idx] = clientResult{err: fmt.Errorf("game.new rpc error: %s", ngResp.Error.Message)}
 				return
 			}
 
 			// 3. Look.
-			lookReq := toolCall(2, "look", nil)
+			lookReq := gameCall(2, "look", nil)
 			lookResp, err := sendAndRead(lookReq)
 			if err != nil {
-				results[idx] = clientResult{err: fmt.Errorf("look: %w", err)}
+				results[idx] = clientResult{err: fmt.Errorf("game.look: %w", err)}
 				return
 			}
 			if lookResp.Error != nil {
-				results[idx] = clientResult{err: fmt.Errorf("look rpc error: %s", lookResp.Error.Message)}
+				results[idx] = clientResult{err: fmt.Errorf("game.look rpc error: %s", lookResp.Error.Message)}
 				return
 			}
 
 			// Extract character name from new_game result.
 			ngData, _ := json.Marshal(ngResp.Result)
-			var tr ToolResult
-			_ = json.Unmarshal(ngData, &tr)
 			var ngResult map[string]any
-			_ = json.Unmarshal([]byte(tr.Content[0].Text), &ngResult)
+			_ = json.Unmarshal(ngData, &ngResult)
 			hero, _ := ngResult["hero"].(map[string]any)
 			heroName, _ := hero["name"].(string)
 
 			// Extract room from look result.
 			lookData, _ := json.Marshal(lookResp.Result)
-			var ltr ToolResult
-			_ = json.Unmarshal(lookData, &ltr)
 			var lookResult map[string]any
-			_ = json.Unmarshal([]byte(ltr.Content[0].Text), &lookResult)
+			_ = json.Unmarshal(lookData, &lookResult)
 			room, _ := lookResult["room"].(string)
 
 			results[idx] = clientResult{
@@ -563,7 +559,7 @@ func TestIntegration_SessionIsolation(t *testing.T) {
 	// Session A: start a game, move south.
 	sidA, connA, scannerA := socketSession(t, sockPath)
 
-	ngReq := toolCall(1, "new_game", map[string]any{
+	ngReq := newGameCall(1, map[string]any{
 		"scenario_id": "minimal", "character_name": "HeroA", "character_class": "fighter",
 	})
 	data, _ := json.Marshal(ngReq)
@@ -574,7 +570,7 @@ func TestIntegration_SessionIsolation(t *testing.T) {
 
 	// Session B: start a different game.
 	sidB, connB, scannerB := socketSession(t, sockPath)
-	ngReq2 := toolCall(1, "new_game", map[string]any{
+	ngReq2 := newGameCall(1, map[string]any{
 		"scenario_id": "minimal", "character_name": "HeroB", "character_class": "mage",
 	})
 	data, _ = json.Marshal(ngReq2)
@@ -591,16 +587,16 @@ func TestIntegration_SessionIsolation(t *testing.T) {
 	require.NoError(t, err)
 	defer conn3.Close()
 	params, _ := json.Marshal(InitializeParams{SessionID: sidA})
-	initReq3 := Request{JSONRPC: "2.0", ID: json.RawMessage(`0`), Method: "initialize", Params: params}
+	initReq3 := Request{JSONRPC: "2.0", ID: json.RawMessage(`0`), Method: "session.init", Params: params}
 	data, _ = json.Marshal(initReq3)
 	data = append(data, '\n')
 	conn3.Write(data)
-	lookReq := toolCall(2, "look", nil)
+	lookReq := gameCall(2, "look", nil)
 	data, _ = json.Marshal(lookReq)
 	data = append(data, '\n')
 	conn3.Write(data)
 	scanner3 := bufio.NewScanner(conn3)
-	require.True(t, scanner3.Scan()) // initialize
+	require.True(t, scanner3.Scan()) // session.init
 	require.True(t, scanner3.Scan()) // look
 	var isoLookResp Response
 	require.NoError(t, json.Unmarshal(scanner3.Bytes(), &isoLookResp))
@@ -659,7 +655,7 @@ func startTestTCPNormalDaemon(t *testing.T) string {
 func TestIntegration_SessionReconnect_StatePreserved(t *testing.T) {
 	addr := startTestTCPNormalDaemon(t)
 
-	// --- Connection 1: initialize -> new_game -> play "go south" -> disconnect ---
+	// --- Connection 1: session.init -> game.new -> play "go south" -> disconnect ---
 	conn1, err := net.Dial("tcp", addr)
 	require.NoError(t, err)
 
@@ -681,31 +677,30 @@ func TestIntegration_SessionReconnect_StatePreserved(t *testing.T) {
 
 	// Initialize.
 	reconInitResp := sendAndRead(conn1, scanner1, Request{
-		JSONRPC: "2.0", ID: json.RawMessage(`0`), Method: "initialize",
+		JSONRPC: "2.0", ID: json.RawMessage(`0`), Method: "session.init",
 	})
 	require.Nil(t, reconInitResp.Error)
 	sessionID := extractSessionID(t, reconInitResp)
 
-	// New game (tools/call in normal mode).
-	argsJSON, _ := json.Marshal(map[string]string{
+	// New game (game.new in normal mode).
+	ngParams, _ := json.Marshal(map[string]string{
 		"scenario_id":     "minimal",
 		"character_name":  "ReconnectHero",
 		"character_class": "fighter",
 	})
-	tcParams, _ := json.Marshal(ToolCallParams{Name: "new_game", Arguments: argsJSON})
 	reconNgResp := sendAndRead(conn1, scanner1, Request{
 		JSONRPC: "2.0",
 		ID:      json.RawMessage(`1`),
-		Method:  "tools/call",
-		Params:  tcParams,
+		Method:  "game.new",
+		Params:  ngParams,
 	})
-	require.Nil(t, reconNgResp.Error, "new_game error: %+v", reconNgResp.Error)
+	require.Nil(t, reconNgResp.Error, "game.new error: %+v", reconNgResp.Error)
 
-	// After new_game, the game loop is running. Send "go south".
+	// After game.new, the game loop is running. Send "go south".
 	reconPlayResp := sendAndRead(conn1, scanner1, Request{
 		JSONRPC: "2.0",
 		ID:      json.RawMessage(`2`),
-		Method:  "play",
+		Method:  "game.play",
 		Params:  json.RawMessage(`{"text":"go south"}`),
 	})
 	require.Nil(t, reconPlayResp.Error)
@@ -723,7 +718,7 @@ func TestIntegration_SessionReconnect_StatePreserved(t *testing.T) {
 	// Wait a moment for the server to process the disconnection.
 	time.Sleep(100 * time.Millisecond)
 
-	// --- Connection 2: initialize with session ID -> read resumed room ---
+	// --- Connection 2: session.init with session ID -> read resumed room ---
 	conn2, err := net.Dial("tcp", addr)
 	require.NoError(t, err)
 	defer conn2.Close()
@@ -731,12 +726,12 @@ func TestIntegration_SessionReconnect_StatePreserved(t *testing.T) {
 	scanner2 := bufio.NewScanner(conn2)
 	scanner2.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 
-	// Send initialize with session ID.
+	// Send session.init with session ID.
 	initParams, _ := json.Marshal(InitializeParams{SessionID: sessionID})
 	reconInitResp2 := sendAndRead(conn2, scanner2, Request{
 		JSONRPC: "2.0",
 		ID:      json.RawMessage(`0`),
-		Method:  "initialize",
+		Method:  "session.init",
 		Params:  initParams,
 	})
 	require.Nil(t, reconInitResp2.Error)
@@ -787,22 +782,21 @@ func TestIntegration_GracefulShutdown(t *testing.T) {
 	}
 
 	// Initialize.
-	sendReq(Request{JSONRPC: "2.0", ID: json.RawMessage(`0`), Method: "initialize"})
+	sendReq(Request{JSONRPC: "2.0", ID: json.RawMessage(`0`), Method: "session.init"})
 	shutdownInitResp := readResp()
 	require.Nil(t, shutdownInitResp.Error)
 
 	// New game.
-	shutdownArgsJSON, _ := json.Marshal(map[string]string{
+	ngParams, _ := json.Marshal(map[string]string{
 		"scenario_id":     "minimal",
 		"character_name":  "ShutdownHero",
 		"character_class": "fighter",
 	})
-	shutdownTcParams, _ := json.Marshal(ToolCallParams{Name: "new_game", Arguments: shutdownArgsJSON})
 	sendReq(Request{
 		JSONRPC: "2.0",
 		ID:      json.RawMessage(`1`),
-		Method:  "tools/call",
-		Params:  shutdownTcParams,
+		Method:  "game.new",
+		Params:  ngParams,
 	})
 	shutdownNgResp := readResp()
 	require.Nil(t, shutdownNgResp.Error)

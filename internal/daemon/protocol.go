@@ -1,5 +1,5 @@
 // Package daemon implements a JSON-RPC 2.0 server over Unix sockets,
-// exposing the game engine's 15 MCP tools as RPC methods.
+// exposing the game engine as direct JSON-RPC methods.
 //
 // Wire protocol types live in internal/protocol. This file re-exports
 // them so existing daemon code compiles without import changes.
@@ -15,10 +15,6 @@ type (
 	RPCError         = protocol.RPCError
 	PlayRequest      = protocol.PlayRequest
 	PlayResponse     = protocol.PlayResponse
-	ToolCallParams   = protocol.ToolCallParams
-	ToolResult       = protocol.ToolResult
-	ToolContent      = protocol.ToolContent
-	ToolInfo         = protocol.ToolInfo
 	InitializeParams = protocol.InitializeParams
 	InitializeResult = protocol.InitializeResult
 	ServerInfo       = protocol.ServerInfo
