@@ -7,6 +7,21 @@ import (
 )
 
 func main() {
+	// Check for subcommands before flag parsing.
+	if len(os.Args) > 1 && os.Args[1] == "mcp" {
+		mcpFS := flag.NewFlagSet("mcp", flag.ContinueOnError)
+		mcpSocket := mcpFS.String("socket", "", "Unix socket path (default ~/.crypt/daemon.sock)")
+		mcpAddr := mcpFS.String("addr", "", "TCP address (e.g. host:9000)")
+		if err := mcpFS.Parse(os.Args[2:]); err != nil {
+			os.Exit(1)
+		}
+		if *mcpSocket != "" && *mcpAddr != "" {
+			fmt.Fprintln(os.Stderr, "error: --socket and --addr are mutually exclusive")
+			os.Exit(1)
+		}
+		os.Exit(runMCP(*mcpSocket, *mcpAddr))
+	}
+
 	fs := flag.NewFlagSet("crypt", flag.ContinueOnError)
 	socketPath := fs.String("socket", "", "Unix socket path (default ~/.crypt/daemon.sock)")
 	addr := fs.String("addr", "", "TCP address (e.g. host:9000)")
