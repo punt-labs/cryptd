@@ -4,13 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-### Fixed
-
-- `crypt` REPL now uses `ergochat/readline` for proper terminal line editing, history, and Ctrl-C handling (was broken with bare `bufio.Scanner`).
-- `TestSLMLoop_HappyPath` integration test no longer hangs — test inputs changed to phrases the Rules interpreter can't parse, so the SLM is actually invoked.
-
 ### Added
 
+- **LLM inference tier (M9):** `LLMInterpreter` and `LLMNarrator` implementations that call Claude's API via the OpenAI-compatible `/v1/chat/completions` endpoint. Same two-tier fallback strategy as the SLM tier: Rules-first for deterministic commands, LLM for ambiguous input; Template fallback for tactical events, LLM for atmospheric narration. Claude-optimized system prompts.
+- **`inference.Client` auth support:** `NewClientWithOpts` constructor with `WithAPIKey(string)` and `WithTimeout(time.Duration)` functional options. When set, adds `Authorization: Bearer <key>` to every request. Existing `NewClient` is unchanged.
+- **`cryptd serve --api-key`** flag (and `ANTHROPIC_API_KEY` env var fallback) selects the Claude LLM tier. Probe chain: Claude API → ollama → llama.cpp → rules+templates.
+- **DM pipeline integration tests:** full game loop and daemon-level tests wiring `FakeLLMInterpreter` + `FakeLLMNarrator` through the interpreter → engine → narrator pipeline. Verifies state transitions are identical to headless mode.
 - **`cryptd serve -t --lux`**: renders the game in a Lux ImGui frame instead of the terminal. Horizontal quick-action buttons, text input + Send for free-form commands, separators between sections. Requires a running Lux display.
 - **Lux wire protocol client** (`internal/lux`): Go `Client` that connects to a running Lux display over Unix domain socket using the length-prefixed JSON wire protocol (port of the Python `LuxClient`). `Display` adapter wires `Client` + `SceneToElements`/`UpdateToPatches` into the `LuxDisplay` interface, enabling the game engine to render to a real Lux ImGui window.
 - **Lux element tree builder:** pure-function translation layer (`SceneToElements`, `UpdateToPatches`, `TranslateLuxEvent`) converts `LuxScene`/`LuxUpdate` Go structs into Lux-native element dicts (`[]map[string]any`). Bidirectional: button click events translate back to `InputEvent`.
@@ -43,6 +42,11 @@ All notable changes to this project will be documented in this file.
 - `internal/daemon` ServerOption functional options: `WithPassthrough()`, `WithInterpreter()`, `WithNarrator()`.
 - `internal/game.Loop.Dispatch()` exported so the daemon can reuse the game loop's orchestration logic (combat, enemy turns, level-ups) without duplicating 300+ lines.
 - Nil client guards in `interpreter.SLM` and `narrator.SLM` — graceful fallback when no inference server is available.
+
+### Fixed
+
+- `crypt` REPL now uses `ergochat/readline` for proper terminal line editing, history, and Ctrl-C handling (was broken with bare `bufio.Scanner`).
+- `TestSLMLoop_HappyPath` integration test no longer hangs — test inputs changed to phrases the Rules interpreter can't parse, so the SLM is actually invoked.
 
 ### Removed
 

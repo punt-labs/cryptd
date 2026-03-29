@@ -39,7 +39,22 @@ type Options struct {
 type Client struct {
 	baseURL    string
 	model      string
+	apiKey     string
 	httpClient *http.Client
+}
+
+// ClientOption configures a Client created via NewClientWithOpts.
+type ClientOption func(*Client)
+
+// WithAPIKey sets the API key for Bearer token authentication.
+// When set, an Authorization header is added to every request.
+func WithAPIKey(key string) ClientOption {
+	return func(c *Client) { c.apiKey = key }
+}
+
+// WithTimeout sets the HTTP client timeout.
+func WithTimeout(d time.Duration) ClientOption {
+	return func(c *Client) { c.httpClient.Timeout = d }
 }
 
 // NewClient creates an inference client targeting the given base URL and model.
@@ -52,6 +67,22 @@ func NewClient(baseURL, model string, timeout time.Duration) *Client {
 			Timeout: timeout,
 		},
 	}
+}
+
+// NewClientWithOpts creates an inference client with functional options.
+// If no WithTimeout option is provided, the default timeout is 10 seconds.
+func NewClientWithOpts(baseURL, model string, opts ...ClientOption) *Client {
+	c := &Client{
+		baseURL: strings.TrimRight(baseURL, "/"),
+		model:   model,
+		httpClient: &http.Client{
+			Timeout: 10 * time.Second,
+		},
+	}
+	for _, o := range opts {
+		o(c)
+	}
+	return c
 }
 
 // chatRequest is the JSON body sent to /v1/chat/completions.
@@ -93,6 +124,9 @@ func (c *Client) ChatCompletion(ctx context.Context, messages []Message, opts *O
 		return "", fmt.Errorf("inference: create request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
+	if c.apiKey != "" {
+		httpReq.Header.Set("Authorization", "Bearer "+c.apiKey)
+	}
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {

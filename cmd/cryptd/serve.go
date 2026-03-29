@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -36,6 +37,10 @@ func runServe(args []string) {
 	foreground := fs.Bool("f", false, "run in foreground (don't daemonize)")
 	testing := fs.Bool("t", false, "testing mode: stdin/stdout, no network (implies -f)")
 
+	// Inference flags.
+	apiKey := fs.String("api-key", "", "Anthropic API key for Claude LLM tier (or set ANTHROPIC_API_KEY)")
+	modelFlag := fs.String("model", "claude-sonnet-4-20250514", "model name for Claude LLM tier")
+
 	// Scenario flag — used for both -t mode and daemon default scenario.
 	scenarioID := fs.String("scenario", "", "scenario ID (-t mode: required; daemon: default for new_game)")
 	charName := fs.String("name", "Adventurer", "character name for -t mode")
@@ -52,6 +57,16 @@ func runServe(args []string) {
 		*foreground = true
 	}
 
+	// Resolve API key: flag takes precedence, then env var.
+	resolvedKey := *apiKey
+	if resolvedKey == "" {
+		resolvedKey = os.Getenv("ANTHROPIC_API_KEY")
+	}
+
+	if *apiKey != "" {
+		log.Println("cryptd: warning: --api-key is visible in process listings; prefer ANTHROPIC_API_KEY env var")
+	}
+
 	// Validate flag combinations.
 	if *testing {
 		if *scenarioID == "" {
@@ -62,7 +77,7 @@ func runServe(args []string) {
 			fmt.Fprintln(os.Stderr, "error: --json requires --script")
 			os.Exit(1)
 		}
-		runTestingMode(*scenarioID, *charName, *charClass, *scriptFile, *jsonMode, *luxMode)
+		runTestingMode(*scenarioID, *charName, *charClass, *scriptFile, *jsonMode, *luxMode, resolvedKey, *modelFlag)
 		return
 	}
 
@@ -94,7 +109,7 @@ func runServe(args []string) {
 	if *passthrough {
 		opts = append(opts, daemon.WithPassthrough())
 	} else {
-		interp, narr := resolveInterpreterNarrator()
+		interp, narr := resolveInterpreterNarrator(resolvedKey, *modelFlag)
 		opts = append(opts, daemon.WithInterpreter(interp), daemon.WithNarrator(narr))
 	}
 
@@ -127,9 +142,10 @@ func runServe(args []string) {
 	}
 }
 
-// runTestingMode runs the engine on stdin/stdout with Rules+Template.
-// No network, no SLM — deterministic and fast.
-func runTestingMode(scenarioID, charName, charClass, scriptFile string, jsonMode, luxMode bool) {
+// runTestingMode runs the engine on stdin/stdout. Scripted mode uses
+// Rules+Template (deterministic, no inference). Interactive and Lux modes
+// probe for available inference (Claude API → SLM → rules+templates).
+func runTestingMode(scenarioID, charName, charClass, scriptFile string, jsonMode, luxMode bool, anthropicKey, modelName string) {
 	s, err := scenariodir.Load(scenariodir.Dir(), scenarioID)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -184,7 +200,7 @@ func runTestingMode(scenarioID, charName, charClass, scriptFile string, jsonMode
 		}
 	} else if luxMode {
 		// Lux mode: render to Lux ImGui display, input via button clicks.
-		interp, narr := resolveInterpreterNarrator()
+		interp, narr := resolveInterpreterNarrator(anthropicKey, modelName)
 		rend, cleanup, err := createLuxRenderer()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -199,7 +215,7 @@ func runTestingMode(scenarioID, charName, charClass, scriptFile string, jsonMode
 		}
 	} else {
 		// Interactive mode: probe for SLM, fall back to rules+templates.
-		interp, narr := resolveInterpreterNarrator()
+		interp, narr := resolveInterpreterNarrator(anthropicKey, modelName)
 		rend := renderer.NewCLI(os.Stdout, os.Stdin)
 		loop := game.NewLoop(eng, interp, narr, rend)
 		if err := loop.Run(context.Background(), &state); err != nil {
@@ -230,22 +246,49 @@ func readCommandFile(path string) ([]string, error) {
 	return commands, scanner.Err()
 }
 
-// resolveInterpreterNarrator probes for an SLM (ollama) and returns the
-// appropriate interpreter and narrator. Falls back to Rules + Template
-// if no inference server is available.
-func resolveInterpreterNarrator() (*interpreter.SLM, *narrator.SLM) {
+// resolveInterpreterNarrator selects the best available inference tier:
+// Large (Claude API) > Medium/Small (local SLM) > Tiny (rules+templates).
+func resolveInterpreterNarrator(anthropicKey, modelName string) (model.CommandInterpreter, model.Narrator) {
 	rules := interpreter.NewRules()
 	tmpl := narrator.NewTemplate()
 
+	// Large tier: Claude API (if API key provided).
+	// Anthropic exposes an OpenAI-compatible /v1/chat/completions endpoint
+	// that accepts Authorization: Bearer <key> — same wire format as ollama.
+	if anthropicKey != "" {
+		client := inference.NewClientWithOpts(
+			"https://api.anthropic.com",
+			modelName,
+			inference.WithAPIKey(anthropicKey),
+			inference.WithTimeout(15*time.Second),
+		)
+
+		// Validate API key before committing to LLM tier.
+		probeCtx, probeCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		_, probeErr := client.ChatCompletion(probeCtx, []inference.Message{
+			{Role: inference.RoleUser, Content: "ping"},
+		}, &inference.Options{MaxTokens: 1})
+		probeCancel()
+		if probeErr != nil {
+			log.Printf("cryptd: Claude API key validation failed: %v", probeErr)
+			log.Println("cryptd: falling back to local inference")
+			// Fall through to SLM probe below.
+		} else {
+			log.Printf("cryptd: using Claude API (model: %s)", modelName)
+			return interpreter.NewLLM(client, rules), narrator.NewLLM(client, tmpl)
+		}
+	}
+
+	// Medium/Small tier: local SLM (ollama).
 	rt := inference.Probe(context.Background(), inference.DefaultEndpoints(), time.Second)
 	if rt != nil {
 		client := inference.NewClient(rt.BaseURL, rt.Model, 5*time.Second)
-		fmt.Fprintf(os.Stderr, "cryptd: using %s (model: %s)\n", rt.BaseURL, rt.Model)
+		log.Printf("cryptd: using %s (model: %s)", rt.BaseURL, rt.Model)
 		return interpreter.NewSLM(client, rules), narrator.NewSLM(client, tmpl)
 	}
 
-	fmt.Fprintln(os.Stderr, "cryptd: no inference server found — using rules+templates")
-	return interpreter.NewSLM(nil, rules), narrator.NewSLM(nil, tmpl)
+	log.Println("cryptd: no inference server found — using rules+templates")
+	return rules, tmpl
 }
 
 // promptCharacterCreation runs an interactive character creation flow,
