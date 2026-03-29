@@ -127,7 +127,8 @@ named triple of interface implementations.  The engine always runs as
 \cmd{cryptd serve}; there is no embedded deployment.
 
 \begin{center}
-\begin{tabular}{llll}
+\small
+\begin{tabular}{lp{3.2cm}p{3.2cm}p{3.2cm}}
 \toprule
 \textbf{Interface} & \textbf{dm} & \textbf{solo} & \textbf{headless} \\
 \midrule
@@ -159,15 +160,17 @@ named triple of interface implementations.  The engine always runs as
 \subsection{Inference Tier Chain}
 
 The server auto-selects the best available inference tier at startup.
-Each tier provides both a \iface{CommandInterpreter} and a
+Each tier provides both a \iface{Command\-Interpreter} and a
 \iface{Narrator} implementation.  The chain is:
 
 \begin{enumerate}
-  \item \textbf{Large (Claude API)}: \texttt{LLMInterpreter} +
-    \texttt{LLMNarrator} via OpenAI-compatible
-    \texttt{/v1/chat/completions} at \texttt{api.anthropic.com}.
-    Activated by \texttt{CRYPTD\_API\_KEY} env var or \cmd{--api-key}
-    flag.  A startup probe validates the key before committing.
+  \item \textbf{Large (Claude API)}:
+    {\sloppy
+    \texttt{LLM\-Interpreter} + \texttt{LLM\-Narrator} via
+    OpenAI-compatible \texttt{/v1/chat/completions} endpoint at
+    \texttt{api.anthropic.com}.  Activated by
+    \texttt{CRYPTD\_API\_KEY} env var or \cmd{--api-key} flag.
+    A startup probe validates the key before committing.\par}
   \item \textbf{Medium/Small (SLM)}: \texttt{SLMInterpreter} +
     \texttt{SLMNarrator} via ollama or any OpenAI-compatible server.
     Auto-detected by probing default endpoints.  Preferred models:
@@ -235,10 +238,11 @@ Game engine
     (interpreter + narrator + RPCRenderer) and passthrough mode (raw
     MCP tool dispatch). \\
 LLM inference
-  & Go (\pkg{internal/inference})
-  & OpenAI-compatible HTTP client for \texttt{/v1/chat/completions}.
-    Used by \texttt{LLMInterpreter}, \texttt{LLMNarrator},
-    \texttt{SLMInterpreter}, and \texttt{SLMNarrator}.  Supports
+  & Go (\pkg{internal/\allowbreak inference})
+  & OpenAI-compatible HTTP client for
+    \texttt{/v1/\allowbreak chat/\allowbreak completions}.
+    Used by \texttt{LLM\-Interpreter}, \texttt{LLM\-Narrator},
+    \texttt{SLM\-Interpreter}, and \texttt{SLM\-Narrator}.  Supports
     Claude API (with API key auth) and ollama (no auth). \\
 \cmd{crypt} client
   & Go binary
@@ -342,15 +346,15 @@ In normal mode, the game loop runs inside the game goroutine.  The
     with \tool{new\_game}.  Server creates a game goroutine, sends
     the initial room, then enters the game loop via
     \texttt{Game.RunLoop()}.  If \field{has\_game} is true, the
-    server enters \texttt{resumeGameLoop} immediately --- no
+    server enters \texttt{resume\-Game\-Loop} immediately --- no
     \tool{new\_game} needed.  The current room is re-rendered.
   \item \textbf{Play loop.}
-    Client sends \texttt{play} requests with free text.  Inside the
-    game goroutine: \texttt{RPCRenderer.Events()} reads the text,
-    the interpreter converts it to an \texttt{EngineAction}, the
-    engine executes it, the narrator generates prose, and
-    \texttt{RPCRenderer.Render()} writes a \texttt{PlayResponse}
-    back to the client.
+    Client sends \texttt{play} requests with free text.  Inside
+    the game goroutine: \texttt{RPC\-Renderer.\-Events()} reads
+    the text, the interpreter converts it to an
+    \texttt{Engine\-Action}, the engine executes it, the narrator
+    generates prose, and \texttt{RPC\-Renderer.\-Render()} writes
+    a \texttt{Play\-Response} back to the client.
   \item \textbf{Quit or death.}
     The game loop exits.  A final \texttt{PlayResponse} with
     \field{quit} or \field{dead} set to true is sent.  The game
@@ -464,20 +468,21 @@ type CommandInterpreter interface {
 \end{lstlisting}
 
 \begin{center}
-\begin{tabular}{lll}
+\small
+\begin{tabular}{lp{2.5cm}p{7cm}}
 \toprule
 \textbf{Implementation} & \textbf{Used in} & \textbf{Mechanism} \\
 \midrule
 \texttt{LLMInterpreter}
   & \mode{dm} (Large tier)
-  & Claude API via OpenAI-compatible \texttt{/v1/chat/completions};
+  & Claude API via OpenAI-compatible \texttt{/v1/\allowbreak chat/\allowbreak completions};
     rules-first strategy (exact verbs handled without LLM call;
     LLM invoked only for ambiguous input needing ID resolution). \\
 \texttt{SLMInterpreter}
   & \mode{solo} (Medium tier)
   & ollama or any OpenAI-compatible server; uses
-    \pkg{internal/inference} client; same rules-first fallback. \\
-\texttt{RulesInterpreter}
+    \pkg{internal/\allowbreak inference} client; same rules-first fallback. \\
+\texttt{Rules\-Interpreter}
   & \mode{headless} (Tiny tier)
   & Regex/keyword matching over known verb--noun pairs; no model
     required.  Also serves as fallback for both LLM and SLM
@@ -499,7 +504,8 @@ type Narrator interface {
 \end{lstlisting}
 
 \begin{center}
-\begin{tabular}{lll}
+\small
+\begin{tabular}{lp{2.5cm}p{7cm}}
 \toprule
 \textbf{Implementation} & \textbf{Used in} & \textbf{Mechanism} \\
 \midrule
@@ -514,11 +520,11 @@ type Narrator interface {
   & \mode{solo} (Medium tier)
   & ollama generates 1--3 sentences of atmospheric prose from room
     seed + event type.  Same selective enrichment strategy as LLM. \\
-\texttt{TemplateNarrator}
+\texttt{Template\-Narrator}
   & \mode{headless} (Tiny tier)
-  & Go text/template: ``You move north. You are in the \{room.name\}.''
-    Also serves as fallback for both LLM and SLM narrators on
-    inference failure. \\
+  & Go text/template: ``You move north. You are in the
+    \{room.name\}.''  Also serves as fallback for both LLM and SLM
+    narrators on inference failure. \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -537,14 +543,15 @@ type Renderer interface {
 \end{lstlisting}
 
 \begin{center}
-\begin{tabular}{lll}
+\small
+\begin{tabular}{lp{2.8cm}p{7cm}}
 \toprule
 \textbf{Implementation} & \textbf{Used in} & \textbf{Mechanism} \\
 \midrule
 \texttt{RPCRenderer}
   & Normal mode daemon
   & Bridges the game loop to the network connection in normal mode.
-    \texttt{Render()} serializes a \texttt{PlayResponse} as NDJSON.
+    \texttt{Render()} serializes a \texttt{Play\-Response} as NDJSON.
     \texttt{Events()} reads \texttt{play} requests from the client's
     scanner.  Runs inside the game goroutine. \\
 \texttt{LuxRenderer}
@@ -982,34 +989,38 @@ additions, not the unbounded accretion that killed the beads daemon.
 % ===================================================================
 
 All inference calls use the OpenAI-compatible
-\texttt{/v1/chat/completions} wire format via
-\pkg{internal/inference.Client}.  The same client code works for
-Claude API, ollama, llama.cpp, and any other compatible server.
+\texttt{/v1/\allowbreak chat/\allowbreak completions} wire format
+via the \texttt{inference.\allowbreak Client} type in
+\pkg{internal/\allowbreak inference}.  The same client code works
+for Claude API, ollama, llama.cpp, and any other compatible server.
 
 \subsection{Three Tiers}
 
 \begin{center}
-\begin{tabular}{llp{7cm}}
+\small
+\begin{tabular}{lp{3.2cm}p{6.5cm}}
 \toprule
 \textbf{Tier} & \textbf{Backend} & \textbf{Configuration} \\
 \midrule
 \textbf{Large}
-  & Claude API (\texttt{api.anthropic.com})
-  & Activated by \texttt{CRYPTD\_API\_KEY} env var or \cmd{--api-key}
-    flag.  Default model: \texttt{claude-sonnet-4-20250514} (configurable via
-    \cmd{--model}).  Uses \texttt{Authorization: Bearer <key>} header.
-    A startup probe validates the key with a 5~s timeout before
-    committing to this tier.  On probe failure, falls through to
-    Medium. \\
-\textbf{Medium/Small}
+  & Claude API (\texttt{api.\allowbreak anthropic.\allowbreak com})
+  & Activated by \texttt{CRYPTD\_API\_KEY} env var or
+    \cmd{--api-key} flag.  Default model:
+    \texttt{claude-sonnet-4-20250514} (configurable via
+    \cmd{--model}).  Uses \texttt{Authorization: Bearer <key>}
+    header.  A startup probe validates the key with a 5~s timeout
+    before committing to this tier.  On probe failure, falls
+    through to Medium. \\
+\textbf{Medium/\allowbreak Small}
   & ollama or any OpenAI-compatible server
   & Auto-detected by probing default endpoints
-    (\texttt{localhost:11434}).  Preferred models: \texttt{gemma3:1b},
-    \texttt{llama3.2:3b}.  Configurable via \cmd{--model}. \\
+    (\texttt{localhost:\allowbreak 11434}).  Preferred models:
+    \texttt{gemma3:1b}, \texttt{llama3.2:3b}.  Configurable via
+    \cmd{--model}. \\
 \textbf{Tiny}
   & Rules + Templates (no inference)
   & Deterministic fallback when no inference server is available.
-    \texttt{RulesInterpreter} + \texttt{TemplateNarrator}.
+    \texttt{Rules\-Interpreter} + \texttt{Template\-Narrator}.
     Zero external dependencies. \\
 \bottomrule
 \end{tabular}
@@ -1096,7 +1107,8 @@ When Biff is added:
 % ===================================================================
 
 \begin{center}
-\begin{tabular}{lp{8cm}l}
+\small
+\begin{tabular}{lp{7.5cm}l}
 \toprule
 \textbf{Phase} & \textbf{Deliverable} & \textbf{Status} \\
 \midrule
@@ -1174,8 +1186,9 @@ When Biff is added:
     \cmd{--model} flag.  Auto-detected by probing ollama endpoints.
   \item \textbf{Go MCP SDK.}
     \emph{Resolved.}  Hand-rolled JSON-RPC 2.0 in
-    \pkg{internal/daemon} and \pkg{internal/protocol}.  Approximately
-    500~lines; no external dependency.
+    \pkg{internal/\allowbreak daemon} and
+    \pkg{internal/\allowbreak protocol}.  Approximately 500~lines;
+    no external dependency.
   \item \textbf{Dice notation parser.}
     \emph{Resolved.}  Hand-rolled in \pkg{internal/dice}.  Supports
     \texttt{NdS}, \texttt{NdS+M}, \texttt{NdS-M}.
