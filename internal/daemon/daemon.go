@@ -264,14 +264,6 @@ func (s *Server) getOrCreateSession(id string) *Session {
 	return sess
 }
 
-// lookupSession returns a session by ID.
-func (s *Server) lookupSession(id string) (*Session, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	sess, ok := s.sessions[id]
-	return sess, ok
-}
-
 // createAndStartGame creates a new Game, starts its goroutine, and stores it in the registry.
 func (s *Server) createAndStartGame() (*Game, error) {
 	id, err := generateGameID()
