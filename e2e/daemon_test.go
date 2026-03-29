@@ -27,7 +27,7 @@ func TestDaemon_ServeAndCallMethods(t *testing.T) {
 	sockPath := filepath.Join(dir, "d.sock")
 
 	// Start daemon subprocess.
-	cmd := exec.Command(bin, "serve", "-f", "--socket", sockPath, "--passthrough")
+	cmd := exec.Command(bin, "serve", "-f", "--socket", sockPath)
 	cmd.Dir = root
 	cmd.Env = append(os.Environ(), "CRYPT_SCENARIO_DIR=testdata/scenarios")
 	cmd.Stderr = os.Stderr
@@ -88,8 +88,8 @@ func TestDaemon_ServeAndCallMethods(t *testing.T) {
 		return resp
 	}
 
-	// 1. Initialize
-	resp := send(1, "session.init", nil)
+	// 1. Initialize in passthrough mode (direct game.* methods).
+	resp := send(1, "session.init", map[string]string{"mode": "passthrough"})
 	require.Nil(t, resp["error"])
 	result, ok := resp["result"].(map[string]any)
 	require.True(t, ok)

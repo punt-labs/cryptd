@@ -65,6 +65,7 @@ type PlayResponse struct {
 // InitializeParams is the optional params for the "session.init" method.
 type InitializeParams struct {
 	SessionID string `json:"session_id,omitempty"`
+	Mode      string `json:"mode,omitempty"` // "passthrough" or "" (normal)
 }
 
 // InitializeResult is the result of the initialize method.

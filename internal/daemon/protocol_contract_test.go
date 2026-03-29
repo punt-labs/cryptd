@@ -123,7 +123,7 @@ func TestProtocol_UnknownGameMethod(t *testing.T) {
 }
 
 func TestProtocol_GamePlayRejectedInPassthrough(t *testing.T) {
-	srv := testServer(t) // testServer uses WithPassthrough()
+	srv := testServer(t) // testServer has no interp/narr, so sessions default to passthrough
 
 	params, _ := json.Marshal(map[string]any{"text": "look around"})
 	idJSON, _ := json.Marshal(2)

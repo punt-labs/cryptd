@@ -31,7 +31,6 @@ func runServe(args []string) {
 	// Network flags.
 	socketPath := fs.String("socket", "", "Unix socket path (default ~/.crypt/daemon.sock)")
 	listenAddr := fs.String("listen", "", "TCP listen address (e.g. :9000)")
-	passthrough := fs.Bool("passthrough", false, "MCP passthrough mode (structured JSON, no interpreter/narrator)")
 
 	// Daemon flags.
 	foreground := fs.Bool("f", false, "run in foreground (don't daemonize)")
@@ -106,12 +105,10 @@ func runServe(args []string) {
 
 	var opts []daemon.ServerOption
 
-	if *passthrough {
-		opts = append(opts, daemon.WithPassthrough())
-	} else {
-		interp, narr := resolveInterpreterNarrator(resolvedKey, *modelFlag)
-		opts = append(opts, daemon.WithInterpreter(interp), daemon.WithNarrator(narr))
-	}
+	// Always configure interpreter+narrator when available. Per-session mode
+	// selection (passthrough vs normal) happens at session.init time.
+	interp, narr := resolveInterpreterNarrator(resolvedKey, *modelFlag)
+	opts = append(opts, daemon.WithInterpreter(interp), daemon.WithNarrator(narr))
 
 	if *scenarioID != "" {
 		opts = append(opts, daemon.WithDefaultScenario(*scenarioID))

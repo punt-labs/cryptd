@@ -16,11 +16,13 @@ import (
 )
 
 // testServer creates a Server wired to the minimal scenario in testdata.
+// No interpreter or narrator is configured, so sessions default to passthrough
+// mode (the server has no normal-mode capability).
 func testServer(t *testing.T) *Server {
 	t.Helper()
 	// Find testdata relative to repo root.
 	scenarioDir := filepath.Join(repoRoot(t), "testdata", "scenarios")
-	return NewServer(filepath.Join(t.TempDir(), "test.sock"), scenarioDir, WithPassthrough())
+	return NewServer(filepath.Join(t.TempDir(), "test.sock"), scenarioDir)
 }
 
 func repoRoot(t *testing.T) string {
