@@ -11,7 +11,7 @@ import (
 )
 
 func TestSessionID_Format(t *testing.T) {
-	id, err := generateSessionID()
+	id, err := generateID()
 	require.NoError(t, err)
 	assert.Len(t, id, 32, "session ID should be 32 hex characters")
 
@@ -19,7 +19,7 @@ func TestSessionID_Format(t *testing.T) {
 	assert.NoError(t, decErr, "session ID should be valid hex")
 
 	// Two calls should produce different IDs.
-	id2, err := generateSessionID()
+	id2, err := generateID()
 	require.NoError(t, err)
 	assert.NotEqual(t, id, id2, "session IDs should be unique")
 }

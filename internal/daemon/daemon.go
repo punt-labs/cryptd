@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -11,7 +12,6 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/punt-labs/cryptd/internal/engine"
 	"github.com/punt-labs/cryptd/internal/model"
 	"golang.org/x/term"
 )
@@ -23,8 +23,6 @@ import (
 //   - Normal: interpreter → engine → narrator → display text (for crypt CLI)
 //   - Passthrough: raw MCP tool surface with structured JSON (for Claude Code)
 type Server struct {
-	eng         *engine.Engine
-	state       *model.GameState
 	interp      model.CommandInterpreter
 	narr        model.Narrator
 	passthrough     bool   // true = structured JSON, false = interpreted + narrated text
@@ -33,7 +31,15 @@ type Server struct {
 	scenarioDir     string
 	defaultScenario string // scenario ID used when new_game omits scenario_id
 	listener    net.Listener
-	mu          sync.Mutex // guards eng and state
+
+	// Session and game registries. Protected by mu.
+	mu       sync.RWMutex
+	sessions map[string]*Session
+	games    map[string]*Game
+
+	// Server-level context for game goroutine lifecycle.
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 // ServerOption configures a Server.
@@ -65,10 +71,15 @@ func WithDefaultScenario(id string) ServerOption {
 // NewServer creates a Server that listens on a Unix socket at the given path.
 // scenarioDir is the directory to search for scenario YAML files.
 func NewServer(socketPath, scenarioDir string, opts ...ServerOption) *Server {
+	ctx, cancel := context.WithCancel(context.Background())
 	s := &Server{
 		network:     "unix",
 		address:     socketPath,
 		scenarioDir: scenarioDir,
+		sessions:    make(map[string]*Session),
+		games:       make(map[string]*Game),
+		ctx:         ctx,
+		cancel:      cancel,
 	}
 	for _, o := range opts {
 		o(s)
@@ -80,10 +91,15 @@ func NewServer(socketPath, scenarioDir string, opts ...ServerOption) *Server {
 // NewTCPServer creates a Server that listens on a TCP address (e.g. ":9000").
 // scenarioDir is the directory to search for scenario YAML files.
 func NewTCPServer(listenAddr, scenarioDir string, opts ...ServerOption) *Server {
+	ctx, cancel := context.WithCancel(context.Background())
 	s := &Server{
 		network:     "tcp",
 		address:     listenAddr,
 		scenarioDir: scenarioDir,
+		sessions:    make(map[string]*Session),
+		games:       make(map[string]*Game),
+		ctx:         ctx,
+		cancel:      cancel,
 	}
 	for _, o := range opts {
 		o(s)
@@ -178,24 +194,109 @@ func (s *Server) Serve(ln net.Listener) error {
 
 	log.Printf("daemon: listening on %s %s", s.network, s.address)
 
+	var (
+		wg      sync.WaitGroup
+		connsMu sync.Mutex
+		conns   = make(map[net.Conn]struct{})
+	)
+
+	// shutdown cancels the server context, closes all active connections
+	// to unblock any blocked scanners, then waits for handler goroutines.
+	shutdown := func() {
+		s.cancel()
+		connsMu.Lock()
+		for c := range conns {
+			c.Close()
+		}
+		connsMu.Unlock()
+		wg.Wait()
+	}
+
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
 			if errors.Is(err, net.ErrClosed) {
+				shutdown()
 				return nil // intentional shutdown
 			}
+			shutdown()
 			return fmt.Errorf("accept: %w", err)
 		}
 		log.Println("daemon: client connected")
-		s.handleConnection(conn, conn)
-		if err := conn.Close(); err != nil {
-			log.Printf("daemon: conn close: %v", err)
-		}
-		log.Println("daemon: client disconnected")
+
+		connsMu.Lock()
+		conns[conn] = struct{}{}
+		connsMu.Unlock()
+
+		wg.Add(1)
+		go func(c net.Conn) {
+			defer wg.Done()
+			defer func() {
+				if r := recover(); r != nil {
+					log.Printf("daemon: connection handler panicked: %v", r)
+				}
+				connsMu.Lock()
+				delete(conns, c)
+				connsMu.Unlock()
+				if err := c.Close(); err != nil {
+					log.Printf("daemon: conn close: %v", err)
+				}
+				log.Println("daemon: client disconnected")
+			}()
+			s.handleConnection(c, c)
+		}(conn)
 	}
 }
 
 // Address returns the configured listen address.
 func (s *Server) Address() string {
 	return s.address
+}
+
+// --- registry methods ---
+
+// getOrCreateSession returns an existing session by ID, or creates a new one.
+func (s *Server) getOrCreateSession(id string) *Session {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if sess, ok := s.sessions[id]; ok {
+		return sess
+	}
+	sess := &Session{id: id}
+	s.sessions[id] = sess
+	return sess
+}
+
+// createAndStartGame creates a new Game, starts its goroutine, and stores it in the registry.
+func (s *Server) createAndStartGame() (*Game, error) {
+	id, err := generateID()
+	if err != nil {
+		return nil, err
+	}
+	g := newGame(s.ctx, id, s.scenarioDir, s.defaultScenario)
+	s.mu.Lock()
+	s.games[id] = g
+	s.mu.Unlock()
+	return g, nil
+}
+
+// removeGame removes a game from the registry (e.g. on Send failure after creation).
+func (s *Server) removeGame(id string) {
+	s.mu.Lock()
+	delete(s.games, id)
+	s.mu.Unlock()
+}
+
+// gameForSession returns the game associated with a session, or an error if none.
+func (s *Server) gameForSession(sess *Session) (*Game, *RPCError) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if sess.gameID == "" {
+		return nil, &RPCError{Code: CodeNoActiveGame, Message: "no active game — call new_game first"}
+	}
+	g, ok := s.games[sess.gameID]
+	if !ok {
+		return nil, &RPCError{Code: CodeNoActiveGame, Message: "game not found"}
+	}
+	return g, nil
 }

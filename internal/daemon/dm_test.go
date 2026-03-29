@@ -33,9 +33,9 @@ func testDMServer(t *testing.T, interp model.CommandInterpreter, narr model.Narr
 	)
 }
 
-// dmRoundTrip sends all requests on a single connection (new_game first, then
-// play requests) and collects all responses. This exercises the full normal-mode
-// flow: new_game → game loop via RPCRenderer.
+// dmRoundTrip sends all requests on a single connection (initialize + new_game
+// first, then play requests) and collects all responses. This exercises the
+// full normal-mode flow: initialize → new_game → game loop via RPCRenderer.
 func dmRoundTrip(t *testing.T, srv *Server, reqs []Request) []Response {
 	t.Helper()
 	var input bytes.Buffer
@@ -94,6 +94,7 @@ func TestDMDaemon_NewGameAndPlay(t *testing.T) {
 	srv := testDMServer(t, interp, narr)
 
 	reqs := []Request{
+		initRequest(0),
 		toolCall(1, "new_game", map[string]any{
 			"scenario_id": "minimal", "character_name": "Hero", "character_class": "fighter",
 		}),
@@ -102,11 +103,11 @@ func TestDMDaemon_NewGameAndPlay(t *testing.T) {
 	}
 
 	resps := dmRoundTrip(t, srv, reqs)
-	// new_game response + play response + quit response.
-	require.GreaterOrEqual(t, len(resps), 2, "expected at least new_game + quit responses")
+	// initialize + new_game response + play response + quit response.
+	require.GreaterOrEqual(t, len(resps), 3, "expected at least initialize + new_game + quit responses")
 
-	// First response is new_game with narrated text.
-	data, err := json.Marshal(resps[0].Result)
+	// Second response (index 1) is new_game with narrated text.
+	data, err := json.Marshal(resps[1].Result)
 	require.NoError(t, err)
 	var playResp PlayResponse
 	require.NoError(t, json.Unmarshal(data, &playResp))
@@ -134,6 +135,7 @@ func TestDMDaemon_PlayMovement(t *testing.T) {
 	srv := testDMServer(t, interp, narr)
 
 	reqs := []Request{
+		initRequest(0),
 		toolCall(1, "new_game", map[string]any{
 			"scenario_id": "minimal", "character_name": "Hero", "character_class": "fighter",
 		}),
@@ -150,7 +152,7 @@ func TestDMDaemon_PlayMovement(t *testing.T) {
 	}
 
 	resps := dmRoundTrip(t, srv, reqs)
-	require.GreaterOrEqual(t, len(resps), 2)
+	require.GreaterOrEqual(t, len(resps), 3)
 
 	// Verify all responses have no RPC errors.
 	for i, resp := range resps {
