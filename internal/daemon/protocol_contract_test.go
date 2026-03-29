@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// standardSetup returns the init + new_game requests used by most contract tests.
+// standardSetup returns the init + game.new requests used by most contract tests.
 func standardSetup() []Request {
 	return []Request{
 		initRequest(0),
@@ -23,7 +23,7 @@ func standardSetup() []Request {
 	}
 }
 
-// setupAndCall sends init + new_game, then appends the given game call and
+// setupAndCall sends init + game.new, then appends the given game call and
 // returns all responses. Asserts setup succeeded.
 func setupAndCall(t *testing.T, srv *Server, call Request) []Response {
 	t.Helper()
@@ -95,7 +95,7 @@ func TestProtocol_ErrorsAreJSONRPC(t *testing.T) {
 
 		resp := resps[2]
 		require.NotNil(t, resp.Error, "expected JSON-RPC error for invalid direction")
-		assert.NotZero(t, resp.Error.Code, "error must have a non-zero Code")
+		assert.Equal(t, CodeInvalidParams, resp.Error.Code, "expected CodeInvalidParams for invalid direction")
 		assert.NotEmpty(t, resp.Error.Message, "error must have a Message")
 		assert.Nil(t, resp.Result, "result must be nil when error is set")
 	})
@@ -117,7 +117,9 @@ func TestProtocol_UnknownGameMethod(t *testing.T) {
 
 	resp := resps[2]
 	require.NotNil(t, resp.Error)
+	assert.Equal(t, CodeMethodNotFound, resp.Error.Code)
 	assert.Contains(t, resp.Error.Message, "unknown command")
+	assert.Nil(t, resp.Result)
 }
 
 func TestProtocol_GamePlayRejectedInPassthrough(t *testing.T) {
@@ -152,7 +154,9 @@ func TestProtocol_SessionInitRequired(t *testing.T) {
 	}))
 
 	require.NotNil(t, resp.Error)
+	assert.Equal(t, CodeInvalidRequest, resp.Error.Code)
 	assert.Contains(t, resp.Error.Message, "call session.init first")
+	assert.Nil(t, resp.Result)
 }
 
 func TestProtocol_SessionQuit(t *testing.T) {
