@@ -63,9 +63,6 @@ All notable changes to this project will be documented in this file.
 - `crypt solo`, `crypt headless`, `crypt autoplay`, `crypt connect` subcommands — replaced by plain `crypt` thin client.
 - `cryptd headless` and `cryptd autoplay` subcommands — replaced by `cryptd serve -t` (testing mode on stdin/stdout).
 - E2E acceptance and headless tests — replaced by `cryptd serve -t --script` demos.
-
-### Changed
-
 - `cryptd validate` prints deprecation warning directing users to `crypt-admin validate`.
 - `make build` now builds all three binaries (`cryptd`, `crypt`, `crypt-admin`).
 - `cryptd serve -t` (interactive, no `--script`) now probes for ollama and uses SLM interpreter + narrator when available. Scripted mode retains deterministic rules+templates.
