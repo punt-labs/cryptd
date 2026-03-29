@@ -19,6 +19,7 @@ type (
 	ToolResult       = protocol.ToolResult
 	ToolContent      = protocol.ToolContent
 	ToolInfo         = protocol.ToolInfo
+	InitializeParams = protocol.InitializeParams
 	InitializeResult = protocol.InitializeResult
 	ServerInfo       = protocol.ServerInfo
 )

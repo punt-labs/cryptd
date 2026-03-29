@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"os"
 	"os/exec"
@@ -155,9 +156,14 @@ func session(conn net.Conn, in io.Reader, out, errOut io.Writer, scenario, charN
 	}
 
 	// MCP initialize handshake.
-	if _, err := send("initialize", nil); err != nil {
+	initResult, err := send("initialize", nil)
+	if err != nil {
 		fmt.Fprintf(errOut, "error: %v\n", err)
 		return 1
+	}
+	var initResp protocol.InitializeResult
+	if err := json.Unmarshal(initResult, &initResp); err == nil && initResp.SessionID != "" {
+		log.Printf("crypt: session %s", initResp.SessionID)
 	}
 
 	// Auto-start game if --scenario given.

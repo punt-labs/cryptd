@@ -70,6 +70,8 @@ func (s *Server) handleConnection(r io.Reader, w io.Writer) {
 	// Allow up to 1 MB per line (generous for JSON-RPC).
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 
+	conn := &connState{}
+
 	for scanner.Scan() {
 		line := scanner.Bytes()
 		if len(line) == 0 {
@@ -95,7 +97,7 @@ func (s *Server) handleConnection(r io.Reader, w io.Writer) {
 			continue
 		}
 
-		resp := s.safeHandleRequest(req)
+		resp := s.safeHandleRequest(req, conn)
 
 		// JSON-RPC 2.0: requests without an ID are notifications — no response.
 		if req.ID == nil {
@@ -118,7 +120,7 @@ func (s *Server) handleConnection(r io.Reader, w io.Writer) {
 
 // safeHandleRequest wraps handleRequest with panic recovery so one bad request
 // does not crash the daemon or drop the connection.
-func (s *Server) safeHandleRequest(req Request) (resp Response) {
+func (s *Server) safeHandleRequest(req Request, conn *connState) (resp Response) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("daemon: panic handling %s: %v", req.Method, r)
@@ -129,13 +131,25 @@ func (s *Server) safeHandleRequest(req Request) (resp Response) {
 			}
 		}
 	}()
-	return s.handleRequest(req)
+	return s.handleRequest(req, conn)
 }
 
 // handleRequest routes a single JSON-RPC request to the appropriate handler.
-func (s *Server) handleRequest(req Request) Response {
+func (s *Server) handleRequest(req Request, conn *connState) Response {
 	switch req.Method {
 	case "initialize":
+		var params protocol.InitializeParams
+		if len(req.Params) > 0 {
+			// Best-effort parse; missing or malformed params are fine.
+			_ = json.Unmarshal(req.Params, &params)
+		}
+		sid := params.SessionID
+		if sid == "" {
+			sid = generateSessionID()
+		}
+		conn.sessionID = sid
+		log.Printf("daemon: session %s established", sid)
+
 		return Response{
 			JSONRPC: "2.0",
 			ID:      req.ID,
@@ -143,6 +157,7 @@ func (s *Server) handleRequest(req Request) Response {
 				ProtocolVersion: "2024-11-05",
 				ServerInfo:      ServerInfo{Name: "cryptd", Version: "0.1.0"},
 				Capabilities:    map[string]any{"tools": map[string]any{}},
+				SessionID:       sid,
 			},
 		}
 
