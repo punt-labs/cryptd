@@ -102,7 +102,7 @@ func TestProtocol_ErrorsAreJSONRPC(t *testing.T) {
 
 	t.Run("attack outside combat", func(t *testing.T) {
 		srv := testServer(t)
-		resps := setupAndCall(t, srv, gameCall(2, "attack", map[string]any{"target": "goblin"}))
+		resps := setupAndCall(t, srv, gameCall(2, "attack", map[string]any{"target_id": "goblin"}))
 
 		resp := resps[2]
 		require.NotNil(t, resp.Error, "expected JSON-RPC error for attack outside combat")
