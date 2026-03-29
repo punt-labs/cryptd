@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"os"
 	"os/exec"
@@ -163,7 +162,7 @@ func session(conn net.Conn, in io.Reader, out, errOut io.Writer, scenario, charN
 	}
 	var initResp protocol.InitializeResult
 	if err := json.Unmarshal(initResult, &initResp); err == nil && initResp.SessionID != "" {
-		log.Printf("crypt: session %s", initResp.SessionID)
+		fmt.Fprintf(errOut, "crypt: session %s\n", initResp.SessionID)
 	}
 
 	// Auto-start game if --scenario given.

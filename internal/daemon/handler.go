@@ -143,9 +143,19 @@ func (s *Server) handleRequest(req Request, conn *connState) Response {
 			// Best-effort parse; missing or malformed params are fine.
 			_ = json.Unmarshal(req.Params, &params)
 		}
-		sid := params.SessionID
-		if sid == "" {
-			sid = generateSessionID()
+		var sid string
+		if params.SessionID != "" && len(params.SessionID) <= 128 {
+			sid = params.SessionID
+		} else {
+			var err error
+			sid, err = generateSessionID()
+			if err != nil {
+				return Response{
+					JSONRPC: "2.0",
+					ID:      req.ID,
+					Error:   &RPCError{Code: CodeInternalError, Message: "generate session ID: " + err.Error()},
+				}
+			}
 		}
 		conn.sessionID = sid
 		log.Printf("daemon: session %s established", sid)
