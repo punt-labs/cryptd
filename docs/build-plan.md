@@ -521,18 +521,20 @@ M7  Full SLM+Med    All verbs; solo mode complete; ollama medium tier; --model f
 M8  Server Slice    cryptd serve; single-session; TCP + Unix socket; MCP wire tests ✓ DONE
 M8b Twin Renderer   Renderer interface across the wire (DES-026); typed data;
                     fancy client display; map[string]any eliminated
-M9  DM Thin Slice   LLM in the loop; crypt dm; SKILL.md rewrite
+M9  DM Thin Slice   LLM in the loop; Claude API; inference tier chain            ✓ DONE
                     ← FIRST FULL DM MODE VALIDATION →
-M10 Daemon Routing  Multi-session; privilege gating; push notifications
+M10 Daemon Routing  Concurrent sessions; game-as-goroutine; session resume       ✓ DONE
 M11 Full DM Mode    Rich narration; scenario creation
 M12 Rich World      Shops, traps, multiple scenarios
 M13 Biff            Multi-player party
 ```
 
-The two critical integration gates are **M2** (architecture validated end-to-end
+The two critical integration gates were **M2** (architecture validated end-to-end
 before any real mechanics) and **M9** (LLM in the loop before the engine is
-heavily invested in). If either of these gates reveals a design flaw, the cost
-of correction is low.
+heavily invested in). Both gates are now complete. Neither revealed design flaws
+requiring correction — the interface-driven architecture held through full
+integration. The next focus areas are **M8b** (Twin Renderer: typed data across
+the wire) and **M11** (Full DM Mode).
 
 ---
 

@@ -8,7 +8,7 @@ There is no such thing as a "pre-existing" issue. If you see a problem — in co
 
 ## Project State
 
-**M0 (foundation) and M1 (data contracts) are complete. M2 (thin E2E slice) is substantially complete. M8 (server thin slice) is complete.**
+**M0 (foundation), M1 (data contracts), M2 (thin E2E slice), M8 (server thin slice), M9 (DM thin slice), and M10 (session routing) are complete.**
 
 Two binaries (DES-025): `cryptd` (server/daemon) and `crypt` (thin client). Server subcommands: `cryptd serve`, `cryptd validate`. The client (`crypt`) takes no subcommands — it connects to `cryptd serve`, auto-starts the server if needed, and sends natural language text via the `play` JSON-RPC method. `cryptd serve` will daemonize by default (bead cryptd-ydf); `-f` for foreground, `-t` for testing on stdin/stdout.
 
@@ -187,7 +187,7 @@ Org-wide issues (touching 2+ repos or changing a punt-kit standard) go in `../pu
 
 ### Milestone Order
 
-Follow the build plan in `docs/build-plan.md`. The critical integration gates are **M2** (architecture validated end-to-end before real mechanics) and **M9** (LLM in the loop before heavy engine investment). `go test ./...` must always be green on `main`.
+Follow the build plan in `docs/build-plan.md`. The two critical integration gates — **M2** (architecture validated end-to-end) and **M9** (LLM in the loop) — are both complete. The next milestone focus is **M8b** (Twin Renderer: typed data across the wire, fancy client display) and **M11** (Full DM Mode). `go test ./...` must always be green on `main`.
 
 ### Session Close Protocol
 
