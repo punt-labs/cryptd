@@ -3,6 +3,7 @@ package daemon
 import (
 	"encoding/hex"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -35,6 +36,28 @@ func TestInitialize_AssignsSessionID(t *testing.T) {
 
 	assert.NotEmpty(t, init.SessionID, "server should assign a session ID")
 	assert.Len(t, init.SessionID, 32, "server-assigned session ID should be 32 hex chars")
+}
+
+func TestSanitizeSessionID(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"valid", "abc-123", "abc-123"},
+		{"empty", "", ""},
+		{"too long", strings.Repeat("a", 129), ""},
+		{"max length", strings.Repeat("a", 128), strings.Repeat("a", 128)},
+		{"strips newlines", "abc\ndef", "abcdef"},
+		{"strips tabs", "abc\tdef", "abcdef"},
+		{"all control chars", "\n\r\t", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := sanitizeSessionID(tt.input)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }
 
 func TestInitialize_EchoesClientSessionID(t *testing.T) {

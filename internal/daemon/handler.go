@@ -144,8 +144,8 @@ func (s *Server) handleRequest(req Request, conn *connState) Response {
 			_ = json.Unmarshal(req.Params, &params)
 		}
 		var sid string
-		if params.SessionID != "" && len(params.SessionID) <= 128 {
-			sid = params.SessionID
+		if id := sanitizeSessionID(params.SessionID); id != "" {
+			sid = id
 		} else {
 			var err error
 			sid, err = generateSessionID()
@@ -153,7 +153,7 @@ func (s *Server) handleRequest(req Request, conn *connState) Response {
 				return Response{
 					JSONRPC: "2.0",
 					ID:      req.ID,
-					Error:   &RPCError{Code: CodeInternalError, Message: "generate session ID: " + err.Error()},
+					Error:   &RPCError{Code: CodeInternalError, Message: err.Error()},
 				}
 			}
 		}
