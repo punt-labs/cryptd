@@ -16,7 +16,7 @@ import (
 
 // TestSession_ResumeReadsInitialRoom verifies that the session() function,
 // when called with a resumeSessionID, reads and displays the initial room
-// response that the server sends after initialize.
+// response that the server sends after session.init.
 func TestSession_ResumeReadsInitialRoom(t *testing.T) {
 	// Create a pipe-based mock server.
 	clientConn, serverConn := net.Pipe()
@@ -38,7 +38,7 @@ func TestSession_ResumeReadsInitialRoom(t *testing.T) {
 			_, _ = serverConn.Write(data)
 		}
 
-		// 1. Read and respond to initialize.
+		// 1. Read and respond to session.init.
 		if !scanner.Scan() {
 			return
 		}

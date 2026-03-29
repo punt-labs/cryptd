@@ -19,8 +19,8 @@ import (
 //
 // Flow:
 //
-//	Connection 1: initialize -> new_game -> play "go south" -> disconnect
-//	Connection 2: initialize with same session ID -> read initial room render
+//	Connection 1: session.init -> game.new -> play "go south" -> disconnect
+//	Connection 2: session.init with same session ID -> read initial room render
 //	  (should be goblin_lair, not entrance) -> play "look" -> read response -> quit
 func TestResumeGameLoop_NormalMode(t *testing.T) {
 	scenarioDir := filepath.Join(repoRoot(t), "testdata", "scenarios")
@@ -35,7 +35,7 @@ func TestResumeGameLoop_NormalMode(t *testing.T) {
 		WithNarrator(narr),
 	)
 
-	// --- Connection 1: initialize -> new_game -> play "go south" -> disconnect ---
+	// --- Connection 1: session.init -> game.new -> play "go south" -> disconnect ---
 	clientR1, serverW1 := io.Pipe()
 	serverR1, clientW1 := io.Pipe()
 
@@ -65,7 +65,7 @@ func TestResumeGameLoop_NormalMode(t *testing.T) {
 	}
 
 	// Initialize.
-	initResp := send1("initialize", nil)
+	initResp := send1("session.init", nil)
 	require.Nil(t, initResp.Error)
 	initData, _ := json.Marshal(initResp.Result)
 	var initResult protocol.InitializeResult
@@ -74,14 +74,15 @@ func TestResumeGameLoop_NormalMode(t *testing.T) {
 	require.NotEmpty(t, sessionID)
 
 	// New game.
-	ngResp := send1("tools/call", map[string]any{
-		"name": "new_game",
-		"arguments": json.RawMessage(`{"scenario_id":"minimal","character_name":"Tester","character_class":"fighter"}`),
+	ngResp := send1("game.new", map[string]any{
+		"scenario_id":     "minimal",
+		"character_name":  "Tester",
+		"character_class": "fighter",
 	})
-	require.Nil(t, ngResp.Error, "new_game error: %+v", ngResp.Error)
+	require.Nil(t, ngResp.Error, "game.new error: %+v", ngResp.Error)
 
-	// After new_game, the server enters the game loop. Send "go south".
-	moveResp := send1("play", protocol.PlayRequest{Text: "go south"})
+	// After game.new, the server enters the game loop. Send "go south".
+	moveResp := send1("game.play", protocol.PlayRequest{Text: "go south"})
 	require.Nil(t, moveResp.Error)
 
 	// Verify we moved to goblin_lair via the game state in the response.
@@ -104,7 +105,7 @@ func TestResumeGameLoop_NormalMode(t *testing.T) {
 	require.True(t, ok, "session should exist after disconnect")
 	require.NotEmpty(t, sess.gameID, "session should have a game after disconnect")
 
-	// --- Connection 2: initialize with session ID -> resume -> look -> quit ---
+	// --- Connection 2: session.init with session ID -> resume -> look -> quit ---
 	clientR2, serverW2 := io.Pipe()
 	serverR2, clientW2 := io.Pipe()
 
@@ -119,16 +120,16 @@ func TestResumeGameLoop_NormalMode(t *testing.T) {
 	scanner2 := bufio.NewScanner(clientR2)
 	scanner2.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 
-	// Send initialize with session ID.
+	// Send session.init with session ID.
 	initParams, _ := json.Marshal(protocol.InitializeParams{SessionID: sessionID})
-	initReq := protocol.Request{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "initialize", Params: initParams}
+	initReq := protocol.Request{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "session.init", Params: initParams}
 	initReqData, _ := json.Marshal(initReq)
 	initReqData = append(initReqData, '\n')
 	_, err := clientW2.Write(initReqData)
 	require.NoError(t, err)
 
-	// Read initialize response.
-	require.True(t, scanner2.Scan(), "expected initialize response")
+	// Read session.init response.
+	require.True(t, scanner2.Scan(), "expected session.init response")
 	var initResp2 protocol.Response
 	require.NoError(t, json.Unmarshal(scanner2.Bytes(), &initResp2))
 	require.Nil(t, initResp2.Error)
@@ -139,7 +140,7 @@ func TestResumeGameLoop_NormalMode(t *testing.T) {
 	require.NoError(t, json.Unmarshal(initData2, &initResult2))
 	assert.True(t, initResult2.HasGame, "resumed session with active game should have has_game=true")
 
-	// After initialize with an existing game, the server enters resumeGameLoop
+	// After session.init with an existing game, the server enters resumeGameLoop
 	// which runs RunLoop with SkipInitialRender=false, meaning it sends the
 	// initial room render. Read it.
 	require.True(t, scanner2.Scan(), "expected initial room render on resume")
@@ -157,7 +158,7 @@ func TestResumeGameLoop_NormalMode(t *testing.T) {
 	lookReq := protocol.Request{
 		JSONRPC: "2.0",
 		ID:      json.RawMessage(`3`),
-		Method:  "play",
+		Method:  "game.play",
 		Params:  json.RawMessage(`{"text":"look"}`),
 	}
 	lookData, _ := json.Marshal(lookReq)
@@ -182,9 +183,9 @@ func TestResumeGameLoop_NormalMode(t *testing.T) {
 	<-done2
 }
 
-// TestResumeGameLoop_NoGame verifies that initialize with an unknown session ID
+// TestResumeGameLoop_NoGame verifies that session.init with an unknown session ID
 // (that has no game) does not enter the game loop. The server should create a
-// new session and let the client proceed normally (e.g. send new_game).
+// new session and let the client proceed normally (e.g. send game.new).
 func TestResumeGameLoop_NoGame(t *testing.T) {
 	srv := testNormalServer(t)
 
@@ -206,7 +207,7 @@ func TestResumeGameLoop_NoGame(t *testing.T) {
 	assert.False(t, init.HasGame, "new session without a game should have has_game=false")
 }
 
-// TestResumeGameLoop_SkipInitialRender verifies that the new_game path sets
+// TestResumeGameLoop_SkipInitialRender verifies that the game.new path sets
 // SkipInitialRender=true so the initial room is not rendered twice (once by
 // handleNewGamePlay and once by RunLoop).
 func TestResumeGameLoop_SkipInitialRender(t *testing.T) {
@@ -245,25 +246,24 @@ func TestResumeGameLoop_SkipInitialRender(t *testing.T) {
 	}
 
 	// Initialize.
-	sendReq(protocol.Request{JSONRPC: "2.0", ID: json.RawMessage(`0`), Method: "initialize"})
-	require.True(t, scanner.Scan(), "expected initialize response")
+	sendReq(protocol.Request{JSONRPC: "2.0", ID: json.RawMessage(`0`), Method: "session.init"})
+	require.True(t, scanner.Scan(), "expected session.init response")
 
-	// New game via tools/call.
-	argsJSON, _ := json.Marshal(map[string]string{
+	// New game via game.new.
+	ngParams, _ := json.Marshal(map[string]string{
 		"scenario_id":     "minimal",
 		"character_name":  "Tester",
 		"character_class": "fighter",
 	})
-	tcParams, _ := json.Marshal(protocol.ToolCallParams{Name: "new_game", Arguments: argsJSON})
 	sendReq(protocol.Request{
 		JSONRPC: "2.0",
 		ID:      json.RawMessage(`1`),
-		Method:  "tools/call",
-		Params:  tcParams,
+		Method:  "game.new",
+		Params:  ngParams,
 	})
 
-	// Read new_game response (the PlayResponse from handleNewGamePlay).
-	require.True(t, scanner.Scan(), "expected new_game response")
+	// Read game.new response (the PlayResponse from handleNewGamePlay).
+	require.True(t, scanner.Scan(), "expected game.new response")
 	var ngResp protocol.Response
 	require.NoError(t, json.Unmarshal(scanner.Bytes(), &ngResp))
 	require.Nil(t, ngResp.Error)
@@ -271,7 +271,7 @@ func TestResumeGameLoop_SkipInitialRender(t *testing.T) {
 	ngData, _ := json.Marshal(ngResp.Result)
 	var ngPlay protocol.PlayResponse
 	require.NoError(t, json.Unmarshal(ngData, &ngPlay))
-	assert.NotEmpty(t, ngPlay.Text, "new_game should return narrated text")
+	assert.NotEmpty(t, ngPlay.Text, "game.new should return narrated text")
 
 	// The game loop is now running with SkipInitialRender=true. The next
 	// response should come only when we send a play request -- no unsolicited
@@ -279,7 +279,7 @@ func TestResumeGameLoop_SkipInitialRender(t *testing.T) {
 	sendReq(protocol.Request{
 		JSONRPC: "2.0",
 		ID:      json.RawMessage(`2`),
-		Method:  "play",
+		Method:  "game.play",
 		Params:  json.RawMessage(`{"text":"look"}`),
 	})
 

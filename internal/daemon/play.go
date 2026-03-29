@@ -26,25 +26,16 @@ func deepCopyState(state *model.GameState) *model.GameState {
 	return &cp
 }
 
-// handleNewGamePlay handles new_game in normal mode: creates a game, sends
+// handleNewGamePlay handles game.new in normal mode: creates a game, sends
 // new_game to its goroutine, then narrates the initial room as a PlayResponse.
 // After this returns, handleConnection starts the game loop via RunLoop.
 func (s *Server) handleNewGamePlay(req Request, sess **Session) Response {
-	var params ToolCallParams
-	if err := json.Unmarshal(req.Params, &params); err != nil {
-		return Response{
-			JSONRPC: "2.0",
-			ID:      req.ID,
-			Error:   &RPCError{Code: CodeInvalidParams, Message: "invalid tool call params: " + err.Error()},
-		}
-	}
-
 	// Ensure we have a session.
 	if *sess == nil {
 		return Response{
 			JSONRPC: "2.0",
 			ID:      req.ID,
-			Error:   &RPCError{Code: CodeInvalidRequest, Message: "call initialize first"},
+			Error:   &RPCError{Code: CodeInvalidRequest, Message: "call session.init first"},
 		}
 	}
 
@@ -71,7 +62,7 @@ func (s *Server) handleNewGamePlay(req Request, sess **Session) Response {
 		}
 	}
 
-	_, rpcErr := g.Send(s.ctx, "new_game", params.Arguments)
+	_, rpcErr := g.Send(s.ctx, "new_game", req.Params)
 	if rpcErr != nil {
 		s.removeGame(g.id)
 		g.Stop()
@@ -134,4 +125,3 @@ func (s *Server) handleNewGamePlay(req Request, sess **Session) Response {
 		},
 	}
 }
-

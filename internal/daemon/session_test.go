@@ -27,7 +27,7 @@ func TestSessionID_Format(t *testing.T) {
 func TestInitialize_AssignsSessionID(t *testing.T) {
 	srv := testServer(t)
 	idJSON, _ := json.Marshal(1)
-	resp := roundTrip(t, srv, Request{JSONRPC: "2.0", ID: idJSON, Method: "initialize"})
+	resp := roundTrip(t, srv, Request{JSONRPC: "2.0", ID: idJSON, Method: "session.init"})
 
 	require.Nil(t, resp.Error)
 	data, _ := json.Marshal(resp.Result)
@@ -69,7 +69,7 @@ func TestInitialize_EchoesClientSessionID(t *testing.T) {
 	resp := roundTrip(t, srv, Request{
 		JSONRPC: "2.0",
 		ID:      idJSON,
-		Method:  "initialize",
+		Method:  "session.init",
 		Params:  params,
 	})
 

@@ -62,34 +62,7 @@ type PlayResponse struct {
 	Quit  bool             `json:"quit,omitempty"`
 }
 
-// MCP tool call/result types (subset of MCP spec used by tools/call).
-
-// ToolCallParams is the params object for a tools/call request.
-type ToolCallParams struct {
-	Name      string          `json:"name"`
-	Arguments json.RawMessage `json:"arguments,omitempty"`
-}
-
-// ToolResult is the result object for a tools/call response.
-type ToolResult struct {
-	Content []ToolContent `json:"content"`
-	IsError bool          `json:"isError,omitempty"`
-}
-
-// ToolContent is one element in a tool result's content array.
-type ToolContent struct {
-	Type string `json:"type"`
-	Text string `json:"text"`
-}
-
-// ToolInfo describes one tool for tools/list.
-type ToolInfo struct {
-	Name        string         `json:"name"`
-	Description string         `json:"description"`
-	InputSchema map[string]any `json:"inputSchema"`
-}
-
-// InitializeParams is the optional params for the "initialize" method.
+// InitializeParams is the optional params for the "session.init" method.
 type InitializeParams struct {
 	SessionID string `json:"session_id,omitempty"`
 }

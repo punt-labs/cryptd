@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **Protocol: direct JSON-RPC methods replace MCP framing.** Daemon protocol refactored from `tools/call` dispatch to direct named methods: `session.init`, `game.new`, `game.move`, `game.look`, `game.play`, `session.quit`, etc. Response results are direct JSON objects instead of `ToolResult{content:[{text:"..."}]}` wrappers. Error responses use standard JSON-RPC error objects instead of `ToolResult{isError:true}`.
+- **Removed MCP schema infrastructure.** Deleted `cmd/dump-mcp-schema`, `testdata/mcp-schema.json`, and the `mcp-schema` CI job. The daemon is a game server, not an MCP server.
+- **Client updated for new protocol.** `crypt` sends `session.init` instead of `initialize`, `game.new` instead of `tools/call` with `name=new_game`, and `game.play` instead of `play`.
+
 ### Added
 
 - **LLM inference tier (M9):** `LLMInterpreter` and `LLMNarrator` implementations that call Claude's API via the OpenAI-compatible `/v1/chat/completions` endpoint. Same two-tier fallback strategy as the SLM tier: Rules-first for deterministic commands, LLM for ambiguous input; Template fallback for tactical events, LLM for atmospheric narration. Claude-optimized system prompts.

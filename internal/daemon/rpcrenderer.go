@@ -17,8 +17,8 @@ import (
 // PlayResponse NDJSON lines; Events() reads play requests and converts
 // them to InputEvents.
 //
-// RPCRenderer only handles the play loop. Handshake methods (initialize,
-// tools/list, new_game) are handled by the daemon before the game loop starts.
+// RPCRenderer only handles the play loop. Handshake methods (session.init,
+// game.new) are handled by the daemon before the game loop starts.
 type RPCRenderer struct {
 	scanner          *bufio.Scanner
 	writer           io.Writer
@@ -113,7 +113,7 @@ func (r *RPCRenderer) readLoop(ctx context.Context) {
 		}
 
 		switch req.Method {
-		case "play":
+		case "game.play":
 			var params protocol.PlayRequest
 			if err := json.Unmarshal(req.Params, &params); err != nil {
 				continue
@@ -131,7 +131,7 @@ func (r *RPCRenderer) readLoop(ctx context.Context) {
 				return
 			}
 
-		case "quit":
+		case "session.quit":
 			ev := model.InputEvent{Type: "quit"}
 			select {
 			case r.events <- ev:

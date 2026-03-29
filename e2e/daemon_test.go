@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDaemon_ServeAndCallTools(t *testing.T) {
+func TestDaemon_ServeAndCallMethods(t *testing.T) {
 	bin := serverBinary(t)
 	root := repoRoot(t)
 
@@ -88,16 +88,8 @@ func TestDaemon_ServeAndCallTools(t *testing.T) {
 		return resp
 	}
 
-	toolCallParams := func(name string, args any) map[string]any {
-		argsJSON, _ := json.Marshal(args)
-		return map[string]any{
-			"name":      name,
-			"arguments": json.RawMessage(argsJSON),
-		}
-	}
-
 	// 1. Initialize
-	resp := send(1, "initialize", nil)
+	resp := send(1, "session.init", nil)
 	require.Nil(t, resp["error"])
 	result, ok := resp["result"].(map[string]any)
 	require.True(t, ok)
@@ -105,59 +97,37 @@ func TestDaemon_ServeAndCallTools(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "cryptd", serverInfo["name"])
 
-	// 2. List tools
-	resp = send(2, "tools/list", nil)
+	// 2. New game
+	resp = send(2, "game.new", map[string]any{
+		"scenario_id": "minimal", "character_name": "E2E Hero", "character_class": "fighter",
+	})
 	require.Nil(t, resp["error"])
 	result, ok = resp["result"].(map[string]any)
 	require.True(t, ok)
-	tools, ok := result["tools"].([]any)
+	assert.Equal(t, "entrance", result["room"])
+
+	// 3. Look
+	resp = send(3, "game.look", nil)
+	require.Nil(t, resp["error"])
+	result, ok = resp["result"].(map[string]any)
 	require.True(t, ok)
-	assert.Len(t, tools, 15)
+	assert.Equal(t, "Entrance Hall", result["name"])
 
-	// 3. New game
-	resp = send(3, "tools/call", toolCallParams("new_game", map[string]any{
-		"scenario_id": "minimal", "character_name": "E2E Hero", "character_class": "fighter",
-	}))
+	// 4. Pick up sword
+	resp = send(4, "game.pick_up", map[string]any{"item_id": "short_sword"})
 	require.Nil(t, resp["error"])
-	toolResult := extractE2EToolResult(t, resp)
-	assert.Equal(t, "entrance", toolResult["room"])
-
-	// 4. Look
-	resp = send(4, "tools/call", toolCallParams("look", nil))
-	require.Nil(t, resp["error"])
-	toolResult = extractE2EToolResult(t, resp)
-	assert.Equal(t, "Entrance Hall", toolResult["name"])
-
-	// 5. Pick up sword
-	resp = send(5, "tools/call", toolCallParams("pick_up", map[string]any{"item_id": "short_sword"}))
-	require.Nil(t, resp["error"])
-	toolResult = extractE2EToolResult(t, resp)
-	item, ok := toolResult["item"].(map[string]any)
+	result, ok = resp["result"].(map[string]any)
+	require.True(t, ok)
+	item, ok := result["item"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "short_sword", item["id"])
 
-	// 6. Move south (triggers combat)
-	resp = send(6, "tools/call", toolCallParams("move", map[string]any{"direction": "south"}))
+	// 5. Move south (triggers combat)
+	resp = send(5, "game.move", map[string]any{"direction": "south"})
 	require.Nil(t, resp["error"])
-	toolResult = extractE2EToolResult(t, resp)
-	assert.Equal(t, "goblin_lair", toolResult["room"])
-	_, hasCombat := toolResult["combat"]
+	result, ok = resp["result"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "goblin_lair", result["room"])
+	_, hasCombat := result["combat"]
 	assert.True(t, hasCombat, "expected combat to start in goblin_lair")
-}
-
-// extractE2EToolResult extracts the parsed JSON from a tools/call response.
-func extractE2EToolResult(t *testing.T, resp map[string]any) map[string]any {
-	t.Helper()
-	result, ok := resp["result"].(map[string]any)
-	require.True(t, ok, "expected result object")
-	content, ok := result["content"].([]any)
-	require.True(t, ok, "expected content array")
-	require.Len(t, content, 1)
-	entry, ok := content[0].(map[string]any)
-	require.True(t, ok)
-	text, ok := entry["text"].(string)
-	require.True(t, ok)
-	var parsed map[string]any
-	require.NoError(t, json.Unmarshal([]byte(text), &parsed))
-	return parsed
 }

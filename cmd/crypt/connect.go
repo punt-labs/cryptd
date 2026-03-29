@@ -154,12 +154,12 @@ func session(conn net.Conn, in io.Reader, out, errOut io.Writer, scenario, charN
 		return resp.Result, nil
 	}
 
-	// MCP initialize handshake.
+	// Session init handshake.
 	var initParams any
 	if resumeSessionID != "" {
 		initParams = protocol.InitializeParams{SessionID: resumeSessionID}
 	}
-	initResult, err := send("initialize", initParams)
+	initResult, err := send("session.init", initParams)
 	if err != nil {
 		fmt.Fprintf(errOut, "error: %v\n", err)
 		return 1
@@ -276,7 +276,7 @@ func handleLine(line string, send func(string, any) (json.RawMessage, error), ou
 	}
 
 	// Everything else: send to server as play text.
-	result, err := send("play", map[string]string{"text": line})
+	result, err := send("game.play", map[string]string{"text": line})
 	if err != nil {
 		if errors.Is(err, errConnLost) {
 			fmt.Fprintf(errOut, "Error: %v\n", err)
@@ -317,21 +317,13 @@ func replScanner(in io.Reader, out, errOut io.Writer, send func(string, any) (js
 	return 0
 }
 
-// startGame sends a new_game tool call and displays the initial narration.
+// startGame sends a game.new request and displays the initial narration.
 func startGame(send func(string, any) (json.RawMessage, error), out, errOut io.Writer, scenario, name, class string) error {
-	argsJSON, err := json.Marshal(map[string]string{
+	result, err := send("game.new", map[string]string{
 		"scenario_id":     scenario,
 		"character_name":  name,
 		"character_class": class,
 	})
-	if err != nil {
-		return err
-	}
-	params := map[string]any{
-		"name":      "new_game",
-		"arguments": json.RawMessage(argsJSON),
-	}
-	result, err := send("tools/call", params)
 	if err != nil {
 		return err
 	}

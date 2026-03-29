@@ -124,7 +124,7 @@ func TestRPCRenderer_Events_PlayRequest(t *testing.T) {
 	req := protocol.Request{
 		JSONRPC: "2.0",
 		ID:      json.RawMessage(`1`),
-		Method:  "play",
+		Method:  "game.play",
 		Params:  json.RawMessage(`{"text":"go north"}`),
 	}
 	data, err := json.Marshal(req)
@@ -160,7 +160,7 @@ func TestRPCRenderer_Events_QuitRequest(t *testing.T) {
 	req := protocol.Request{
 		JSONRPC: "2.0",
 		ID:      json.RawMessage(`2`),
-		Method:  "quit",
+		Method:  "session.quit",
 	}
 	data, err := json.Marshal(req)
 	require.NoError(t, err)
@@ -221,7 +221,7 @@ func TestRPCRenderer_Events_SkipsEmptyText(t *testing.T) {
 	req1 := protocol.Request{
 		JSONRPC: "2.0",
 		ID:      json.RawMessage(`1`),
-		Method:  "play",
+		Method:  "game.play",
 		Params:  json.RawMessage(`{"text":""}`),
 	}
 	data, err := json.Marshal(req1)
@@ -234,7 +234,7 @@ func TestRPCRenderer_Events_SkipsEmptyText(t *testing.T) {
 	req2 := protocol.Request{
 		JSONRPC: "2.0",
 		ID:      json.RawMessage(`2`),
-		Method:  "play",
+		Method:  "game.play",
 		Params:  json.RawMessage(`{"text":"look"}`),
 	}
 	data, err = json.Marshal(req2)
@@ -269,7 +269,7 @@ func TestRPCRenderer_Events_SkipsMalformedJSON(t *testing.T) {
 	req := protocol.Request{
 		JSONRPC: "2.0",
 		ID:      json.RawMessage(`3`),
-		Method:  "play",
+		Method:  "game.play",
 		Params:  json.RawMessage(`{"text":"help"}`),
 	}
 	data, err := json.Marshal(req)

@@ -276,7 +276,7 @@ func dispatch(eng *engine.Engine, state *model.GameState, name string, args json
 	case "load_game":
 		return dispatchLoadGame(eng, state, args)
 	default:
-		return nil, &RPCError{Code: CodeInvalidParams, Message: fmt.Sprintf("unknown tool %q", name)}
+		return nil, &RPCError{Code: CodeInvalidParams, Message: fmt.Sprintf("unknown command %q", name)}
 	}
 }
 
