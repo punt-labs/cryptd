@@ -35,7 +35,7 @@ func TestWriteYAMLDir_RoundTrip(t *testing.T) {
 	require.NoError(t, v.Visit(g, content))
 
 	// Add an item and enemy to test catalog export.
-	content.Items["sword"] = &scenario.ScenarioItem{
+	content.Items["sword"] = &scenario.Item{
 		Name: "Short Sword", Type: "weapon", Damage: "1d6", Weight: 3.0, Value: 10,
 	}
 	content.Enemies["rat"] = &scenario.EnemyTemplate{

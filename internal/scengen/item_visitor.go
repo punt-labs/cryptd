@@ -10,9 +10,9 @@ import (
 
 // ItemTier defines items available at a difficulty level.
 type ItemTier struct {
-	Weapons []scenario.ScenarioItem
-	Armor   []scenario.ScenarioItem
-	Potions []scenario.ScenarioItem
+	Weapons []scenario.Item
+	Armor   []scenario.Item
+	Potions []scenario.Item
 }
 
 // DefaultItemTiers returns a 5-tier item progression.
@@ -20,58 +20,58 @@ func DefaultItemTiers() []ItemTier {
 	return []ItemTier{
 		// Tier 0: starter — placed near start
 		{
-			Weapons: []scenario.ScenarioItem{
+			Weapons: []scenario.Item{
 				{Name: "Rusty Dagger", Type: "weapon", Damage: "1d4", Weight: 1.5, Value: 5, Description: "A pitted blade, but better than bare fists."},
 			},
-			Potions: []scenario.ScenarioItem{
+			Potions: []scenario.Item{
 				{Name: "Minor Healing Potion", Type: "consumable", Effect: "heal", Power: "1d6", Weight: 0.3, Value: 5, Description: "A small vial of red liquid."},
 			},
 		},
 		// Tier 1: early
 		{
-			Weapons: []scenario.ScenarioItem{
+			Weapons: []scenario.Item{
 				{Name: "Short Sword", Type: "weapon", Damage: "1d6", Weight: 3.0, Value: 15, Description: "A reliable blade."},
 			},
-			Armor: []scenario.ScenarioItem{
+			Armor: []scenario.Item{
 				{Name: "Leather Armor", Type: "armor", Defense: 1, Weight: 5.0, Value: 20, Description: "Tough hide, lightly protective."},
 			},
-			Potions: []scenario.ScenarioItem{
+			Potions: []scenario.Item{
 				{Name: "Healing Potion", Type: "consumable", Effect: "heal", Power: "2d6", Weight: 0.5, Value: 15, Description: "A shimmering red vial."},
 			},
 		},
 		// Tier 2: mid
 		{
-			Weapons: []scenario.ScenarioItem{
+			Weapons: []scenario.Item{
 				{Name: "Longsword", Type: "weapon", Damage: "1d8", Weight: 4.0, Value: 30, Description: "A well-balanced two-handed blade."},
 			},
-			Armor: []scenario.ScenarioItem{
+			Armor: []scenario.Item{
 				{Name: "Chain Mail", Type: "armor", Defense: 2, Weight: 8.0, Value: 40, Description: "Interlocking rings of steel."},
 			},
-			Potions: []scenario.ScenarioItem{
+			Potions: []scenario.Item{
 				{Name: "Greater Healing Potion", Type: "consumable", Effect: "heal", Power: "3d6", Weight: 0.5, Value: 25, Description: "A glowing crimson vial."},
 			},
 		},
 		// Tier 3: late
 		{
-			Weapons: []scenario.ScenarioItem{
+			Weapons: []scenario.Item{
 				{Name: "War Axe", Type: "weapon", Damage: "1d10", Weight: 5.0, Value: 50, Description: "A heavy, brutal weapon."},
 			},
-			Armor: []scenario.ScenarioItem{
+			Armor: []scenario.Item{
 				{Name: "Plate Armor", Type: "armor", Defense: 3, Weight: 12.0, Value: 60, Description: "Full plate, forged in fire."},
 			},
-			Potions: []scenario.ScenarioItem{
+			Potions: []scenario.Item{
 				{Name: "Superior Healing Potion", Type: "consumable", Effect: "heal", Power: "4d6", Weight: 0.5, Value: 40, Description: "Liquid gold with a crimson swirl."},
 			},
 		},
 		// Tier 4: endgame / boss loot
 		{
-			Weapons: []scenario.ScenarioItem{
+			Weapons: []scenario.Item{
 				{Name: "Vorpal Blade", Type: "weapon", Damage: "1d12+2", Weight: 4.0, Value: 100, Description: "The edge hums with lethal precision."},
 			},
-			Armor: []scenario.ScenarioItem{
+			Armor: []scenario.Item{
 				{Name: "Dragon Scale Mail", Type: "armor", Defense: 4, Weight: 10.0, Value: 100, Description: "Scales shimmer with ancient power."},
 			},
-			Potions: []scenario.ScenarioItem{
+			Potions: []scenario.Item{
 				{Name: "Elixir of Life", Type: "consumable", Effect: "heal", Power: "6d6", Weight: 0.5, Value: 75, Description: "Restores body and spirit alike."},
 			},
 		},
@@ -115,7 +115,7 @@ func (v *ItemVisitor) Visit(g *Graph, content *ScenarioContent) error {
 
 	// Track placed item IDs to avoid duplicates.
 	itemCounter := 0
-	placeItem := func(roomID string, item scenario.ScenarioItem) {
+	placeItem := func(roomID string, item scenario.Item) {
 		itemCounter++
 		itemID := fmt.Sprintf("%s_%d", sanitizeItemID(item.Name), itemCounter)
 		content.Items[itemID] = &item
@@ -154,10 +154,11 @@ func (v *ItemVisitor) Visit(g *Graph, content *ScenarioContent) error {
 	})
 
 	// Place starter weapon in the first non-start room (distance 1).
+	// Note: tiers is guaranteed non-empty after the DefaultItemTiers() fallback above.
 	starterPlaced := false
 	for _, n := range nodes {
-		if n.distance == 1 && !n.isHub && !starterPlaced {
-			if len(tiers) > 0 && len(tiers[0].Weapons) > 0 {
+		if n.distance == 1 && !n.isHub {
+			if len(tiers[0].Weapons) > 0 {
 				placeItem(n.id, tiers[0].Weapons[0])
 				starterPlaced = true
 			}
@@ -166,12 +167,12 @@ func (v *ItemVisitor) Visit(g *Graph, content *ScenarioContent) error {
 	}
 
 	// If no distance-1 room, place at start.
-	if !starterPlaced && len(tiers) > 0 && len(tiers[0].Weapons) > 0 {
+	if !starterPlaced && len(tiers[0].Weapons) > 0 {
 		placeItem(g.Start, tiers[0].Weapons[0])
 	}
 
 	// Always place a starter potion at the start room.
-	if len(tiers) > 0 && len(tiers[0].Potions) > 0 {
+	if len(tiers[0].Potions) > 0 {
 		placeItem(g.Start, tiers[0].Potions[0])
 	}
 

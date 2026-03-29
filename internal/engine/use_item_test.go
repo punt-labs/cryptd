@@ -11,14 +11,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func consumableScenario() *scenario.Scenario {
-	return &scenario.Scenario{
+func consumableScenario() *scenario.Spec {
+	return &scenario.Spec{
 		ID:           "consumable-test",
 		StartingRoom: "room",
 		Rooms: map[string]*scenario.Room{
 			"room": {Name: "Room", Items: []string{"health_potion", "sword"}},
 		},
-		Items: map[string]*scenario.ScenarioItem{
+		Items: map[string]*scenario.Item{
 			"health_potion": {
 				Name: "Health Potion", Type: "consumable",
 				Effect: "heal", Power: "2d6",

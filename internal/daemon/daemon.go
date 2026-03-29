@@ -144,12 +144,12 @@ func (s *Server) listenUnix() error {
 
 	// Restrict socket permissions to owner only, independent of umask.
 	if err := os.Chmod(s.address, 0o600); err != nil {
-		ln.Close()
+		_ = ln.Close() // best-effort close on chmod failure
 		return fmt.Errorf("set unix socket permissions: %w", err)
 	}
 
-	// Clean up socket file on shutdown.
-	defer os.Remove(s.address)
+	// Clean up socket file on shutdown; removal failure is non-fatal.
+	defer func() { _ = os.Remove(s.address) }()
 
 	return s.Serve(ln)
 }
@@ -169,7 +169,7 @@ func (s *Server) Serve(ln net.Listener) error {
 	s.listener = ln
 	s.address = ln.Addr().String()
 
-	defer ln.Close()
+	defer func() { _ = ln.Close() }()
 
 	// Handle signals for graceful shutdown.
 	sigCh := make(chan os.Signal, 1)
@@ -186,10 +186,10 @@ func (s *Server) Serve(ln net.Listener) error {
 		// When stderr is a terminal, print a newline so the shutdown
 		// message starts on a clean line after the terminal's ^C echo.
 		if term.IsTerminal(int(os.Stderr.Fd())) {
-			fmt.Fprintln(os.Stderr)
+			_, _ = fmt.Fprintln(os.Stderr)
 		}
 		log.Printf("daemon: received %s, shutting down", sig)
-		ln.Close()
+		_ = ln.Close() // trigger accept loop exit
 	}()
 
 	log.Printf("daemon: listening on %s %s", s.network, s.address)
@@ -206,7 +206,7 @@ func (s *Server) Serve(ln net.Listener) error {
 		s.cancel()
 		connsMu.Lock()
 		for c := range conns {
-			c.Close()
+			_ = c.Close() // best-effort shutdown of active connections
 		}
 		connsMu.Unlock()
 		wg.Wait()

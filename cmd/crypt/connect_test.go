@@ -20,22 +20,22 @@ import (
 func TestSession_ResumeReadsInitialRoom(t *testing.T) {
 	// Create a pipe-based mock server.
 	clientConn, serverConn := net.Pipe()
-	defer clientConn.Close()
-	defer serverConn.Close()
+	defer func() { _ = clientConn.Close() }()
+	defer func() { _ = serverConn.Close() }()
 
 	const testSessionID = "test-resume-session-abc123"
 
 	// Run the mock server in a goroutine: it reads requests and writes
 	// canned responses to simulate a cryptd server in resume mode.
 	go func() {
-		defer serverConn.Close()
+		defer func() { _ = serverConn.Close() }()
 		scanner := bufio.NewScanner(serverConn)
 		scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 
 		writeResp := func(resp any) {
-			data, _ := json.Marshal(resp)
+			data, _ := json.Marshal(resp) // known-good struct literals; marshal cannot fail
 			data = append(data, '\n')
-			serverConn.Write(data)
+			_, _ = serverConn.Write(data)
 		}
 
 		// 1. Read and respond to initialize.
@@ -43,7 +43,7 @@ func TestSession_ResumeReadsInitialRoom(t *testing.T) {
 			return
 		}
 		var initReq map[string]any
-		json.Unmarshal(scanner.Bytes(), &initReq)
+		_ = json.Unmarshal(scanner.Bytes(), &initReq) // best-effort parse in mock server
 
 		writeResp(map[string]any{
 			"jsonrpc": "2.0",

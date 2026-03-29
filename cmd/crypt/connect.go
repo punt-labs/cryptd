@@ -28,7 +28,7 @@ func run(socketPath, addr, scenario, charName, charClass, sessionID string) int 
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	return session(conn, os.Stdin, os.Stdout, os.Stderr, scenario, charName, charClass, sessionID)
 }
@@ -212,7 +212,7 @@ func session(conn net.Conn, in io.Reader, out, errOut io.Writer, scenario, charN
 		// Readline failed (e.g. not a terminal) — fall back to plain scanner.
 		return replScanner(in, out, errOut, send)
 	}
-	defer rl.Close()
+	defer func() { _ = rl.Close() }()
 
 	for {
 		line, err := rl.Readline()
@@ -293,7 +293,7 @@ func handleLine(line string, send func(string, any) (json.RawMessage, error), ou
 func replScanner(in io.Reader, out, errOut io.Writer, send func(string, any) (json.RawMessage, error)) int {
 	inputScanner := bufio.NewScanner(in)
 	for {
-		fmt.Fprint(out, "> ")
+		_, _ = fmt.Fprint(out, "> ") // prompt write failure is non-fatal
 		if !inputScanner.Scan() {
 			break
 		}
@@ -309,7 +309,7 @@ func replScanner(in io.Reader, out, errOut io.Writer, send func(string, any) (js
 }
 
 // startGame sends a new_game tool call and displays the initial narration.
-func startGame(send func(string, any) (json.RawMessage, error), out, errOut io.Writer, scenario, name, class string) error {
+func startGame(send func(string, any) (json.RawMessage, error), out, _ io.Writer, scenario, name, class string) error {
 	argsJSON, err := json.Marshal(map[string]string{
 		"scenario_id":     scenario,
 		"character_name":  name,

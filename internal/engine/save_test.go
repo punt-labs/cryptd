@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func saveScenario() *scenario.Scenario {
-	return &scenario.Scenario{
+func saveScenario() *scenario.Spec {
+	return &scenario.Spec{
 		ID:           "save-test",
 		StartingRoom: "entrance",
 		Rooms: map[string]*scenario.Room{
@@ -23,7 +23,7 @@ func saveScenario() *scenario.Scenario {
 		Enemies: map[string]*scenario.EnemyTemplate{
 			"goblin": {Name: "Goblin", HP: 8, Attack: "1d4", AI: "aggressive"},
 		},
-		Items:  map[string]*scenario.ScenarioItem{},
+		Items:  map[string]*scenario.Item{},
 		Spells: map[string]*scenario.SpellTemplate{},
 	}
 }

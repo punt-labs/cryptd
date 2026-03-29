@@ -146,13 +146,13 @@ func (e *SlotEmptyError) Error() string {
 // Engine is the deterministic rules machine. All game state transitions go
 // through Engine methods. The Engine holds the scenario but never mutates it.
 type Engine struct {
-	s       *scenario.Scenario
+	s       *scenario.Spec
 	Now     func() time.Time // injectable clock; defaults to time.Now
 	SaveDir string           // injectable save directory; defaults to ".dungeon/saves"
 }
 
 // New creates an Engine for the given scenario.
-func New(s *scenario.Scenario) *Engine {
+func New(s *scenario.Spec) *Engine {
 	return &Engine{s: s, Now: time.Now}
 }
 
@@ -282,7 +282,7 @@ func hero(state *model.GameState) *model.Character {
 }
 
 // totalCarryWeight returns the total weight of all carried items (inventory + equipped).
-func totalCarryWeight(char *model.Character, s *scenario.Scenario) float64 {
+func totalCarryWeight(char *model.Character, s *scenario.Spec) float64 {
 	var w float64
 	for _, item := range char.Inventory {
 		w += item.Weight
@@ -335,7 +335,7 @@ func (e *Engine) ensureRoomState(state *model.GameState, roomID string) model.Ro
 }
 
 // scenarioItem converts a scenario item definition to a model.Item.
-func scenarioItem(id string, si *scenario.ScenarioItem) model.Item {
+func scenarioItem(id string, si *scenario.Item) model.Item {
 	return model.Item{
 		ID:          id,
 		Name:        si.Name,

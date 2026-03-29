@@ -23,8 +23,8 @@ func testScanner(r io.Reader) *bufio.Scanner {
 func TestRPCRenderer_Render_WritesValidNDJSON(t *testing.T) {
 	clientR, serverW := io.Pipe()
 	serverR, _ := io.Pipe() // reader side unused in this test
-	defer clientR.Close()
-	defer serverR.Close()
+	defer func() { _ = clientR.Close() }()
+	defer func() { _ = serverR.Close() }()
 
 	rend := NewRPCRenderer(testScanner(serverR), serverW)
 
@@ -45,7 +45,7 @@ func TestRPCRenderer_Render_WritesValidNDJSON(t *testing.T) {
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- rend.Render(context.Background(), state, "You enter the dungeon.")
-		serverW.Close()
+		_ = serverW.Close()
 	}()
 
 	// Read the NDJSON line from the client side.
@@ -76,8 +76,8 @@ func TestRPCRenderer_Render_WritesValidNDJSON(t *testing.T) {
 func TestRPCRenderer_Render_DeepCopiesState(t *testing.T) {
 	clientR, serverW := io.Pipe()
 	serverR, _ := io.Pipe()
-	defer clientR.Close()
-	defer serverR.Close()
+	defer func() { _ = clientR.Close() }()
+	defer func() { _ = serverR.Close() }()
 
 	rend := NewRPCRenderer(testScanner(serverR), serverW)
 	rend.setLastID(json.RawMessage(`1`))
@@ -91,7 +91,7 @@ func TestRPCRenderer_Render_DeepCopiesState(t *testing.T) {
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- rend.Render(context.Background(), state, "test")
-		serverW.Close()
+		_ = serverW.Close()
 	}()
 
 	// Read the NDJSON output and verify the deep-copied state has the
@@ -113,7 +113,7 @@ func TestRPCRenderer_Render_DeepCopiesState(t *testing.T) {
 func TestRPCRenderer_Events_PlayRequest(t *testing.T) {
 	serverR, clientW := io.Pipe()
 	_, serverW := io.Pipe()
-	defer serverW.Close()
+	defer func() { _ = serverW.Close() }()
 
 	rend := NewRPCRenderer(testScanner(serverR), serverW)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -149,7 +149,7 @@ func TestRPCRenderer_Events_PlayRequest(t *testing.T) {
 func TestRPCRenderer_Events_QuitRequest(t *testing.T) {
 	serverR, clientW := io.Pipe()
 	_, serverW := io.Pipe()
-	defer serverW.Close()
+	defer func() { _ = serverW.Close() }()
 
 	rend := NewRPCRenderer(testScanner(serverR), serverW)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -188,7 +188,7 @@ func TestRPCRenderer_Events_QuitRequest(t *testing.T) {
 func TestRPCRenderer_Events_EOF(t *testing.T) {
 	serverR, clientW := io.Pipe()
 	_, serverW := io.Pipe()
-	defer serverW.Close()
+	defer func() { _ = serverW.Close() }()
 
 	rend := NewRPCRenderer(testScanner(serverR), serverW)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -196,7 +196,7 @@ func TestRPCRenderer_Events_EOF(t *testing.T) {
 	rend.StartReader(ctx)
 
 	// Close the writer to simulate EOF.
-	clientW.Close()
+	_ = clientW.Close()
 
 	// Channel should be closed.
 	select {
@@ -210,7 +210,7 @@ func TestRPCRenderer_Events_EOF(t *testing.T) {
 func TestRPCRenderer_Events_SkipsEmptyText(t *testing.T) {
 	serverR, clientW := io.Pipe()
 	_, serverW := io.Pipe()
-	defer serverW.Close()
+	defer func() { _ = serverW.Close() }()
 
 	rend := NewRPCRenderer(testScanner(serverR), serverW)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -255,7 +255,7 @@ func TestRPCRenderer_Events_SkipsEmptyText(t *testing.T) {
 func TestRPCRenderer_Events_SkipsMalformedJSON(t *testing.T) {
 	serverR, clientW := io.Pipe()
 	_, serverW := io.Pipe()
-	defer serverW.Close()
+	defer func() { _ = serverW.Close() }()
 
 	rend := NewRPCRenderer(testScanner(serverR), serverW)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -290,14 +290,14 @@ func TestRPCRenderer_Events_SkipsMalformedJSON(t *testing.T) {
 func TestRPCRenderer_Events_ContextCancellation(t *testing.T) {
 	serverR, clientW := io.Pipe()
 	_, serverW := io.Pipe()
-	defer serverW.Close()
+	defer func() { _ = serverW.Close() }()
 
 	rend := NewRPCRenderer(testScanner(serverR), serverW)
 	ctx, cancel := context.WithCancel(context.Background())
 	rend.StartReader(ctx)
 
 	// Close the writer first to give the scanner a clean EOF, then cancel.
-	clientW.Close()
+	_ = clientW.Close()
 	cancel()
 
 	// Drain the channel until it is closed.

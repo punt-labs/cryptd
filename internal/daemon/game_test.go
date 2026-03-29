@@ -44,7 +44,7 @@ func TestGame_SendDuringRunLoop(t *testing.T) {
 	// The RunLoop blocks reading from the RPCRenderer scanner, so the game
 	// goroutine is busy and cannot process Send commands.
 	pipeR, pipeW := io.Pipe()
-	defer pipeW.Close()
+	defer func() { _ = pipeW.Close() }()
 
 	scanner := bufio.NewScanner(pipeR)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
@@ -74,7 +74,7 @@ func TestGame_SendDuringRunLoop(t *testing.T) {
 
 	// Clean up: close the pipe to make the scanner return EOF,
 	// which causes RunLoop to exit.
-	pipeW.Close()
+	_ = pipeW.Close()
 	// Cancel server context to ensure game goroutine exits cleanly.
 	srv.cancel()
 	<-loopDone
@@ -165,7 +165,7 @@ func TestGame_StopDuringRunLoop(t *testing.T) {
 
 	// Close the pipe to make scanner.Scan() return false, which causes
 	// RunLoop's game loop to exit.
-	pipeW.Close()
+	_ = pipeW.Close()
 
 	// Wait for RunLoop to finish. This ensures the game goroutine is back
 	// in its select loop, so Stop can safely close the commands channel

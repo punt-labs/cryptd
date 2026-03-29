@@ -48,7 +48,7 @@ func TestLoad_FileNotFound(t *testing.T) {
 }
 
 func TestValidate_StartingRoomNotInRooms(t *testing.T) {
-	s := &scenario.Scenario{
+	s := &scenario.Spec{
 		Title:        "Test",
 		StartingRoom: "nonexistent",
 		Rooms:        map[string]*scenario.Room{"entrance": {Name: "Hall"}},

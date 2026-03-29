@@ -10,14 +10,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func armorScenario() *scenario.Scenario {
-	return &scenario.Scenario{
+func armorScenario() *scenario.Spec {
+	return &scenario.Spec{
 		ID:           "armor-test",
 		StartingRoom: "arena",
 		Rooms: map[string]*scenario.Room{
 			"arena": {Name: "Arena", Enemies: []string{"goblin"}, Items: []string{"shield"}},
 		},
-		Items: map[string]*scenario.ScenarioItem{
+		Items: map[string]*scenario.Item{
 			"shield": {Name: "Shield", Type: "armor", Defense: 3, Weight: 5.0, Value: 15},
 		},
 		Enemies: map[string]*scenario.EnemyTemplate{

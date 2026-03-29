@@ -176,11 +176,11 @@ func buildCombatStartPrompt(event model.EngineEvent) string {
 	return fmt.Sprintf("Combat begins! The player faces: %s.", names)
 }
 
-func buildCombatWonPrompt(event model.EngineEvent) string {
+func buildCombatWonPrompt(_ model.EngineEvent) string {
 	return "The player has defeated all enemies and won the battle."
 }
 
-func buildHeroDiedPrompt(event model.EngineEvent) string {
+func buildHeroDiedPrompt(_ model.EngineEvent) string {
 	return "The player has been slain in combat. Their adventure ends here."
 }
 

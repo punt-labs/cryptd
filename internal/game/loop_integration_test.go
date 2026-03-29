@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func loadScenario(t *testing.T) *scenario.Scenario {
+func loadScenario(t *testing.T) *scenario.Spec {
 	t.Helper()
 	s, err := scenario.Load("../../testdata/scenarios/minimal.yaml")
 	require.NoError(t, err)
