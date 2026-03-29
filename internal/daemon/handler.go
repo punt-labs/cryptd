@@ -69,7 +69,7 @@ func (s *Server) handleConnection(r io.Reader, w io.Writer) {
 				s.runGameLoop(scanner, w, sess)
 				return
 			}
-			// Session resume: if initialize found an existing game, send the
+			// Session resume: if session.init found an existing game, send the
 			// current room and enter the game loop.
 			s.mu.RLock()
 			hasGame := sess.gameID != ""
@@ -155,6 +155,13 @@ func (s *Server) handleRequest(req Request, sess **Session) Response {
 	default:
 		// Route game.* methods to the game goroutine in passthrough mode.
 		if s.passthrough && strings.HasPrefix(req.Method, "game.") {
+			if req.Method == "game.play" {
+				return Response{
+					JSONRPC: "2.0",
+					ID:      req.ID,
+					Error:   &RPCError{Code: CodeMethodNotFound, Message: fmt.Sprintf("unknown method %q", req.Method)},
+				}
+			}
 			return s.handleGameCommand(req, *sess)
 		}
 		return Response{
