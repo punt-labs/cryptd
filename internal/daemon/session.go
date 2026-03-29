@@ -9,7 +9,7 @@ import (
 )
 
 // Session tracks per-connection state for a client session.
-// A session persists across reconnects — a client that sends `initialize` with
+// A session persists across reconnects — a client that sends `session.init` with
 // its previous session ID gets the same Session back, with its game intact.
 type Session struct {
 	id          string
