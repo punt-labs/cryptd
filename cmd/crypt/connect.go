@@ -35,6 +35,20 @@ func run(socketPath, addr, scenario, charName, charClass, sessionID string) int 
 
 // dial connects to the server via TCP or Unix socket.
 func dial(socketPath, addr string) (net.Conn, error) {
+	return dialWithFlags(socketPath, addr)
+}
+
+// dialMCP connects to the server for MCP mode. If auto-starting, it uses
+// --passthrough because MCP clients send game.* methods that require passthrough
+// dispatch. Normal mode only accepts game.new and game.play.
+func dialMCP(socketPath, addr string) (net.Conn, error) {
+	return dialWithFlags(socketPath, addr, "--passthrough")
+}
+
+// dialWithFlags connects to the server via TCP (if addr is set) or Unix socket,
+// auto-starting cryptd serve with the given extra flags if the socket is not
+// already listening.
+func dialWithFlags(socketPath, addr string, extraFlags ...string) (net.Conn, error) {
 	if addr != "" {
 		conn, err := net.DialTimeout("tcp", addr, 5*time.Second)
 		if err != nil {
@@ -51,11 +65,12 @@ func dial(socketPath, addr string) (net.Conn, error) {
 			return nil, fmt.Errorf("cannot determine home directory: %w", err)
 		}
 	}
-	return dialOrStart(sock)
+	return dialOrStart(sock, extraFlags...)
 }
 
 // dialOrStart connects to the Unix socket, starting cryptd serve if needed.
-func dialOrStart(socketPath string) (net.Conn, error) {
+// Any extraFlags are appended to the serve command (e.g. "--passthrough").
+func dialOrStart(socketPath string, extraFlags ...string) (net.Conn, error) {
 	conn, err := net.DialTimeout("unix", socketPath, time.Second)
 	if err == nil {
 		return conn, nil
@@ -70,8 +85,10 @@ func dialOrStart(socketPath string) (net.Conn, error) {
 	// wait target the right PID (not a daemonize parent that already exited).
 	// Capture stderr in a buffer — server log output on the client terminal
 	// corrupts readline's raw-mode state, but we need diagnostics on failure.
+	args := []string{"serve", "-f", "--socket", socketPath}
+	args = append(args, extraFlags...)
 	var stderrBuf bytes.Buffer
-	cmd := exec.Command(cryptd, "serve", "-f", "--socket", socketPath)
+	cmd := exec.Command(cryptd, args...)
 	cmd.Stderr = &stderrBuf
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start cryptd: %w", err)
