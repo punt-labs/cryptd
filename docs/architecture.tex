@@ -14,6 +14,7 @@
 \usepackage{xcolor}
 \usepackage{enumitem}
 \usepackage{longtable}
+\usepackage{textcomp}
 \usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
 
 \lstset{
@@ -150,8 +151,8 @@ named triple of interface implementations.  The engine always runs as
   & daemon \\
 \midrule
 \textbf{Invoked by}
-  & \cmd{crypt} client $\to$ \cmd{cryptd serve}
-  & \cmd{crypt} client $\to$ \cmd{cryptd serve}
+  & \cmd{crypt} client \textrightarrow{} \cmd{cryptd serve}
+  & \cmd{crypt} client \textrightarrow{} \cmd{cryptd serve}
   & \cmd{cryptd serve -t} \\
 \bottomrule
 \end{tabular}
@@ -905,7 +906,7 @@ Combat begins/ends
 Map fog reveal (new room)
   & \tool{lux.update()} --- patch map canvas element \\
 Nav button press (player)
-  & \tool{lux.recv()} event $\to$ engine directly \\
+  & \tool{lux.recv()} event \textrightarrow{} engine directly \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -972,7 +973,7 @@ game daemon handles:
 
 \begin{itemize}
   \item Game state (authoritative \texttt{GameState} for the session).
-  \item MCP tool dispatch (receive call $\to$ engine method $\to$
+  \item MCP tool dispatch (receive call \textrightarrow{} engine method \textrightarrow{}
     return result).
   \item Push routing (\texttt{tools/list\_changed}, narration
     broadcast).
@@ -1137,7 +1138,7 @@ When Biff is added:
   & Complete \\
 \midrule
 \textbf{M9 — LLM Integration}
-  & Three-tier inference chain (Claude API $\to$ ollama SLM $\to$
+  & Three-tier inference chain (Claude API \textrightarrow{} ollama SLM \textrightarrow{}
     rules+templates); \texttt{LLMInterpreter}, \texttt{LLMNarrator},
     \texttt{SLMInterpreter}, \texttt{SLMNarrator}; auto-detection;
     \pkg{internal/inference} OpenAI-compatible client.
