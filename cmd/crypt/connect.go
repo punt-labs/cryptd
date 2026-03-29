@@ -54,6 +54,76 @@ func dial(socketPath, addr string) (net.Conn, error) {
 	return dialOrStart(sock)
 }
 
+// dialMCP connects to the server for MCP mode. If auto-starting, it uses
+// --passthrough because MCP clients send game.* methods that require passthrough
+// dispatch. Normal mode only accepts game.new and game.play.
+func dialMCP(socketPath, addr string) (net.Conn, error) {
+	if addr != "" {
+		conn, err := net.DialTimeout("tcp", addr, 5*time.Second)
+		if err != nil {
+			return nil, fmt.Errorf("cannot connect to %s: %w", addr, err)
+		}
+		return conn, nil
+	}
+
+	sock := socketPath
+	if sock == "" {
+		var err error
+		sock, err = protocol.DefaultSocketPath()
+		if err != nil {
+			return nil, fmt.Errorf("cannot determine home directory: %w", err)
+		}
+	}
+	return dialOrStartPassthrough(sock)
+}
+
+// dialOrStartPassthrough connects to the Unix socket, starting cryptd serve
+// with --passthrough if needed. Used by MCP mode which requires passthrough
+// dispatch for game.* methods.
+func dialOrStartPassthrough(socketPath string) (net.Conn, error) {
+	conn, err := net.DialTimeout("unix", socketPath, time.Second)
+	if err == nil {
+		return conn, nil
+	}
+
+	cryptd, err := exec.LookPath("cryptd")
+	if err != nil {
+		return nil, fmt.Errorf("cryptd not found in PATH — install it or start the server manually")
+	}
+
+	var stderrBuf bytes.Buffer
+	cmd := exec.Command(cryptd, "serve", "-f", "--passthrough", "--socket", socketPath)
+	cmd.Stderr = &stderrBuf
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("failed to start cryptd: %w", err)
+	}
+
+	waitCh := make(chan error, 1)
+	go func() { waitCh <- cmd.Wait() }()
+
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		select {
+		case err := <-waitCh:
+			msg := strings.TrimSpace(stderrBuf.String())
+			if msg != "" {
+				return nil, fmt.Errorf("cryptd exited before socket ready: %s", msg)
+			}
+			return nil, fmt.Errorf("cryptd exited before socket ready: %v", err)
+		default:
+		}
+		conn, err = net.DialTimeout("unix", socketPath, 500*time.Millisecond)
+		if err == nil {
+			return conn, nil
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	_ = cmd.Process.Kill()
+	<-waitCh
+	return nil, fmt.Errorf("cryptd started but socket %s not ready within 5s", socketPath)
+}
+
 // dialOrStart connects to the Unix socket, starting cryptd serve if needed.
 func dialOrStart(socketPath string) (net.Conn, error) {
 	conn, err := net.DialTimeout("unix", socketPath, time.Second)

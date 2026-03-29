@@ -17,7 +17,7 @@ import (
 // runMCP connects to the daemon and serves an MCP server on stdio.
 // Returns an exit code (0 = clean, 1 = error).
 func runMCP(socketPath, addr string) int {
-	conn, err := dial(socketPath, addr)
+	conn, err := dialMCP(socketPath, addr)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "crypt mcp: %v\n", err)
 		return 1
@@ -221,7 +221,7 @@ func gameTools() []toolDef {
 		{
 			name:        "save_game",
 			description: "Save the current game.",
-			gameMethod:  "save",
+			gameMethod:  "save_game",
 			opts: []mcplib.ToolOption{
 				mcplib.WithString("slot", mcplib.Description("Save slot (optional)")),
 			},
@@ -229,7 +229,7 @@ func gameTools() []toolDef {
 		{
 			name:        "load_game",
 			description: "Load a saved game.",
-			gameMethod:  "load",
+			gameMethod:  "load_game",
 			opts: []mcplib.ToolOption{
 				mcplib.WithString("slot", mcplib.Description("Save slot to load (optional)")),
 			},
