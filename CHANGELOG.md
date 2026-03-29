@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **`crypt mcp`: stdio MCP bridge for Claude Code.** Runs as an MCP server on stdio, proxies tool calls to `cryptd serve` over Unix socket/TCP. 16 game tools registered (new_game, move, look, attack, etc.). Thread-safe daemon proxy with mutex. Registration: `claude mcp add -s project crypt -- crypt mcp`.
 - **LLM inference tier (M9):** `LLMInterpreter` and `LLMNarrator` implementations that call Claude's API via the OpenAI-compatible `/v1/chat/completions` endpoint. Same two-tier fallback strategy as the SLM tier: Rules-first for deterministic commands, LLM for ambiguous input; Template fallback for tactical events, LLM for atmospheric narration. Claude-optimized system prompts.
 - **`inference.Client` auth support:** `NewClientWithOpts` constructor with `WithAPIKey(string)` and `WithTimeout(time.Duration)` functional options. When set, adds `Authorization: Bearer <key>` to every request. Existing `NewClient` is unchanged.
 - **`cryptd serve --api-key`** flag (and `CRYPTD_API_KEY` env var fallback) selects the Claude LLM tier. Probe chain: Claude API → ollama → llama.cpp → rules+templates.
