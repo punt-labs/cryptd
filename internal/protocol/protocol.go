@@ -89,11 +89,17 @@ type ToolInfo struct {
 	InputSchema map[string]any `json:"inputSchema"`
 }
 
+// InitializeParams is the optional params for the "initialize" method.
+type InitializeParams struct {
+	SessionID string `json:"session_id,omitempty"`
+}
+
 // InitializeResult is the result of the initialize method.
 type InitializeResult struct {
 	ProtocolVersion string         `json:"protocolVersion"`
 	ServerInfo      ServerInfo     `json:"serverInfo"`
 	Capabilities    map[string]any `json:"capabilities"`
+	SessionID       string         `json:"session_id"`
 }
 
 // ServerInfo identifies the server in the initialize handshake.
