@@ -53,6 +53,7 @@ func TestSession_ResumeReadsInitialRoom(t *testing.T) {
 				ServerInfo:      protocol.ServerInfo{Name: "cryptd", Version: "0.1.0"},
 				Capabilities:    map[string]any{"tools": map[string]any{}},
 				SessionID:       testSessionID,
+				HasGame:         true,
 			},
 		})
 

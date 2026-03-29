@@ -114,7 +114,10 @@ func (s *Server) handleConnection(r io.Reader, w io.Writer) {
 			}
 			// Session resume: if initialize found an existing game, send the
 			// current room and enter the game loop.
-			if req.Method == "initialize" && resp.Error == nil && sess.gameID != "" {
+			s.mu.RLock()
+			hasGame := sess.gameID != ""
+			s.mu.RUnlock()
+			if req.Method == "initialize" && resp.Error == nil && hasGame {
 				s.resumeGameLoop(scanner, w, sess)
 				return
 			}
@@ -167,7 +170,12 @@ func (s *Server) handleRequest(req Request, sess **Session) Response {
 		}
 
 		*sess = s.getOrCreateSession(sid)
-		log.Printf("daemon: session %s established", sid)
+
+		s.mu.RLock()
+		hasGame := (*sess).gameID != ""
+		s.mu.RUnlock()
+
+		log.Printf("daemon: session %s established (has_game=%v)", sid, hasGame)
 
 		return Response{
 			JSONRPC: "2.0",
@@ -177,6 +185,7 @@ func (s *Server) handleRequest(req Request, sess **Session) Response {
 				ServerInfo:      ServerInfo{Name: "cryptd", Version: "0.1.0"},
 				Capabilities:    map[string]any{"tools": map[string]any{}},
 				SessionID:       sid,
+				HasGame:         hasGame,
 			},
 		}
 

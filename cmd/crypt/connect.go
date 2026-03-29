@@ -168,7 +168,7 @@ func session(conn net.Conn, in io.Reader, out, errOut io.Writer, scenario, charN
 	if err := json.Unmarshal(initResult, &initResp); err == nil && initResp.SessionID != "" {
 		fmt.Fprintf(errOut, "crypt: session %s\n", initResp.SessionID)
 	}
-	resuming := resumeSessionID != "" && initResp.SessionID == resumeSessionID
+	resuming := resumeSessionID != "" && initResp.HasGame
 
 	if resuming {
 		// The server enters RunLoop immediately on resume and sends the current

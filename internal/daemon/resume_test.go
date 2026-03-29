@@ -133,6 +133,12 @@ func TestResumeGameLoop_NormalMode(t *testing.T) {
 	require.NoError(t, json.Unmarshal(scanner2.Bytes(), &initResp2))
 	require.Nil(t, initResp2.Error)
 
+	// Verify HasGame is true for a resumed session with an active game.
+	initData2, _ := json.Marshal(initResp2.Result)
+	var initResult2 protocol.InitializeResult
+	require.NoError(t, json.Unmarshal(initData2, &initResult2))
+	assert.True(t, initResult2.HasGame, "resumed session with active game should have has_game=true")
+
 	// After initialize with an existing game, the server enters resumeGameLoop
 	// which runs RunLoop with SkipInitialRender=false, meaning it sends the
 	// initial room render. Read it.
@@ -197,6 +203,7 @@ func TestResumeGameLoop_NoGame(t *testing.T) {
 	var init InitializeResult
 	require.NoError(t, json.Unmarshal(data, &init))
 	assert.Equal(t, "nonexistent-session-id", init.SessionID)
+	assert.False(t, init.HasGame, "new session without a game should have has_game=false")
 }
 
 // TestResumeGameLoop_SkipInitialRender verifies that the new_game path sets

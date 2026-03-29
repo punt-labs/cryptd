@@ -100,6 +100,7 @@ type InitializeResult struct {
 	ServerInfo      ServerInfo     `json:"serverInfo"`
 	Capabilities    map[string]any `json:"capabilities"`
 	SessionID       string         `json:"session_id"`
+	HasGame         bool           `json:"has_game,omitempty"`
 }
 
 // ServerInfo identifies the server in the initialize handshake.
