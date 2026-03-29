@@ -27,7 +27,7 @@ Switching modes mid-adventure is valid — save in `dm`, resume in `solo`.
 │  │  Narrator:      │  │  Narrator:      │  │  Narrator:              │  │
 │  │    LLM (Claude) │  │    SLM (ollama) │  │    template             │  │
 │  │  Renderer:      │  │  Renderer:      │  │  Renderer:              │  │
-│  │    Lux or RPC   │  │    RPC or CLI   │  │    CLI / stdout         │  │
+│  │    Lux renderer  │  │    CLI renderer │  │    CLI / stdout         │  │
 │  │  Engine:        │  │  Engine:        │  │  Engine:                │  │
 │  │    daemon       │  │    daemon       │  │    daemon               │  │
 │  └─────────────────┘  └─────────────────┘  └─────────────────────────┘  │
@@ -83,10 +83,10 @@ cryptd serve -t ───────► stdin/stdout (testing mode, no network)
 
 - `cryptd serve` — game server daemon (JSON-RPC 2.0 over NDJSON). Supports Unix sockets
   (`--socket`) for local dev and TCP (`--listen`) for remote play. Client-agnostic.
-- `cryptd serve -t` — testing mode on stdin/stdout (no network, implies `-f`).
+- `cryptd serve -t --scenario <id>` — testing mode on stdin/stdout (no network, implies `-f`). Requires `--scenario`. Optional: `--script` for file input, `--json` for JSON transcript (requires `--script`).
 - `cryptd serve --passthrough` — passthrough mode for Claude Code MCP clients (no
   interpreter/narrator; Claude acts as its own DM).
-- `crypt` — thin CLI client. Connects to `cryptd serve`, auto-starts if needed.
+- `crypt` — thin CLI client. Connects to `cryptd serve`. For the default local Unix socket, auto-starts `cryptd serve` if available on PATH (no auto-start for remote/TCP via `--addr`).
 - `crypt --session <id>` — resume a previous session by ID.
 
 Play mode (interpreter + narrator selection) is server configuration via `--api-key`,
@@ -95,7 +95,7 @@ text and displays responses regardless of which tier the server uses.
 
 **Session routing (M10):** The daemon handles concurrent sessions natively via
 game-as-goroutine architecture. Session identity is established in the `initialize`
-handshake (`session_id` param, `has_game` response field). Session resume works by
+handshake (`session_id` param, `has_game` optional response field; absent means false). Session resume works by
 reconnecting with the same `session_id`. mcp-proxy remains a future option for Claude
 Code MCP stdio multiplexing but is no longer a blocker for multi-session play.
 
