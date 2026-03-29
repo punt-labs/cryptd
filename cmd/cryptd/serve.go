@@ -38,7 +38,7 @@ func runServe(args []string) {
 	testing := fs.Bool("t", false, "testing mode: stdin/stdout, no network (implies -f)")
 
 	// Inference flags.
-	apiKey := fs.String("api-key", "", "Anthropic API key for Claude LLM tier (or set ANTHROPIC_API_KEY)")
+	apiKey := fs.String("api-key", "", "Anthropic API key for Claude LLM tier (or set CRYPTD_API_KEY)")
 	modelFlag := fs.String("model", "claude-sonnet-4-20250514", "model name for Claude LLM tier")
 
 	// Scenario flag — used for both -t mode and daemon default scenario.
@@ -60,11 +60,11 @@ func runServe(args []string) {
 	// Resolve API key: flag takes precedence, then env var.
 	resolvedKey := *apiKey
 	if resolvedKey == "" {
-		resolvedKey = os.Getenv("ANTHROPIC_API_KEY")
+		resolvedKey = os.Getenv("CRYPTD_API_KEY")
 	}
 
 	if *apiKey != "" {
-		log.Println("cryptd: warning: --api-key is visible in process listings; prefer ANTHROPIC_API_KEY env var")
+		log.Println("cryptd: warning: --api-key is visible in process listings; prefer CRYPTD_API_KEY env var")
 	}
 
 	// Validate flag combinations.
