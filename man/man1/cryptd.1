@@ -34,10 +34,11 @@ The server runs in two modes:
 .TP
 .B Normal mode
 Accepts free text from the player, routes it through an interpreter
-(SLM with Rules fallback) and narrator (SLM with Template fallback),
-and returns display\-ready narrated text.
-Auto\-detects ollama for SLM inference; falls back to deterministic
-rules + templates if no inference server is available.
+and narrator, and returns display\-ready narrated text.
+Three inference tiers: Claude API (with
+.BR CRYPTD_API_KEY ),
+local SLM via ollama, or deterministic rules + templates.
+The server supports concurrent sessions with per\-session game isolation.
 .TP
 .B Passthrough mode
 Exposes the raw MCP tool surface with structured JSON responses.
@@ -72,6 +73,17 @@ Mutually exclusive with
 .TP
 .B \-\-passthrough
 Enable MCP passthrough mode (structured JSON, no interpreter/narrator).
+.TP
+.BI \-\-api\-key " key"
+Anthropic API key for the Claude LLM inference tier. When set, the
+server uses Claude for command interpretation and atmospheric narration.
+Prefer the
+.B CRYPTD_API_KEY
+environment variable to avoid exposing the key in process listings.
+.TP
+.BI \-\-model " model"
+Model name for the Claude LLM tier. Default:
+.IR claude\-sonnet\-4\-20250514 .
 .TP
 .B \-f
 Run in foreground (don't daemonize).
@@ -128,6 +140,10 @@ Stat allocation: distribute 8 points across STR, DEX, CON, INT, WIS, CHA
 .BR "4 0 2 0 2 0" )
 or press Enter for defaults (STR 14, DEX 12, CON 12).
 .SH ENVIRONMENT
+.TP
+.B CRYPTD_API_KEY
+Anthropic API key for the Claude LLM inference tier. Equivalent to
+.BR \-\-api\-key .
 .TP
 .B CRYPT_SCENARIO_DIR
 Directory containing scenario files. Default:
