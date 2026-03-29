@@ -56,6 +56,7 @@ func dmRoundTrip(t *testing.T, srv *Server, reqs []Request) []Response {
 		require.NoError(t, json.Unmarshal(scanner.Bytes(), &resp))
 		resps = append(resps, resp)
 	}
+	require.NoError(t, scanner.Err())
 	return resps
 }
 

@@ -142,8 +142,9 @@ func runServe(args []string) {
 	}
 }
 
-// runTestingMode runs the engine on stdin/stdout with Rules+Template.
-// No network, no SLM — deterministic and fast.
+// runTestingMode runs the engine on stdin/stdout. Scripted mode uses
+// Rules+Template (deterministic, no inference). Interactive and Lux modes
+// probe for available inference (Claude API → SLM → rules+templates).
 func runTestingMode(scenarioID, charName, charClass, scriptFile string, jsonMode, luxMode bool, anthropicKey, modelName string) {
 	s, err := scenariodir.Load(scenariodir.Dir(), scenarioID)
 	if err != nil {
@@ -252,6 +253,8 @@ func resolveInterpreterNarrator(anthropicKey, modelName string) (model.CommandIn
 	tmpl := narrator.NewTemplate()
 
 	// Large tier: Claude API (if API key provided).
+	// Anthropic exposes an OpenAI-compatible /v1/chat/completions endpoint
+	// that accepts Authorization: Bearer <key> — same wire format as ollama.
 	if anthropicKey != "" {
 		client := inference.NewClientWithOpts(
 			"https://api.anthropic.com",
