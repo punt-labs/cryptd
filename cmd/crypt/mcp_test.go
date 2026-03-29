@@ -19,7 +19,7 @@ func TestMCP_ToolRegistration(t *testing.T) {
 	expected := []string{
 		"new_game", "move", "look", "pick_up", "drop", "equip", "unequip",
 		"examine", "inventory", "attack", "defend", "flee", "cast_spell",
-		"save_game", "load_game", "play",
+		"save_game", "load_game",
 	}
 	require.Len(t, tools, len(expected), "tool count mismatch")
 

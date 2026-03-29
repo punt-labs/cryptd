@@ -234,14 +234,6 @@ func gameTools() []toolDef {
 				mcplib.WithString("slot", mcplib.Description("Save slot to load (optional)")),
 			},
 		},
-		{
-			name:        "play",
-			description: "Send natural language text to the game engine.",
-			gameMethod:  "play",
-			opts: []mcplib.ToolOption{
-				mcplib.WithString("text", mcplib.Required(), mcplib.Description("Natural language command")),
-			},
-		},
 	}
 }
 
