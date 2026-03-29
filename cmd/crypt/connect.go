@@ -170,6 +170,22 @@ func session(conn net.Conn, in io.Reader, out, errOut io.Writer, scenario, charN
 	}
 	resuming := resumeSessionID != "" && initResp.SessionID == resumeSessionID
 
+	if resuming {
+		// The server enters RunLoop immediately on resume and sends the current
+		// room as the initial render. Read and display it before entering the REPL.
+		if scanner.Scan() {
+			var resp struct {
+				Result json.RawMessage `json:"result"`
+			}
+			if err := json.Unmarshal(scanner.Bytes(), &resp); err == nil {
+				var playResp protocol.PlayResponse
+				if err := json.Unmarshal(resp.Result, &playResp); err == nil {
+					displayPlayResponse(out, playResp)
+				}
+			}
+		}
+	}
+
 	// Auto-start game if --scenario given (skip if resuming an existing session).
 	if scenario != "" && !resuming {
 		if err := startGame(send, out, errOut, scenario, charName, charClass); err != nil {
