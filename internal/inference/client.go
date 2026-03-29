@@ -25,9 +25,6 @@ const (
 	RoleAssistant = "assistant"
 )
 
-// Ensure RoleAssistant is not reported unused; it completes the API triple.
-var _ = RoleAssistant
-
 // Message is a single message in a chat conversation.
 type Message struct {
 	Role    string `json:"role"`

@@ -173,16 +173,25 @@ func session(conn net.Conn, in io.Reader, out, errOut io.Writer, scenario, charN
 	if resuming {
 		// The server enters RunLoop immediately on resume and sends the current
 		// room as the initial render. Read and display it before entering the REPL.
-		if scanner.Scan() {
-			var resp struct {
-				Result json.RawMessage `json:"result"`
-			}
-			if err := json.Unmarshal(scanner.Bytes(), &resp); err == nil {
-				var playResp protocol.PlayResponse
-				if err := json.Unmarshal(resp.Result, &playResp); err == nil {
-					displayPlayResponse(out, playResp)
-				}
-			}
+		if !scanner.Scan() {
+			fmt.Fprintf(errOut, "error: connection lost during session resume\n")
+			return 1
+		}
+		var resp struct {
+			Result json.RawMessage    `json:"result"`
+			Error  *protocol.RPCError `json:"error"`
+		}
+		if err := json.Unmarshal(scanner.Bytes(), &resp); err != nil {
+			fmt.Fprintf(errOut, "error: invalid response during resume: %v\n", err)
+			return 1
+		}
+		if resp.Error != nil {
+			fmt.Fprintf(errOut, "error: resume failed: %s\n", resp.Error.Message)
+			return 1
+		}
+		var playResp protocol.PlayResponse
+		if err := json.Unmarshal(resp.Result, &playResp); err == nil {
+			displayPlayResponse(out, playResp)
 		}
 	}
 
@@ -309,7 +318,7 @@ func replScanner(in io.Reader, out, errOut io.Writer, send func(string, any) (js
 }
 
 // startGame sends a new_game tool call and displays the initial narration.
-func startGame(send func(string, any) (json.RawMessage, error), out, _ io.Writer, scenario, name, class string) error {
+func startGame(send func(string, any) (json.RawMessage, error), out, errOut io.Writer, scenario, name, class string) error {
 	argsJSON, err := json.Marshal(map[string]string{
 		"scenario_id":     scenario,
 		"character_name":  name,
@@ -329,8 +338,8 @@ func startGame(send func(string, any) (json.RawMessage, error), out, _ io.Writer
 
 	var playResp protocol.PlayResponse
 	if err := json.Unmarshal(result, &playResp); err != nil {
-		// Not a play response — print raw.
-		fmt.Fprintln(out, string(result))
+		// Not a play response — print raw to errOut since this is unexpected.
+		fmt.Fprintf(errOut, "warning: unexpected response format: %s\n", string(result))
 		return nil
 	}
 	displayPlayResponse(out, playResp)
