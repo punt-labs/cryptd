@@ -177,6 +177,52 @@ func TestChatCompletion_Timeout(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestNewClientWithOpts_APIKeyHeader(t *testing.T) {
+	var gotAuth string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"ok"}}]}`))
+	}))
+	defer srv.Close()
+
+	client := inference.NewClientWithOpts(srv.URL, "claude-sonnet-4-20250514",
+		inference.WithAPIKey("sk-test-key"),
+		inference.WithTimeout(5*time.Second),
+	)
+	resp, err := client.ChatCompletion(context.Background(), []inference.Message{
+		{Role: inference.RoleUser, Content: "hello"},
+	}, nil)
+
+	require.NoError(t, err)
+	assert.Equal(t, "ok", resp)
+	assert.Equal(t, "Bearer sk-test-key", gotAuth)
+}
+
+func TestNewClientWithOpts_NoAPIKey(t *testing.T) {
+	var gotAuth string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"ok"}}]}`))
+	}))
+	defer srv.Close()
+
+	client := inference.NewClientWithOpts(srv.URL, "model")
+	_, err := client.ChatCompletion(context.Background(), []inference.Message{
+		{Role: inference.RoleUser, Content: "hello"},
+	}, nil)
+
+	require.NoError(t, err)
+	assert.Empty(t, gotAuth, "no auth header when API key not set")
+}
+
+func TestNewClientWithOpts_DefaultTimeout(t *testing.T) {
+	client := inference.NewClientWithOpts("http://localhost:8080", "model")
+	assert.Equal(t, "http://localhost:8080", client.BaseURL())
+	assert.Equal(t, "model", client.Model())
+}
+
 func TestClientAccessors(t *testing.T) {
 	client := inference.NewClient("http://localhost:8080", "smollm2:135m", 5*time.Second)
 	assert.Equal(t, "http://localhost:8080", client.BaseURL())

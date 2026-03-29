@@ -26,6 +26,7 @@ type FakeSLMCall struct {
 	Messages    []json.RawMessage `json:"messages"`
 	Temperature *float64          `json:"temperature,omitempty"`
 	MaxTokens   int               `json:"max_tokens,omitempty"`
+	AuthHeader  string            `json:"auth_header,omitempty"`
 }
 
 // NewFakeSLMServer creates a FakeSLMServer that will return the provided
@@ -66,12 +67,15 @@ func (f *FakeSLMServer) handleChatCompletions(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	authHeader := r.Header.Get("Authorization")
+
 	f.mu.Lock()
 	f.calls = append(f.calls, FakeSLMCall{
 		Model:       req.Model,
 		Messages:    req.Messages,
 		Temperature: req.Temperature,
 		MaxTokens:   req.MaxTokens,
+		AuthHeader:  authHeader,
 	})
 	delay := f.delay
 
@@ -165,6 +169,7 @@ func (f *FakeSLMServer) Calls() []FakeSLMCall {
 			Messages:    msgs,
 			Temperature: tempCopy,
 			MaxTokens:   c.MaxTokens,
+			AuthHeader:  c.AuthHeader,
 		}
 	}
 	return out

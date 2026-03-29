@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **LLM inference tier (M9):** `LLMInterpreter` and `LLMNarrator` implementations that call Claude's API via the OpenAI-compatible `/v1/chat/completions` endpoint. Same two-tier fallback strategy as the SLM tier: Rules-first for deterministic commands, LLM for ambiguous input; Template fallback for tactical events, LLM for atmospheric narration. Claude-optimized system prompts.
+- **`inference.Client` auth support:** `NewClientWithOpts` constructor with `WithAPIKey(string)` and `WithTimeout(time.Duration)` functional options. When set, adds `Authorization: Bearer <key>` to every request. Existing `NewClient` is unchanged.
+- **`cryptd serve --api-key`** flag (and `ANTHROPIC_API_KEY` env var fallback) selects the Claude LLM tier. Probe chain: Claude API → ollama → llama.cpp → rules+templates.
+- **DM pipeline integration tests:** full game loop and daemon-level tests wiring `FakeLLMInterpreter` + `FakeLLMNarrator` through the interpreter → engine → narrator pipeline. Verifies state transitions are identical to headless mode.
+
 ### Fixed
 
 - `crypt` REPL now uses `ergochat/readline` for proper terminal line editing, history, and Ctrl-C handling (was broken with bare `bufio.Scanner`).
