@@ -712,7 +712,7 @@ The beads lesson is taken seriously.
 ## DES-014: mcp-proxy for DM Mode Session Multiplexing
 
 **Date:** 2026-03-10
-**Status:** OPEN — depends on mcp-proxy shipping
+**Status:** REVISED (2026-03-29) — session routing implemented natively in protocol; mcp-proxy no longer a prerequisite
 **Topic:** How Claude Code sessions connect to the shared game engine daemon
 
 ### Design
@@ -749,12 +749,19 @@ The proxy pattern (one shim per session, one shared daemon) is also how Quarry, 
 and Lux are heading. The dungeon engine follows the same pattern rather than inventing a
 bespoke multi-client solution.
 
-### Status: OPEN
+### Status: REVISED (2026-03-29)
 
-The mcp-proxy binary does not yet exist — the project is design-stage only. DM mode Phase 2
-can start with direct stdio MCP (single-session only, no push routing) and migrate to the
-proxy pattern when mcp-proxy ships. The engine daemon API is identical either way — the
-transport layer changes, not the tool interface.
+M10 implemented direct session identity in the `initialize` handshake: the client sends an
+optional `session_id` param, and the server returns `session_id` and `has_game` in the
+response. The daemon handles concurrent sessions natively via game-as-goroutine architecture
+— each game is a goroutine that exclusively owns its engine and state. Session resume works
+by reconnecting with the same `session_id`; the server re-enters the game loop and re-renders
+the current room. mcp-proxy remains a future option for Claude Code MCP stdio multiplexing
+but is no longer a blocker for multi-session play.
+
+The original mcp-proxy binary does not yet exist — the project is design-stage only. The
+engine daemon API is identical either way — the transport layer changes, not the tool
+interface.
 
 ### Rejected: HTTP Long-Polling for Multi-Player
 

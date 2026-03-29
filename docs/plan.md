@@ -27,27 +27,20 @@ Switching modes mid-adventure is valid — save in `dm`, resume in `solo`.
 │  │  Narrator:      │  │  Narrator:      │  │  Narrator:              │  │
 │  │    LLM (Claude) │  │    SLM (ollama) │  │    template             │  │
 │  │  Renderer:      │  │  Renderer:      │  │  Renderer:              │  │
-│  │    Lux          │  │    Lux or CLI   │  │    CLI / stdout         │  │
+│  │    Lux or RPC   │  │    RPC or CLI   │  │    CLI / stdout         │  │
 │  │  Engine:        │  │  Engine:        │  │  Engine:                │  │
-│  │    daemon       │  │    embedded     │  │    embedded             │  │
+│  │    daemon       │  │    daemon       │  │    daemon               │  │
 │  └─────────────────┘  └─────────────────┘  └─────────────────────────┘  │
 └───────────────────────────────────────────────────────────────────────────┘
-                  │ dm mode                       │ solo/headless
-                  ▼                               ▼
-┌─────────────────────────────┐   ┌──────────────────────────────────────┐
-│  mcp-proxy (per session)    │   │  Engine in-process                   │
-│  <10ms, <10MB Go shim       │   │  No network, no proxy                │
-│  injects session identity   │   └──────────────────────────────────────┘
-└────────────┬────────────────┘
-             │ WebSocket / NDJSON Unix socket
-             ▼
+                                    │
+                                    ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                  GAME ENGINE DAEMON  (`dungeon serve`)                  │
+│                  GAME ENGINE DAEMON  (`cryptd serve`)                   │
 │  ─────────────────────────────────────────────────────────────────────  │
 │  GameState · Character · DungeonMap · Combat · Inventory · Save/Load    │
-│  Knows which session is DM vs. player (via session identity)            │
-│  Pushes tools/list_changed to DM when player acts                       │
-│  Routes DM narration to player sessions                                 │
+│  Game-as-goroutine: each game exclusively owns its engine and state     │
+│  Session identity via initialize handshake (session_id param)           │
+│  Concurrent sessions with session resume on reconnect                   │
 │  Deterministic. No LLM calls. No orchestration.                         │
 └─────────────────────────────────────────────────────────────────────────┘
 
@@ -76,49 +69,38 @@ Switching modes mid-adventure is valid — save in `dm`, resume in `solo`.
 | `LuxRenderer` | `dm`, `solo` | Calls Lux via MCP tools; full HUD with map, HP bars, combat UI |
 | `CLIRenderer` | `headless`, SSH | ANSI terminal output; ASCII map, text HP bar, stdin input loop |
 
-### Engine Deployment: Embedded vs. Server
+### Engine Deployment
 
-The engine runs in two modes depending on play context. The tool API, play modes, and
-interfaces are identical in both. This is not a deployment detail — it directly enables
-multi-player and remote play without redesign. See DES-025.
+The engine always runs as `cryptd serve`. There is no embedded engine mode. All play
+modes — dm, solo, headless — connect to the daemon. See DES-025.
 
 ```text
-EMBEDDED (crypt solo/headless)          SERVER (cryptd serve)
-──────────────────────────────          ─────────────────────────────────────
-Engine runs in-process.                 Engine runs as a network service.
-No server, no network.                  Clients connect via Unix socket or TCP.
-
- player                                  crypt connect ─────► cryptd serve
- (stdin)                                 crypt plugin ──────►    (TCP or
-    │                                    future web client ──►  Unix socket)
- Engine (in-process)
-    │
- CLIRenderer or LuxRenderer (direct)
+crypt (thin client) ─────► cryptd serve    (TCP or Unix socket)
+crypt plugin ──────────►       │
+future web client ─────►       │
+cryptd serve -t ───────► stdin/stdout (testing mode, no network)
 ```
 
-**Why mcp-proxy for DM mode:**
-Claude Code spawns one MCP server process per session via stdio. Without a proxy, the DM's
-Claude session spawns the full engine and owns all state. A second player connection is
-impossible, and the DM cannot push events to players.
+- `cryptd serve` — game server daemon (JSON-RPC 2.0 over NDJSON). Supports Unix sockets
+  (`--socket`) for local dev and TCP (`--listen`) for remote play. Client-agnostic.
+- `cryptd serve -t` — testing mode on stdin/stdout (no network, implies `-f`).
+- `cryptd serve --passthrough` — passthrough mode for Claude Code MCP clients (no
+  interpreter/narrator; Claude acts as its own DM).
+- `crypt` — thin CLI client. Connects to `cryptd serve`, auto-starts if needed.
+- `crypt --session <id>` — resume a previous session by ID.
 
-With mcp-proxy (design-stage Go binary from `../mcp-proxy`), each session spawns a
-near-zero-cost shim (<10ms, <10MB) that connects to the shared daemon over a persistent
-bidirectional transport (WebSocket or NDJSON Unix socket). The daemon:
+Play mode (interpreter + narrator selection) is server configuration via `--api-key`,
+`--passthrough`, and inference tier auto-detection. The client is agnostic — it sends
+text and displays responses regardless of which tier the server uses.
 
-- Holds all game state (one game session, or multiple keyed by game ID)
-- Knows which connection is the DM vs. a player via session identity injection
-  (mcp-proxy resolves the topmost `claude` ancestor PID and sends it at connect time)
-- Exposes DM-privileged tools to the DM session; player-scoped tools to player sessions
-- Pushes `tools/list_changed` to the DM session when a player takes an action —
-  the DM's Claude notices the state change and generates narration without polling
-- Pushes narration events from the DM to all player sessions
+**Session routing (M10):** The daemon handles concurrent sessions natively via
+game-as-goroutine architecture. Session identity is established in the `initialize`
+handshake (`session_id` param, `has_game` response field). Session resume works by
+reconnecting with the same `session_id`. mcp-proxy remains a future option for Claude
+Code MCP stdio multiplexing but is no longer a blocker for multi-session play.
 
 **Daemon scope**: Game logic and push routing only. No LLM calls, no orchestration logic.
 The beads project deleted 70K lines after their daemon grew too large — this daemon stays small.
-
-**`cryptd serve`**: Starts the game server (JSON-RPC 2.0 over NDJSON). Supports Unix sockets
-(`--socket`) for local dev and TCP (`--listen`) for remote play. Client-agnostic — serves
-CLI clients, Claude Code plugins, and future web clients identically.
 
 ### What Stays the Same Across All Modes
 
@@ -414,17 +396,17 @@ is playable before the LLM layer exists. This validates the engine design first.
 - `LuxRenderer` (Lux MCP tool calls)
 - Scenario YAML schema + `classic-fantasy-dungeon.yaml` migration
 - Save/load: `.dungeon/saves/<slot>.json`
-- `dungeon serve` daemon (NDJSON over Unix socket, session identity routing)
-- `dungeon serve` auto-start for DM convenience (starts daemon if not running)
-- `dungeon solo` and `dungeon headless` commands (engine embedded, no daemon)
+- `cryptd serve` daemon (NDJSON over Unix socket/TCP, session identity routing)
+- `crypt` auto-starts server if not running
+- `cryptd serve -t` testing mode (stdin/stdout, no network)
 
 ### Phase 2 — DM Mode + Lux HUD
 
 - `LLMInterpreter` + `LLMNarrator`: MCP callback into Claude
 - SKILL.md rewritten for DM role (narration, scenario generation, lore on examine)
 - Full Lux HUD: map canvas, HP/MP bars, nav buttons, narration log
-- `dungeon dm` command (invoked by `/dungeon` skill)
-- `/dungeon:create` — DM generates a new scenario YAML interactively
+- `cryptd serve --passthrough` for Claude Code MCP clients (invoked by `/crypt` skill)
+- `/crypt:create` — DM generates a new scenario YAML interactively
 
 ### Phase 3 — Combat System
 
@@ -451,10 +433,7 @@ is playable before the LLM layer exists. This validates the engine design first.
 
 ## Open Questions
 
-- **mcp-proxy dependency**: Design-stage only (no implementation yet). DM mode Phase 2
-  should either wait for mcp-proxy, or temporarily use direct stdio MCP and migrate
-  to the proxy pattern when it ships. The engine daemon API is the same either way.
-- **SLM model**: phi-3-mini vs smolLM vs mistral-7b-instruct for ollama?
-- **Go MCP SDK**: `github.com/mark3labs/mcp-go` or minimal stdio JSON-RPC?
-- **Dice notation parser**: third-party Go library or hand-rolled (simple enough)?
+- **mcp-proxy**: Session routing is now implemented natively (M10). mcp-proxy remains
+  a future option for Claude Code MCP stdio multiplexing (one shim per session, shared
+  daemon) but is no longer a blocker. The engine daemon API is the same either way.
 - **Permadeath default**: configurable in scenario YAML — default `respawn`
