@@ -81,6 +81,11 @@ The engine is the most critical unit test target. Every function that touches
 
 **Target coverage:** `internal/engine` ≥ 90 % statement coverage.
 
+**Target coverage:** `internal/daemon` ≥ 80% statement coverage. The daemon is
+the most architecturally complex package: game-as-goroutine dispatch, session
+registry, concurrent accept loop, graceful shutdown. `-race` is mandatory for
+all daemon tests.
+
 ### Parsers and Formats
 
 | Package | What to test |
@@ -118,6 +123,13 @@ Table-driven: event type + room seed → expected substring in output.
 {event: item_found, item: "rusty_key"}
   → output contains item name
 ```
+
+### Client (`cmd/crypt`)
+
+| Test | What it proves |
+|---|---|
+| `TestSession_ResumeReadsInitialRoom` | Client reads and displays server's initial room on `--session` resume |
+| `TestFormatBar`, `TestFormatHUD`, etc. | Display formatting (HP bars, enemy lines) |
 
 ---
 
@@ -200,15 +212,29 @@ Test that `LuxRenderer`:
 - Does not call `show()` for every HP tick (regression guard against performance
   anti-pattern).
 
-### Daemon: Session Identity Routing
+### Daemon: Game-as-Goroutine Architecture
 
-Start a real daemon in-process with two fake client connections. Assign one
-client the DM session identity; the other a player identity. Assert:
+Each Game is a goroutine that owns its engine and state exclusively. Commands
+flow via channel; no mutexes on game state. Tests exercise:
 
-- DM-privileged tool calls succeed from the DM client, fail from the player client.
-- After a player action, `tools/list_changed` is pushed to the DM client only.
-- Disconnecting a client does not crash the daemon.
-- A second game session (different game ID) is isolated from the first.
+| Test | What it proves |
+|---|---|
+| `TestResumeGameLoop_NormalMode` | Disconnect → reconnect with session ID → room state preserved |
+| `TestResumeGameLoop_NoGame` | Initialize without game → no RunLoop entered |
+| `TestResumeGameLoop_SkipInitialRender` | new\_game path doesn't double-render initial room |
+| `TestGame_Stop` | Stop() terminates game goroutine cleanly |
+| `TestGame_StopDuringRunLoop` | Stop() works mid-RunLoop, no deadlock |
+| `TestGame_SendDuringRunLoop` | Send() to game in RunLoop times out, doesn't hang |
+| `TestGame_PanicRecovery` | Game goroutine panic doesn't crash server |
+| `TestRepeatedNewGame_CleansUpOldGame` | Second new\_game on same session stops the old game goroutine |
+
+### Daemon: Concurrent Sessions
+
+| Test | What it proves |
+|---|---|
+| `TestIntegration_ConcurrentSessionIsolation` | Two concurrent TCP goroutines, independent games, race detector active |
+| `TestIntegration_SessionReconnect_StatePreserved` | Real TCP reconnect preserves room and inventory |
+| `TestIntegration_GracefulShutdown` | Server exits without deadlock when connections are active |
 
 ---
 
@@ -216,29 +242,36 @@ client the DM session identity; the other a player identity. Assert:
 
 **Location:** `e2e/`
 
-**Tooling:** `go test -tags e2e ./e2e/...`; spawns real `crypt` subprocess via
-`os/exec`. Requires the binary to be built first (`go build ./cmd/crypt`).
+**Tooling:** `go test -tags e2e ./e2e/...`; spawns real `cryptd` and `crypt`
+subprocesses via `os/exec`. Requires both binaries to be built first
+(`go build ./cmd/cryptd` and `go build ./cmd/crypt`).
 
-**Style:** Black-box. Talks to the binary over stdin/stdout (headless mode) or
-over the MCP stdio protocol. Asserts observable outputs only — exit codes, JSON
+**Style:** Black-box. Talks to the binary over stdin/stdout (`cryptd serve -t`)
+or over a real socket. Asserts observable outputs only — exit codes, JSON
 responses, file side effects (save files created).
 
 ### CLI Smoke Tests
 
 | Test | Command | Assert |
 |---|---|---|
-| Help exits clean | `crypt --help` | Exit 0, usage text present |
-| List scenarios | `crypt list-scenarios` | JSON array, at least one entry |
-| Headless new game | `crypt headless --scenario minimal` | Exit 0, initial state JSON |
-| Headless scripted run | `crypt headless --script testdata/scripts/minimal-run.yaml` | All steps pass, final state matches expected |
-| Save round-trip | new_game → save → kill → load → assert state | Save file created, state restored |
+| Help exits clean | `cryptd --help` | Exit 0, usage text present |
+| Validate scenario | `cryptd validate testdata/scenarios/minimal.yaml` | Exit 0, valid |
+| Test mode new game | `cryptd serve -t` with new\_game on stdin | Exit 0, initial state JSON |
+| Test mode scripted run | `cryptd serve -t` with scripted commands on stdin | All steps pass, final state matches expected |
+| Save round-trip | new\_game → save → kill → load → assert state | Save file created, state restored |
 
 ### MCP Wire Smoke
 
-Spawn `crypt serve` as a subprocess. Connect a minimal MCP client over stdio.
+Spawn `cryptd serve` as a subprocess. Connect a minimal MCP client over stdio.
 Call each tool once with valid arguments. Assert valid JSON responses and no
 unexpected stderr output. This is the "does the binary actually work" check that
 integration tests (in-process) cannot catch.
+
+### Session Reconnect E2E
+
+| Test | What it proves |
+|---|---|
+| `TestE2E_SessionReconnect` | Compiled binary, real socket: play → disconnect → reconnect with session ID → room preserved. Full-stack proof that session resume works. |
 
 ### Cross-Mode Save Compatibility
 
@@ -344,8 +377,10 @@ testdata/
 |---|---|---|
 | LLM (Claude) | `FakeLLMInterpreter` — returns canned action from fixture | Integration: MCP dispatch, Renderer |
 | LLM (Claude) | `FakeLLMNarrator` — returns fixture string | Integration: full-loop sequences |
-| SLM (ollama) | `httptest.NewServer` serving fixture JSON | Integration: SLM interpreter/narrator |
+| LLM (Claude API) | `FakeSLMServer` with `WithAPIKey` — same server, auth header verified | Integration: LLM interpreter/narrator timeout + fallback |
+| SLM (ollama) | `FakeSLMServer` — `httptest.Server` with auth header recording, configurable delay | Integration: SLM timeout fallback, auth verification |
 | Lux MCP | `FakeLuxServer` — records calls, injects events via channel | Integration: LuxRenderer |
+| Game goroutine | `Game.Inspect()` — runs function inside game goroutine for safe state access | Unit: game\_test.go, resume\_test.go |
 | Daemon socket | In-process fake transport | Integration: mcp-proxy routing |
 | CLI stdin | `bytes.Buffer` | Integration: headless mode |
 | CLI stdout | `bytes.Buffer` | Integration: CLIRenderer assertions |
@@ -371,14 +406,16 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     steps:
-      - go build -o cryptd ./cmd/crypt
+      - go build -o cryptd ./cmd/cryptd
+      - go build -o crypt ./cmd/crypt
       - go test -tags e2e ./e2e/...
 
   acceptance:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/')
     steps:
-      - go build -o cryptd ./cmd/crypt
+      - go build -o cryptd ./cmd/cryptd
+      - go build -o crypt ./cmd/crypt
       - go test -tags acceptance -timeout 10m ./e2e/acceptance/...
 ```
 
