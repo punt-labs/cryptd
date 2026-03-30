@@ -9,13 +9,11 @@ import (
 )
 
 // CombatOverlay renders the combat panel as a centered overlay. Pure rendering.
-type CombatOverlay struct {
-	width int
-}
+type CombatOverlay struct{}
 
 // NewCombatOverlay creates an overlay that centers within the given width.
-func NewCombatOverlay(width int) CombatOverlay {
-	return CombatOverlay{width: width}
+func NewCombatOverlay(_ int) CombatOverlay {
+	return CombatOverlay{}
 }
 
 // Render returns the overlay panel. Returns empty string if combat is not active.

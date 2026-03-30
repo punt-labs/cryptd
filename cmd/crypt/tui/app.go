@@ -76,6 +76,8 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case SessionReadyMsg:
 		a.sessionID = msg.SessionID
 		if a.scenario != "" {
+			a.waiting = true
+			a.input.SetWaiting(true)
 			return &a, NewGameCmd(a.send, a.scenario, a.charName, a.charClass)
 		}
 		if msg.HasGame {
@@ -91,6 +93,9 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		resp := msg.Response
 		a.lastResp = &resp
 		a.narration.AppendResponse(resp)
+		if a.combatActive() {
+			a.input.Blur()
+		}
 		return &a, nil
 
 	case ServerResponseMsg:
