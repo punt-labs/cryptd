@@ -8,7 +8,7 @@ adventure game playable via Claude Code, CLI, or (future) web client.
 | Binary | Role | Description |
 |--------|------|-------------|
 | `cryptd` | **Server** | Game engine, interpreter, narrator as a JSON-RPC 2.0 service |
-| `crypt` | **Client** | Player-facing CLI with readline, HP/MP bars, combat display |
+| `crypt` | **Client** | Player-facing CLI with Bubble Tea TUI (readline fallback via `--plain`) |
 | `crypt-admin` | **Author** | Graph-first scenario generation and validation |
 
 ### cryptd (server)
@@ -41,13 +41,16 @@ crypt --addr host:9000                 # connect to remote server
 crypt --scenario unix-catacombs        # auto-start with specific scenario
 crypt --name Gandalf --class mage      # set character name and class
 crypt --session <id>                   # resume a previous session
+crypt --plain                          # readline mode (no TUI)
 ```
 
-Connects to `cryptd serve`, sends natural language text via the `play` JSON-RPC
-method, and renders the game with readline input, HP/MP progress bars, and
-combat enemy lists. Auto-starts the server if the local socket is absent.
-Use `--session` to reconnect to a previous game — the session ID is printed
-to stderr on each connection.
+Connects to `cryptd serve` and sends natural language text via the `play`
+JSON-RPC method. On a TTY, launches a Bubble Tea terminal UI with scrolling
+narration, HP/XP/MP bars, compass exit grid, inventory sidebar, and combat
+overlay with keyboard shortcuts (`a`/`d`/`f`/`u`). Use `--plain` for the
+original readline interface. Auto-starts the server if the local socket is
+absent. Use `--session` to reconnect to a previous game — the session ID is
+printed to stderr on each connection.
 
 ### crypt-admin (author)
 
@@ -122,7 +125,7 @@ linked only into `crypt-admin` — never into `cryptd` or `crypt`.
 | Package | Purpose |
 |---------|---------|
 | `cmd/cryptd` | Server binary: `serve` (with `-f`, `-t`, `--passthrough`), `validate` (deprecated) |
-| `cmd/crypt` | Thin client binary: connects to server, readline + ASCII display |
+| `cmd/crypt` | Thin client binary: connects to server, Bubble Tea TUI + readline fallback |
 | `cmd/crypt-admin` | Author binary: `generate`, `validate`, `export` |
 | `cmd/dump-mcp-schema` | Generates MCP schema JSON for CI contract check |
 | `cmd/eval-slm` | SLM accuracy evaluation harness (65+ inputs, needs ollama) |

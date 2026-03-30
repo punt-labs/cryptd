@@ -1,6 +1,9 @@
 package tui
 
-import "github.com/punt-labs/cryptd/internal/protocol"
+import (
+	"github.com/punt-labs/cryptd/internal/model"
+	"github.com/punt-labs/cryptd/internal/protocol"
+)
 
 // ServerResponseMsg arrives when a JSON-RPC call completes successfully.
 type ServerResponseMsg struct {
@@ -25,4 +28,56 @@ type SendCmdMsg struct {
 // GameStartMsg arrives after a successful game.new response.
 type GameStartMsg struct {
 	Response protocol.PlayResponse
+}
+
+// LoadingMsg signals that a long-running operation (e.g., initial narration
+// generation) has begun and the UI should show a loading indicator.
+type LoadingMsg struct{}
+
+// WelcomeMsg signals that no game is active and the UI should show a welcome
+// message with instructions.
+type WelcomeMsg struct{}
+
+// ScenariosMsg arrives when game.list_scenarios completes.
+type ScenariosMsg struct {
+	Scenarios []protocol.ScenarioInfo
+}
+
+// ScenarioErrMsg arrives when game.list_scenarios fails.
+type ScenarioErrMsg struct {
+	Err error
+}
+
+// SessionsMsg arrives when game.list_sessions completes.
+type SessionsMsg struct {
+	Sessions []protocol.SessionInfo
+}
+
+// SessionErrMsg arrives when game.list_sessions fails.
+type SessionErrMsg struct {
+	Err error
+}
+
+// StartCreationMsg signals a transition from lobby to game creation.
+type StartCreationMsg struct {
+	Scenarios []protocol.ScenarioInfo
+}
+
+// ResumeSessionMsg signals a transition from lobby to game with a saved session.
+type ResumeSessionMsg struct {
+	SessionID string
+}
+
+// SessionInitDoneMsg arrives after a successful session.init for a resumed session.
+type SessionInitDoneMsg struct {
+	SessionID string
+	HasGame   bool
+}
+
+// CreationDoneMsg signals game creation is complete and the game should start.
+type CreationDoneMsg struct {
+	Scenario string
+	Name     string
+	Class    string
+	Stats    *model.Stats
 }

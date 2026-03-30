@@ -38,10 +38,10 @@ func TestNarrationPane(t *testing.T) {
 				})
 			},
 			check: func(t *testing.T, p *NarrationPane) {
-				// First line is the room name, second is the narration.
-				assert.GreaterOrEqual(t, len(p.lines), 2)
-				assert.Contains(t, p.lines[0], "Crypt Entrance")
-				assert.Contains(t, p.lines[1], "A dark corridor.")
+				// Empty line, then room name, then narration text.
+				assert.GreaterOrEqual(t, len(p.lines), 3)
+				assert.Contains(t, p.lines[1], "Crypt Entrance")
+				assert.Contains(t, p.lines[2], "A dark corridor.")
 			},
 		},
 		{

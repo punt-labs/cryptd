@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/punt-labs/cryptd/internal/protocol"
+	"github.com/punt-labs/cryptd/internal/scenariodir"
 )
 
 // handleConnection reads NDJSON requests from r, processes them, and writes
@@ -155,6 +156,12 @@ func (s *Server) handleRequest(req Request, sess **Session) Response {
 				HasGame:         hasGame,
 			},
 		}
+
+	case "game.list_scenarios":
+		return s.handleListScenarios(req)
+
+	case "game.list_sessions":
+		return s.handleListSessions(req)
 
 	case "game.new":
 		s.mu.RLock()
@@ -323,10 +330,39 @@ func (s *Server) handleNewGamePassthrough(req Request, sess *Session) Response {
 	sess.gameID = g.id
 	s.mu.Unlock()
 
+	s.snapshotSessionMeta(sess, g)
+
 	return Response{
 		JSONRPC: "2.0",
 		ID:      req.ID,
 		Result:  result,
+	}
+}
+
+// handleListScenarios returns the available scenarios from the scenario directory.
+func (s *Server) handleListScenarios(req Request) Response {
+	entries, err := scenariodir.ListScenarios(s.scenarioDir)
+	if err != nil {
+		return Response{
+			JSONRPC: "2.0",
+			ID:      req.ID,
+			Error:   &RPCError{Code: CodeInternalError, Message: err.Error()},
+		}
+	}
+
+	scenarios := make([]protocol.ScenarioInfo, len(entries))
+	for i, e := range entries {
+		scenarios[i] = protocol.ScenarioInfo{
+			ID:          e.ID,
+			Title:       e.Title,
+			Description: e.Description,
+		}
+	}
+
+	return Response{
+		JSONRPC: "2.0",
+		ID:      req.ID,
+		Result:  ListScenariosResult{Scenarios: scenarios},
 	}
 }
 

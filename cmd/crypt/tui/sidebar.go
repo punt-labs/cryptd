@@ -27,53 +27,77 @@ func (s SidebarPane) Render(resp *protocol.PlayResponse) string {
 		return ""
 	}
 	hero := resp.State.Party[0]
-	barWidth := s.width - 4 // padding for label + spacing
+	// Inner width available for content (sidebar border + padding eat ~4 chars).
+	innerW := s.width - 4
+	if innerW < 10 {
+		innerW = 10
+	}
 
 	var sections []string
 
-	// HP bar
-	sections = append(sections, formatBar("HP", hero.HP, hero.MaxHP, barWidth,
-		BarStyle(hero.HP, hero.MaxHP)))
-
-	// MP bar (only if MaxMP > 0)
-	if hero.MaxMP > 0 {
-		sections = append(sections, formatBar("MP", hero.MP, hero.MaxMP, barWidth,
-			lipgloss.NewStyle().Foreground(ColorMPBar)))
+	// --- HIT POINTS ---
+	sections = append(sections, SectionHeader("Hit Points"))
+	hpColor := ColorHPHigh
+	if hero.MaxHP > 0 {
+		pct := float64(hero.HP) / float64(hero.MaxHP)
+		if pct <= 0.3 {
+			hpColor = ColorHPLow
+		} else if pct <= 0.6 {
+			hpColor = ColorGold
+		}
 	}
+	sections = append(sections, RenderBar(hero.HP, hero.MaxHP, innerW, hpColor))
 
-	// XP bar
+	// --- EXPERIENCE ---
+	sections = append(sections, SectionHeader("Experience"))
 	if resp.NextLevelXP == 0 {
 		sections = append(sections, fmt.Sprintf("XP %d (MAX)", hero.XP))
 	} else {
-		sections = append(sections, formatBar("XP", hero.XP, resp.NextLevelXP, barWidth,
-			lipgloss.NewStyle().Foreground(ColorXPBar)))
+		sections = append(sections, RenderBar(hero.XP, resp.NextLevelXP, innerW, ColorXPBar))
 	}
 
-	// Compass
+	sections = append(sections, SectionDivider(innerW))
+
+	// --- EXITS ---
+	sections = append(sections, SectionHeader("Exits"))
 	sections = append(sections, renderCompass(resp.Exits))
 
-	// Equipped items
+	sections = append(sections, SectionDivider(innerW))
+
+	// --- EQUIPPED ---
 	equipped := resolveEquipped(hero)
 	if len(equipped) > 0 {
-		lines := []string{StyleSidebarLabel.Render("EQUIPPED")}
+		sections = append(sections, SectionHeader("Equipped"))
 		for _, e := range equipped {
-			lines = append(lines, StyleEquippedItem.Render(e.name)+"  "+StyleEquippedSlot.Render(e.slot))
+			name := StyleEquippedItem.Render(e.name)
+			slot := StyleEquippedSlot.Render(e.slot)
+			// Right-align the slot label.
+			nameLen := lipgloss.Width(name)
+			slotLen := lipgloss.Width(slot)
+			gap := innerW - nameLen - slotLen
+			if gap < 1 {
+				gap = 1
+			}
+			sections = append(sections, name+strings.Repeat(" ", gap)+slot)
 		}
-		sections = append(sections, strings.Join(lines, "\n"))
+		sections = append(sections, SectionDivider(innerW))
 	}
 
-	// Inventory
-	if len(hero.Inventory) > 0 {
-		sections = append(sections, renderInventory(hero, s.height))
+	// --- INVENTORY (non-equipped items only) ---
+	invItems := nonEquippedItems(hero)
+	if len(invItems) > 0 {
+		sections = append(sections, renderInventory(hero, invItems, innerW, s.height))
+		sections = append(sections, SectionDivider(innerW))
 	}
 
-	// Stats
-	sections = append(sections, renderStats(hero.Stats))
+	// --- STATS ---
+	sections = append(sections, renderStats(hero.Stats, innerW))
 
-	return strings.Join(sections, "\n\n")
+	return strings.Join(sections, "\n")
 }
 
 // formatBar renders a bar like: HP 15/20 [████████░░]
+// Kept for backward compatibility with combat overlay and tests.
 func formatBar(label string, cur, max, width int, style lipgloss.Style) string {
 	prefix := fmt.Sprintf("%s %d/%d ", label, cur, max)
 	// Bar width = total width minus prefix and brackets
@@ -113,31 +137,26 @@ var compassDir = map[string][2]int{
 
 // compassLabel maps direction strings to their display abbreviation.
 var compassLabel = map[string]string{
-	"north":     "N",
-	"south":     "S",
-	"east":      "E",
-	"west":      "W",
-	"northeast": "NE",
-	"ne":        "NE",
-	"northwest": "NW",
-	"nw":        "NW",
-	"southeast": "SE",
-	"se":        "SE",
-	"southwest": "SW",
-	"sw":        "SW",
+	"north":     " N ",
+	"south":     " S ",
+	"east":      " E ",
+	"west":      " W ",
+	"northeast": "NE ",
+	"ne":        "NE ",
+	"northwest": "NW ",
+	"nw":        "NW ",
+	"southeast": "SE ",
+	"se":        "SE ",
+	"southwest": "SW ",
+	"sw":        "SW ",
 }
 
 func renderCompass(exits []string) string {
-	// Build a 3x3 grid, center is always dot
-	var grid [3][3]string
-	for r := 0; r < 3; r++ {
-		for c := 0; c < 3; c++ {
-			grid[r][c] = StyleCompassInactive.Render(fmt.Sprintf("%-4s", "·"))
-		}
-	}
-	grid[1][1] = StyleCompassInactive.Render(fmt.Sprintf("%-4s", "·"))
+	// Cell width for each compass cell.
+	cellW := 5
+	cellH := 1
 
-	// Mark active exits
+	// Mark active exits.
 	active := make(map[[2]int]string)
 	for _, exit := range exits {
 		lower := strings.ToLower(exit)
@@ -145,15 +164,45 @@ func renderCompass(exits []string) string {
 			active[pos] = compassLabel[lower]
 		}
 	}
-	for pos, label := range active {
-		grid[pos[0]][pos[1]] = StyleCompassActive.Render(fmt.Sprintf("%-4s", label))
+
+	// Render each cell.
+	var grid [3][3]string
+	for r := 0; r < 3; r++ {
+		for c := 0; c < 3; c++ {
+			pos := [2]int{r, c}
+			if label, ok := active[pos]; ok {
+				grid[r][c] = StyleExitActive.
+					Width(cellW).
+					Height(cellH).
+					Render(label)
+			} else if r == 1 && c == 1 {
+				// Center dot.
+				grid[r][c] = StyleExitInactive.
+					Width(cellW).
+					Height(cellH).
+					Render(" * ")
+			} else {
+				// Empty cell — show dim direction hint.
+				hints := map[[2]int]string{
+					{0, 0}: "   ", {0, 1}: " N ", {0, 2}: "   ",
+					{1, 0}: " W ", {1, 2}: " E ",
+					{2, 0}: "   ", {2, 1}: " S ", {2, 2}: "   ",
+				}
+				hint := hints[pos]
+				grid[r][c] = StyleExitInactive.
+					Width(cellW).
+					Height(cellH).
+					Render(hint)
+			}
+		}
 	}
 
 	var rows []string
 	for r := 0; r < 3; r++ {
-		rows = append(rows, grid[r][0]+" "+grid[r][1]+" "+grid[r][2])
+		rows = append(rows,
+			lipgloss.JoinHorizontal(lipgloss.Center, grid[r][0], grid[r][1], grid[r][2]))
 	}
-	return strings.Join(rows, "\n")
+	return lipgloss.JoinVertical(lipgloss.Center, rows...)
 }
 
 type equippedEntry struct {
@@ -193,8 +242,25 @@ func resolveEquipped(hero model.Character) []equippedEntry {
 	return entries
 }
 
-func renderInventory(hero model.Character, maxHeight int) string {
-	lines := []string{StyleSidebarLabel.Render("INVENTORY")}
+// nonEquippedItems returns inventory items that are not currently equipped.
+func nonEquippedItems(hero model.Character) []model.Item {
+	equippedIDs := map[string]bool{
+		hero.Equipped.Weapon: true,
+		hero.Equipped.Armor:  true,
+		hero.Equipped.Ring:   true,
+		hero.Equipped.Amulet: true,
+	}
+	var items []model.Item
+	for _, item := range hero.Inventory {
+		if !equippedIDs[item.ID] {
+			items = append(items, item)
+		}
+	}
+	return items
+}
+
+func renderInventory(hero model.Character, items []model.Item, innerW, maxHeight int) string {
+	lines := []string{SectionHeader("Inventory")}
 
 	// Reserve lines for weight summary + possible truncation indicator
 	available := maxHeight - 10 // rough budget for other sections
@@ -207,7 +273,7 @@ func renderInventory(hero model.Character, maxHeight int) string {
 		totalWeight += item.Weight
 	}
 
-	shown := hero.Inventory
+	shown := items
 	truncated := 0
 	if len(shown) > available {
 		truncated = len(shown) - available
@@ -215,8 +281,15 @@ func renderInventory(hero model.Character, maxHeight int) string {
 	}
 
 	for _, item := range shown {
-		lines = append(lines,
-			StyleInventoryItem.Render(fmt.Sprintf("%-16s %4.1f", item.Name, item.Weight)))
+		name := StyleInventoryItem.Render(item.Name)
+		weight := StyleEquippedSlot.Render(fmt.Sprintf("%.1f lb", item.Weight))
+		nameLen := lipgloss.Width(name)
+		weightLen := lipgloss.Width(weight)
+		gap := innerW - nameLen - weightLen
+		if gap < 1 {
+			gap = 1
+		}
+		lines = append(lines, name+strings.Repeat(" ", gap)+weight)
 	}
 	if truncated > 0 {
 		lines = append(lines, StyleSystem.Render(fmt.Sprintf("...+%d more", truncated)))
@@ -227,20 +300,28 @@ func renderInventory(hero model.Character, maxHeight int) string {
 	return strings.Join(lines, "\n")
 }
 
-func renderStats(stats model.Stats) string {
-	lines := []string{StyleSidebarLabel.Render("STATS")}
+func renderStats(stats model.Stats, innerW int) string {
+	lines := []string{SectionHeader("Stats")}
 	pairs := [][2]struct {
 		label string
 		val   int
 	}{
-		{{" STR", stats.STR}, {"  INT", stats.INT}},
-		{{" DEX", stats.DEX}, {"  WIS", stats.WIS}},
-		{{" CON", stats.CON}, {"  CHA", stats.CHA}},
+		{{"STR", stats.STR}, {"INT", stats.INT}},
+		{{"DEX", stats.DEX}, {"WIS", stats.WIS}},
+		{{"CON", stats.CON}, {"CHA", stats.CHA}},
+	}
+	colW := innerW / 2
+	if colW < 8 {
+		colW = 8
 	}
 	for _, row := range pairs {
-		left := StyleStatLabel.Render(row[0].label) + " " + StyleStatValue.Render(fmt.Sprintf("%-4d", row[0].val))
+		left := StyleStatLabel.Render(row[0].label) + " " + StyleStatValue.Render(fmt.Sprintf("%d", row[0].val))
 		right := StyleStatLabel.Render(row[1].label) + " " + StyleStatValue.Render(fmt.Sprintf("%d", row[1].val))
-		lines = append(lines, left+right)
+		leftPad := colW - lipgloss.Width(left)
+		if leftPad < 1 {
+			leftPad = 1
+		}
+		lines = append(lines, left+strings.Repeat(" ", leftPad)+right)
 	}
 	return strings.Join(lines, "\n")
 }

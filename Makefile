@@ -13,6 +13,9 @@ PREFIX       = /usr/local
 BINDIR       = $(PREFIX)/bin
 MANDIR       = $(PREFIX)/share/man/man1
 
+##@ Default
+all: build check                           ## Build binaries and run quality gate (default)
+
 ##@ Quality Gates
 check: vet test lint markdownlint          ## Quick gate (before every commit)
 check-full: vet test test-integration coverage lint markdownlint build test-e2e  ## Full gate (before PR)

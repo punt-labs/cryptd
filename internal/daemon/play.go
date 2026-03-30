@@ -78,6 +78,8 @@ func (s *Server) handleNewGamePlay(req Request, sess **Session) Response {
 	(*sess).gameID = g.id
 	s.mu.Unlock()
 
+	s.snapshotSessionMeta(*sess, g)
+
 	// Get the look result and state copy from inside the game goroutine.
 	var lookResult engine.LookResult
 	var stateCopy model.GameState

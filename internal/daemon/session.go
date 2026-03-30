@@ -15,6 +15,23 @@ type Session struct {
 	id          string
 	gameID      string // empty until new_game
 	passthrough bool   // true = structured JSON responses, false = interpreted + narrated text
+
+	// Metadata snapshot, populated after game.new succeeds.
+	// Updated via updateMeta; read under Server.mu.RLock.
+	scenarioID     string
+	characterName  string
+	characterClass string
+	level          int
+	roomName       string
+}
+
+// updateMeta snapshots game metadata onto the session. Caller must hold Server.mu.
+func (s *Session) updateMeta(scenarioID, charName, charClass, room string, level int) {
+	s.scenarioID = scenarioID
+	s.characterName = charName
+	s.characterClass = charClass
+	s.roomName = room
+	s.level = level
 }
 
 // maxSessionIDLen is the maximum length for a client-provided session ID.
