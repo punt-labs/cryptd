@@ -34,3 +34,30 @@ type LoadingMsg struct{}
 // WelcomeMsg signals that no game is active and the UI should show a welcome
 // message with instructions.
 type WelcomeMsg struct{}
+
+// ScenariosMsg arrives when game.list_scenarios completes.
+type ScenariosMsg struct {
+	Scenarios []protocol.ScenarioInfo
+}
+
+// SessionsMsg arrives when game.list_sessions completes.
+type SessionsMsg struct {
+	Sessions []protocol.SessionInfo
+}
+
+// StartCreationMsg signals a transition from lobby to game creation.
+type StartCreationMsg struct {
+	Scenarios []protocol.ScenarioInfo
+}
+
+// ResumeSessionMsg signals a transition from lobby to game with a saved session.
+type ResumeSessionMsg struct {
+	SessionID string
+}
+
+// CreationDoneMsg signals game creation is complete and the game should start.
+type CreationDoneMsg struct {
+	Scenario  string
+	Name      string
+	Class     string
+}

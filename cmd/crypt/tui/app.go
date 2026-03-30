@@ -9,6 +9,15 @@ import (
 	"github.com/punt-labs/cryptd/internal/protocol"
 )
 
+// appState tracks which top-level screen is active.
+type appState int
+
+const (
+	stateLobby    appState = iota
+	stateCreation
+	stateGame
+)
+
 // App is the top-level Bubble Tea model. It composes the four leaf components
 // and routes all messages.
 type App struct {
@@ -19,6 +28,10 @@ type App struct {
 	charClass string
 
 	initialResp *protocol.PlayResponse
+
+	state    appState
+	lobby    Lobby
+	creation GameCreation
 
 	width, height int
 	narrWidth     int
@@ -39,7 +52,13 @@ type App struct {
 // NewApp creates an App wired to the given RPC send function.
 // If initialResp is non-nil (session resume), Init() will use it directly
 // instead of making a network call.
+// When scenario and sessionID are both empty, the app starts in lobby mode.
 func NewApp(send SendFn, sessionID, scenario, charName, charClass string, initialResp *protocol.PlayResponse) App {
+	startState := stateGame
+	if scenario == "" && sessionID == "" && initialResp == nil {
+		startState = stateLobby
+	}
+
 	return App{
 		send:        send,
 		sessionID:   sessionID,
@@ -47,6 +66,8 @@ func NewApp(send SendFn, sessionID, scenario, charName, charClass string, initia
 		charName:    charName,
 		charClass:   charClass,
 		initialResp: initialResp,
+		state:       startState,
+		lobby:       NewLobby(send),
 		narration:   NewNarrationPane(80, 20),
 		sidebar:     NewSidebarPane(SidebarWidth, 20),
 		combat:      NewCombatOverlay(80),
@@ -56,8 +77,11 @@ func NewApp(send SendFn, sessionID, scenario, charName, charClass string, initia
 
 // Init returns the initial command. For resumed sessions, it produces a
 // GameStartMsg from the pre-fetched response. For new games with a scenario,
-// it sends game.new. Otherwise it returns nil.
+// it sends game.new. For lobby mode, it fetches scenarios and sessions.
 func (a App) Init() tea.Cmd {
+	if a.state == stateLobby {
+		return a.lobby.Init()
+	}
 	if a.initialResp != nil {
 		resp := *a.initialResp
 		return func() tea.Msg { return GameStartMsg{Response: resp} }
@@ -71,17 +95,21 @@ func (a App) Init() tea.Cmd {
 	return func() tea.Msg { return WelcomeMsg{} }
 }
 
-// Update routes messages to sub-components.
+// Update routes messages to sub-components based on current state.
 func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
+	// WindowSizeMsg goes to all states.
+	if wsm, ok := msg.(tea.WindowSizeMsg); ok {
+		a.width = wsm.Width
+		a.height = wsm.Height
+		a.lobby.width = wsm.Width
+		a.lobby.height = wsm.Height
+		a.creation.width = wsm.Width
+		a.creation.height = wsm.Height
 
-	case tea.WindowSizeMsg:
-		a.width = msg.Width
-		a.height = msg.Height
-		// Sidebar gets SidebarWidth + border/padding (~4). Narration gets the rest.
+		// Game layout calculations.
 		sidebarTotal := SidebarWidth + 4
 		a.narrWidth = max(a.width-sidebarTotal-1, 10)
-		a.mainHeight = max(a.height-4, 1) // header(1) + border overhead + input(1)
+		a.mainHeight = max(a.height-4, 1)
 		a.narration.SetSize(a.narrWidth, a.mainHeight)
 		a.sidebar = NewSidebarPane(SidebarWidth, a.mainHeight)
 		a.combat = NewCombatOverlay(a.narrWidth)
@@ -92,6 +120,72 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var inputCmd tea.Cmd
 		a.input, inputCmd = a.input.Update(msg)
 		return &a, tea.Batch(cmd, inputCmd)
+	}
+
+	switch a.state {
+	case stateLobby:
+		return a.updateLobby(msg)
+	case stateCreation:
+		return a.updateCreation(msg)
+	case stateGame:
+		return a.updateGame(msg)
+	}
+	return &a, nil
+}
+
+// updateLobby handles messages while in lobby state.
+func (a App) updateLobby(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case StartCreationMsg:
+		a.state = stateCreation
+		a.creation = NewGameCreation(a.send, msg.Scenarios)
+		return &a, a.creation.Init()
+
+	case ResumeSessionMsg:
+		// Transition to game state with the selected session.
+		a.state = stateGame
+		a.sessionID = msg.SessionID
+		// The session is already initialized on the server side from
+		// the session.init handshake. We need to start a new game.new
+		// or just send a "look" to get the current state.
+		a.waiting = true
+		a.input.SetWaiting(true)
+		return &a, PlayCmd(a.send, "look")
+	}
+
+	var cmd tea.Cmd
+	a.lobby, cmd = a.lobby.Update(msg)
+	return &a, cmd
+}
+
+// updateCreation handles messages while in creation state.
+func (a App) updateCreation(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case CreationDoneMsg:
+		a.state = stateGame
+		a.scenario = msg.Scenario
+		a.charName = msg.Name
+		a.charClass = msg.Class
+		a.waiting = true
+		a.input.SetWaiting(true)
+		a.narration.AppendText("Starting game...", StyleSystem)
+		return &a, NewGameCmd(a.send, msg.Scenario, msg.Name, msg.Class)
+	}
+
+	// Handle esc at first step to go back to lobby.
+	if km, ok := msg.(tea.KeyMsg); ok && km.Type == tea.KeyEscape && a.creation.step == stepScenario {
+		a.state = stateLobby
+		return &a, nil
+	}
+
+	var cmd tea.Cmd
+	a.creation, cmd = a.creation.Update(msg)
+	return &a, cmd
+}
+
+// updateGame handles messages while in game state (existing behavior).
+func (a App) updateGame(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
 
 	case GameStartMsg:
 		resp := msg.Response
@@ -243,12 +337,25 @@ func (a App) combatActive() bool {
 		a.lastResp.State.Dungeon.Combat.Active
 }
 
-// View renders the full TUI layout.
+// View renders the full TUI layout based on current state.
 func (a App) View() string {
 	if a.quitting {
 		return ""
 	}
 
+	switch a.state {
+	case stateLobby:
+		return a.lobby.View()
+	case stateCreation:
+		return a.creation.View()
+	case stateGame:
+		return a.viewGame()
+	}
+	return ""
+}
+
+// viewGame renders the game screen (narration + sidebar + input).
+func (a App) viewGame() string {
 	// Header.
 	header := a.renderHeader()
 
@@ -289,7 +396,7 @@ func (a App) renderHeader() string {
 	left := fmt.Sprintf("%s %s %s",
 		StyleCharName.Render(hero.Name),
 		StyleCharClass.Render("the "+hero.Class),
-		StyleLevelXP.Render(fmt.Sprintf("· Lv %d · %d XP", hero.Level, hero.XP)),
+		StyleLevelXP.Render(fmt.Sprintf("Lv %d  %d XP", hero.Level, hero.XP)),
 	)
 	right := StyleSessionID.Render("session " + a.sessionID)
 

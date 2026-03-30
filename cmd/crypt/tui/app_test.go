@@ -347,3 +347,82 @@ func TestAppSessionResume(t *testing.T) {
 	assert.Equal(t, "Thorn", appPtr.lastResp.State.Party[0].Name)
 	assert.Nil(t, cmd)
 }
+
+func TestAppStateMachine_LobbyStart(t *testing.T) {
+	a := NewApp(mockSend(`{}`), "", "", "", "", nil)
+	assert.Equal(t, stateLobby, a.state, "empty scenario+session should start in lobby")
+}
+
+func TestAppStateMachine_GameStartWithScenario(t *testing.T) {
+	a := NewApp(mockSend(`{}`), "", "dungeon", "Thorn", "fighter", nil)
+	assert.Equal(t, stateGame, a.state, "scenario should start in game")
+}
+
+func TestAppStateMachine_GameStartWithSession(t *testing.T) {
+	a := NewApp(mockSend(`{}`), "sess-1", "", "", "", nil)
+	assert.Equal(t, stateGame, a.state, "session should start in game")
+}
+
+func TestAppStateMachine_GameStartWithInitialResp(t *testing.T) {
+	resp := testPlayResponse()
+	a := NewApp(mockSend(`{}`), "", "", "", "", &resp)
+	assert.Equal(t, stateGame, a.state, "initialResp should start in game")
+}
+
+func TestAppStateMachine_LobbyToCreation(t *testing.T) {
+	a := NewApp(mockSend(`{}`), "", "", "", "", nil)
+	scenarios := []protocol.ScenarioInfo{
+		{ID: "dungeon", Title: "The Dungeon"},
+	}
+	result, _ := a.Update(StartCreationMsg{Scenarios: scenarios})
+	appPtr := result.(*App)
+	assert.Equal(t, stateCreation, appPtr.state)
+	assert.Len(t, appPtr.creation.scenarios, 1)
+}
+
+func TestAppStateMachine_CreationToGame(t *testing.T) {
+	a := NewApp(mockSend(`{}`), "", "", "", "", nil)
+	a.state = stateCreation
+	a.creation = NewGameCreation(mockSend(`{}`), []protocol.ScenarioInfo{
+		{ID: "dungeon", Title: "The Dungeon"},
+	})
+
+	result, cmd := a.Update(CreationDoneMsg{
+		Scenario: "dungeon",
+		Name:     "Thorn",
+		Class:    "fighter",
+	})
+	appPtr := result.(*App)
+	assert.Equal(t, stateGame, appPtr.state)
+	assert.Equal(t, "dungeon", appPtr.scenario)
+	assert.Equal(t, "Thorn", appPtr.charName)
+	assert.Equal(t, "fighter", appPtr.charClass)
+	assert.True(t, appPtr.waiting)
+	assert.NotNil(t, cmd, "should produce NewGameCmd")
+}
+
+func TestAppStateMachine_LobbyViewRendersLobby(t *testing.T) {
+	a := NewApp(mockSend(`{}`), "", "", "", "", nil)
+	a.width = 80
+	a.height = 30
+	a.lobby.width = 80
+	a.lobby.height = 30
+	a.lobby.loadingScen = false
+	a.lobby.loadingSess = false
+
+	v := a.View()
+	assert.Contains(t, v, "CRYPT")
+	assert.Contains(t, v, "New Game")
+}
+
+func TestAppStateMachine_CreationEscToLobby(t *testing.T) {
+	a := NewApp(mockSend(`{}`), "", "", "", "", nil)
+	a.state = stateCreation
+	a.creation = NewGameCreation(mockSend(`{}`), []protocol.ScenarioInfo{
+		{ID: "dungeon", Title: "The Dungeon"},
+	})
+	// At stepScenario, esc should go back to lobby.
+	result, _ := a.Update(tea.KeyMsg{Type: tea.KeyEscape})
+	appPtr := result.(*App)
+	assert.Equal(t, stateLobby, appPtr.state)
+}

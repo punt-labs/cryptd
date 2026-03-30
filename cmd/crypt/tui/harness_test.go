@@ -9,6 +9,58 @@ import (
 	"github.com/punt-labs/cryptd/internal/protocol"
 )
 
+// TestRenderLobbyHarness renders the lobby screen for visual inspection.
+func TestRenderLobbyHarness(t *testing.T) {
+	app := NewApp(nil, "", "", "", "", nil)
+	app.width = 120
+	app.height = 40
+	app.lobby.width = 120
+	app.lobby.height = 40
+	app.lobby.loadingScen = false
+	app.lobby.loadingSess = false
+	app.lobby.scenarios = []protocol.ScenarioInfo{
+		{ID: "dungeon", Title: "The Dungeon of Doom", Description: "A classic dungeon crawl through the depths."},
+		{ID: "forest", Title: "The Darkwood", Description: "Lost in a cursed forest, find your way out alive."},
+		{ID: "castle", Title: "Castle Cryptborne", Description: "Siege the undead lord's fortress."},
+	}
+	app.lobby.sessions = []protocol.SessionInfo{
+		{ID: "s1", CharacterName: "Thorn", CharacterClass: "fighter", Level: 3, RoomName: "Entry Hall"},
+		{ID: "s2", CharacterName: "Wisp", CharacterClass: "mage", Level: 1, RoomName: "Clearing"},
+	}
+
+	output := app.View()
+	fmt.Println("\n--- LOBBY ---\n" + output + "\n--- END ---")
+}
+
+// TestRenderCreationHarness renders the creation screen for visual inspection.
+func TestRenderCreationHarness(t *testing.T) {
+	scenarios := []protocol.ScenarioInfo{
+		{ID: "dungeon", Title: "The Dungeon of Doom", Description: "A classic dungeon crawl."},
+		{ID: "forest", Title: "The Darkwood", Description: "Lost in a cursed forest."},
+	}
+	creation := NewGameCreation(nil, scenarios)
+	creation.width = 120
+	creation.height = 40
+
+	// Scenario step.
+	fmt.Println("\n--- CREATION: SCENARIO ---")
+	fmt.Println(creation.View())
+
+	// Class step.
+	creation.step = stepClass
+	creation.classIndex = 1
+	fmt.Println("\n--- CREATION: CLASS ---")
+	fmt.Println(creation.View())
+
+	// Stats step.
+	creation.step = stepStats
+	creation.statPoints = [6]int{4, 2, 2, 0, 0, 0}
+	creation.statIndex = 2
+	fmt.Println("\n--- CREATION: STATS ---")
+	fmt.Println(creation.View())
+	fmt.Println("--- END ---")
+}
+
 // TestRenderHarness instantiates the App with rich mock game state and prints
 // View() output so we can visually iterate on TUI layout.
 func TestRenderHarness(t *testing.T) {

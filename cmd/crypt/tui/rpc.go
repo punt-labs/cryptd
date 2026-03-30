@@ -56,3 +56,39 @@ func NewGameCmd(send SendFn, scenario, name, class string) tea.Cmd {
 	}
 }
 
+// ListScenariosCmd returns a tea.Cmd that sends game.list_scenarios.
+func ListScenariosCmd(send SendFn) tea.Cmd {
+	return func() tea.Msg {
+		result, err := send("game.list_scenarios", nil)
+		if err != nil {
+			if errors.Is(err, ErrConnLost) {
+				return ConnLostMsg{Err: err}
+			}
+			return ServerErrMsg{Err: err}
+		}
+		var resp protocol.ListScenariosResult
+		if err := json.Unmarshal(result, &resp); err != nil {
+			return ServerErrMsg{Err: fmt.Errorf("parse list_scenarios response: %w", err)}
+		}
+		return ScenariosMsg{Scenarios: resp.Scenarios}
+	}
+}
+
+// ListSessionsCmd returns a tea.Cmd that sends game.list_sessions.
+func ListSessionsCmd(send SendFn) tea.Cmd {
+	return func() tea.Msg {
+		result, err := send("game.list_sessions", nil)
+		if err != nil {
+			if errors.Is(err, ErrConnLost) {
+				return ConnLostMsg{Err: err}
+			}
+			return ServerErrMsg{Err: err}
+		}
+		var resp protocol.ListSessionsResult
+		if err := json.Unmarshal(result, &resp); err != nil {
+			return ServerErrMsg{Err: fmt.Errorf("parse list_sessions response: %w", err)}
+		}
+		return SessionsMsg{Sessions: resp.Sessions}
+	}
+}
+

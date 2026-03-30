@@ -119,6 +119,94 @@ var (
 	StyleStatValue     = lipgloss.NewStyle().Foreground(lipgloss.Color("#aaaaaa"))
 )
 
+// Lobby and creation screen colors.
+var (
+	ColorLobbyBg       = lipgloss.Color("#0a0a0a")
+	ColorMenuSelected  = ColorGold
+	ColorMenuNormal    = lipgloss.Color("#777777")
+	ColorMenuDim       = lipgloss.Color("#444444")
+	ColorCreationTitle = ColorGold
+	ColorStepActive    = ColorGold
+	ColorStepDone      = ColorGreen
+	ColorStepPending   = lipgloss.Color("#444444")
+)
+
+// Lobby styles.
+var (
+	StyleLobbyTitle = lipgloss.NewStyle().
+			Foreground(ColorGold).
+			Bold(true)
+
+	StyleLobbySubtitle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#666666")).
+				Italic(true)
+
+	StyleMenuSelected = lipgloss.NewStyle().
+				Foreground(ColorMenuSelected).
+				Bold(true)
+
+	StyleMenuNormal = lipgloss.NewStyle().
+			Foreground(ColorMenuNormal)
+
+	StyleMenuDim = lipgloss.NewStyle().
+			Foreground(ColorMenuDim)
+
+	StyleLobbyBox = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(ColorBorder).
+			Padding(1, 3)
+
+	StyleSessionItem = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#b0b0b0"))
+
+	StyleSessionDetail = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#666666"))
+)
+
+// Creation screen styles.
+var (
+	StyleCreationHeader = lipgloss.NewStyle().
+				Foreground(ColorCreationTitle).
+				Bold(true)
+
+	StyleCreationBox = lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(ColorBorder).
+				Padding(1, 3)
+
+	StyleStepActive = lipgloss.NewStyle().
+			Foreground(ColorStepActive).
+			Bold(true)
+
+	StyleStepDone = lipgloss.NewStyle().
+			Foreground(ColorStepDone)
+
+	StyleStepPending = lipgloss.NewStyle().
+				Foreground(ColorStepPending)
+
+	StyleClassTitle = lipgloss.NewStyle().
+			Foreground(ColorGold).
+			Bold(true)
+
+	StyleClassDesc = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#888888"))
+
+	StyleStatName = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#aaaaaa")).
+			Bold(true).
+			Width(4)
+
+	StyleStatBar = lipgloss.NewStyle().
+			Foreground(ColorGold)
+
+	StyleStatPoints = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#888888"))
+
+	StyleCreationHint = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#555555")).
+				Italic(true)
+)
+
 // BarStyle returns the appropriate HP bar color based on percentage.
 func BarStyle(cur, max int) lipgloss.Style {
 	if max <= 0 {
