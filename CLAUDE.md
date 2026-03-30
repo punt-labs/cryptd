@@ -226,13 +226,13 @@ for the full specification.
 
 | File | Contents |
 |------|---------|
-| `DESIGN.md` | Authoritative decision log (DES-001–026) |
-| `docs/build-plan.md` | 14-milestone roadmap with guiding principles and red lines |
-| `docs/plan.md` | Architecture evolution plan: interfaces, engine design, MCP tool surface |
+| `DESIGN.md` | Authoritative decision log (DES-001–028) |
+| `docs/build-plan.md` | 13-milestone roadmap with guiding principles and red lines |
 | `docs/testing.md` | Full test architecture: pyramid, fixture layout, fakes reference, CI config |
 | `docs/distribution.md` | Binary distribution: GitHub Releases, GoReleaser, Homebrew tap, trust tiers |
-| `docs/architecture.tex` / `.pdf` | Technical architecture specification (LaTeX) |
-| `docs/review.md` | Compliance review of predecessor project; gap list still relevant |
+| `docs/architecture.tex` / `.pdf` | Technical architecture specification (LaTeX, v0.4) |
+| `docs/gameplay.tex` / `.pdf` | Gameplay mechanics: combat, leveling, items, balance |
+| `docs/slm-improvement.md` | SLM accuracy improvement strategy for ollama tier |
 
 ## Standards Authority
 
