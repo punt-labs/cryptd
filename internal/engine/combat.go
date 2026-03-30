@@ -88,7 +88,7 @@ func (e *Engine) StartCombat(state *model.GameState) (CombatStartResult, error) 
 	}
 
 	// Check if room is already cleared.
-	rs := e.ensureRoomState(state, roomID)
+	rs := e.EnsureRoomState(state, roomID)
 	if rs.Cleared {
 		return CombatStartResult{}, &NoEnemiesError{}
 	}
@@ -448,7 +448,7 @@ func (e *Engine) advanceTurn(combat *model.CombatState) {
 // endCombat ends combat with a victory: marks room cleared.
 func (e *Engine) endCombat(state *model.GameState) {
 	state.Dungeon.Combat = model.CombatState{}
-	rs := e.ensureRoomState(state, state.Dungeon.CurrentRoom)
+	rs := e.EnsureRoomState(state, state.Dungeon.CurrentRoom)
 	rs.Cleared = true
 	state.Dungeon.RoomState[state.Dungeon.CurrentRoom] = rs
 }

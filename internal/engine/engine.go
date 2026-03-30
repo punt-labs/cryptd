@@ -156,6 +156,9 @@ func New(s *scenario.Spec) *Engine {
 	return &Engine{s: s, Now: time.Now}
 }
 
+// Scenario returns the scenario spec the engine was created with.
+func (e *Engine) Scenario() *scenario.Spec { return e.s }
+
 // NewGame initialises a fresh GameState for the scenario and character.
 // PlayMode is left empty; the composition layer (cmd or game.Loop) sets it.
 // Room items are seeded from the scenario into mutable RoomState.
@@ -224,7 +227,7 @@ func (e *Engine) Move(state *model.GameState, direction string) (MoveResult, err
 	return MoveResult{
 		NewRoom: conn.Room,
 		Exits:   exitList(dest),
-		Items:   e.ensureRoomState(state, conn.Room).Items,
+		Items:   e.EnsureRoomState(state, conn.Room).Items,
 		Enemies: dest.Enemies,
 	}, nil
 }
@@ -235,7 +238,7 @@ func (e *Engine) Look(state *model.GameState) LookResult {
 	if !ok {
 		return LookResult{Room: state.Dungeon.CurrentRoom}
 	}
-	itemIDs := e.ensureRoomState(state, state.Dungeon.CurrentRoom).Items
+	itemIDs := e.EnsureRoomState(state, state.Dungeon.CurrentRoom).Items
 	itemNames := make([]string, len(itemIDs))
 	for i, id := range itemIDs {
 		if it, ok := e.s.Items[id]; ok {
@@ -316,9 +319,9 @@ func containsItem(items []string, itemID string) bool {
 	return false
 }
 
-// ensureRoomState returns the RoomState for the given room, seeding from the
+// EnsureRoomState returns the RoomState for the given room, seeding from the
 // scenario if no entry exists (handles older save files that lack item state).
-func (e *Engine) ensureRoomState(state *model.GameState, roomID string) model.RoomState {
+func (e *Engine) EnsureRoomState(state *model.GameState, roomID string) model.RoomState {
 	if rs, ok := state.Dungeon.RoomState[roomID]; ok {
 		return rs
 	}
@@ -363,7 +366,7 @@ func removeItem(items []string, itemID string) ([]string, bool) {
 
 // PickUp removes an item from the current room and adds it to the character's inventory.
 func (e *Engine) PickUp(state *model.GameState, itemID string) (PickUpResult, error) {
-	rs := e.ensureRoomState(state, state.Dungeon.CurrentRoom)
+	rs := e.EnsureRoomState(state, state.Dungeon.CurrentRoom)
 	if !containsItem(rs.Items, itemID) {
 		return PickUpResult{}, &ItemNotInRoomError{ItemID: itemID}
 	}
@@ -416,7 +419,7 @@ func (e *Engine) Drop(state *model.GameState, itemID string) (DropResult, error)
 	item := char.Inventory[idx]
 	char.Inventory = append(char.Inventory[:idx], char.Inventory[idx+1:]...)
 
-	rs := e.ensureRoomState(state, state.Dungeon.CurrentRoom)
+	rs := e.EnsureRoomState(state, state.Dungeon.CurrentRoom)
 	rs.Items = append(rs.Items, itemID)
 	state.Dungeon.RoomState[state.Dungeon.CurrentRoom] = rs
 
@@ -625,7 +628,7 @@ func (e *Engine) Examine(state *model.GameState, itemID string) (ExamineResult, 
 	}
 
 	// Check room.
-	rs := e.ensureRoomState(state, state.Dungeon.CurrentRoom)
+	rs := e.EnsureRoomState(state, state.Dungeon.CurrentRoom)
 	for _, id := range rs.Items {
 		if id == itemID {
 			si, ok := e.s.Items[id]
