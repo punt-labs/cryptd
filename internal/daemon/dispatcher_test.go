@@ -156,6 +156,38 @@ func TestInitialize(t *testing.T) {
 	assert.NotEmpty(t, init.ProtocolVersion)
 }
 
+func TestListScenarios(t *testing.T) {
+	srv := testServer(t)
+	// game.list_scenarios works without a session — send session.init first
+	// (required by our handler routing), then list_scenarios.
+	reqs := []Request{
+		initRequest(0),
+		{JSONRPC: "2.0", ID: json.RawMessage(`1`), Method: "game.list_scenarios"},
+	}
+	resps := multiRoundTrip(t, srv, reqs)
+	require.Len(t, resps, 2)
+	require.Nil(t, resps[1].Error)
+
+	data, err := json.Marshal(resps[1].Result)
+	require.NoError(t, err)
+	var result ListScenariosResult
+	require.NoError(t, json.Unmarshal(data, &result))
+
+	// Should contain at least "minimal".
+	var ids []string
+	for _, s := range result.Scenarios {
+		ids = append(ids, s.ID)
+	}
+	assert.Contains(t, ids, "minimal")
+
+	// Verify "minimal" has the correct title.
+	for _, s := range result.Scenarios {
+		if s.ID == "minimal" {
+			assert.Equal(t, "Minimal Dungeon", s.Title)
+		}
+	}
+}
+
 func TestNewGame(t *testing.T) {
 	srv := testServer(t)
 	reqs := []Request{

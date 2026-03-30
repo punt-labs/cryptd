@@ -4,8 +4,9 @@ package scenario
 // Field names match the DES-016 YAML schema.
 type Spec struct {
 	// ID is derived from the filename (without extension).
-	ID    string
-	Title string `yaml:"title"`
+	ID          string
+	Title       string `yaml:"title"`
+	Description string `yaml:"description,omitempty"`
 	// StartingRoom is the key of the room where the adventure begins.
 	StartingRoom string                       `yaml:"starting_room"`
 	Death        string                       `yaml:"death"` // permadeath|respawn

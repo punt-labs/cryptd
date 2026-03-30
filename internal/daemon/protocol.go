@@ -16,8 +16,12 @@ type (
 	PlayRequest      = protocol.PlayRequest
 	PlayResponse     = protocol.PlayResponse
 	InitializeParams = protocol.InitializeParams
-	InitializeResult = protocol.InitializeResult
-	ServerInfo       = protocol.ServerInfo
+	InitializeResult    = protocol.InitializeResult
+	ServerInfo          = protocol.ServerInfo
+	ScenarioInfo        = protocol.ScenarioInfo
+	ListScenariosResult = protocol.ListScenariosResult
+	SessionInfo         = protocol.SessionInfo
+	ListSessionsResult  = protocol.ListSessionsResult
 )
 
 // DefaultSocketPath re-exports protocol.DefaultSocketPath.

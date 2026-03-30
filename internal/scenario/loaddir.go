@@ -12,6 +12,7 @@ import (
 // dirManifest is the top-level scenario.yaml for directory-format scenarios.
 type dirManifest struct {
 	Title        string                       `yaml:"title"`
+	Description  string                       `yaml:"description,omitempty"`
 	StartingRoom string                       `yaml:"starting_room"`
 	Death        string                       `yaml:"death"`
 	Regions      []string                     `yaml:"regions"`
@@ -42,6 +43,7 @@ func LoadDir(dir string) (*Spec, error) {
 	s := &Spec{
 		ID:           filepath.Base(dir),
 		Title:        m.Title,
+		Description:  m.Description,
 		StartingRoom: m.StartingRoom,
 		Death:        m.Death,
 		Rooms:        make(map[string]*Room),

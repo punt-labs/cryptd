@@ -84,3 +84,30 @@ type ServerInfo struct {
 	Name    string `json:"name"`
 	Version string `json:"version"`
 }
+
+// ScenarioInfo describes a single available scenario for the client.
+type ScenarioInfo struct {
+	ID          string `json:"id"`
+	Title       string `json:"title"`
+	Description string `json:"description,omitempty"`
+}
+
+// ListScenariosResult is the result of the game.list_scenarios method.
+type ListScenariosResult struct {
+	Scenarios []ScenarioInfo `json:"scenarios"`
+}
+
+// SessionInfo describes one active game session for the lobby screen.
+type SessionInfo struct {
+	ID             string `json:"id"`
+	ScenarioID     string `json:"scenario_id,omitempty"`
+	CharacterName  string `json:"character_name,omitempty"`
+	CharacterClass string `json:"character_class,omitempty"`
+	Level          int    `json:"level,omitempty"`
+	RoomName       string `json:"room_name,omitempty"`
+}
+
+// ListSessionsResult is the result of the game.list_sessions method.
+type ListSessionsResult struct {
+	Sessions []SessionInfo `json:"sessions"`
+}
