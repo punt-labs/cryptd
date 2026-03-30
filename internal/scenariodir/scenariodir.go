@@ -75,11 +75,12 @@ func ListScenarios(scenarioDir string) ([]ScenarioInfo, error) {
 	for _, e := range entries {
 		name := e.Name()
 
+		// Reject names that would be invalid scenario IDs (same rules as Load).
+		if strings.ContainsAny(name, `/\`) || strings.Contains(name, "..") || filepath.VolumeName(name) != "" {
+			continue
+		}
+
 		if e.IsDir() {
-			// Skip known test-fixture directories.
-			if name == "invalid" {
-				continue
-			}
 			meta, ok := readDirMeta(filepath.Join(scenarioDir, name))
 			if !ok {
 				continue

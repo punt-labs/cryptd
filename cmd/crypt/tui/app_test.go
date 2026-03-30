@@ -93,23 +93,22 @@ func TestApp(t *testing.T) {
 			},
 		},
 		{
-			name: "Init without scenario or initialResp returns WelcomeMsg cmd",
+			name: "Init without scenario or initialResp starts lobby",
 			setup: func() App {
 				return NewApp(mockSend(`{}`), "sess-42", "", "Thorn", "fighter", nil)
 			},
 			msg: nil,
 			check: func(t *testing.T, a *App, cmd tea.Cmd) {
+				assert.Equal(t, stateLobby, a.state, "should start in lobby mode")
 				initCmd := a.Init()
-				require.NotNil(t, initCmd, "should return cmd that produces WelcomeMsg")
-				msg := initCmd()
-				_, ok := msg.(WelcomeMsg)
-				assert.True(t, ok, "expected WelcomeMsg, got %T", msg)
+				require.NotNil(t, initCmd, "should return lobby Init cmd")
 			},
 		},
 		{
 			name: "ServerResponseMsg updates state",
 			setup: func() App {
 				a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter", nil)
+				a.state = stateGame
 				a.waiting = true
 				return a
 			},
@@ -125,6 +124,7 @@ func TestApp(t *testing.T) {
 			name: "combat hotkey a dispatches attack",
 			setup: func() App {
 				a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter", nil)
+				a.state = stateGame
 				resp := combatPlayResponse()
 				a.lastResp = &resp
 				a.input.Blur() // hotkey mode
@@ -143,6 +143,7 @@ func TestApp(t *testing.T) {
 			name: "combat hotkey ignored when input focused",
 			setup: func() App {
 				a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter", nil)
+				a.state = stateGame
 				resp := combatPlayResponse()
 				a.lastResp = &resp
 				// input starts focused by default
@@ -166,6 +167,7 @@ func TestApp(t *testing.T) {
 			name: "dead state: enter quits",
 			setup: func() App {
 				a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter", nil)
+				a.state = stateGame
 				a.dead = true
 				return a
 			},
@@ -182,6 +184,7 @@ func TestApp(t *testing.T) {
 			name: "dead state: random key does not quit",
 			setup: func() App {
 				a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter", nil)
+				a.state = stateGame
 				a.dead = true
 				return a
 			},
@@ -193,7 +196,9 @@ func TestApp(t *testing.T) {
 		{
 			name: "SendCmdMsg sets waiting",
 			setup: func() App {
-				return NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter", nil)
+				a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter", nil)
+				a.state = stateGame
+				return a
 			},
 			msg: SendCmdMsg{Text: "look"},
 			check: func(t *testing.T, a *App, cmd tea.Cmd) {
@@ -205,6 +210,7 @@ func TestApp(t *testing.T) {
 			name: "SendCmdMsg ignored when dead",
 			setup: func() App {
 				a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter", nil)
+				a.state = stateGame
 				a.dead = true
 				return a
 			},
@@ -218,6 +224,7 @@ func TestApp(t *testing.T) {
 			name: "SendCmdMsg ignored when already waiting",
 			setup: func() App {
 				a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter", nil)
+				a.state = stateGame
 				a.waiting = true
 				return a
 			},
@@ -256,6 +263,7 @@ func TestAppGameStartMsg(t *testing.T) {
 
 func TestAppServerErrMsg(t *testing.T) {
 	a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter", nil)
+	a.state = stateGame
 	a.waiting = true
 	result, _ := a.Update(ServerErrMsg{Err: assert.AnError})
 	appPtr := result.(*App)
@@ -264,6 +272,7 @@ func TestAppServerErrMsg(t *testing.T) {
 
 func TestAppConnLostMsg(t *testing.T) {
 	a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter", nil)
+	a.state = stateGame
 	result, _ := a.Update(ConnLostMsg{Err: assert.AnError})
 	appPtr := result.(*App)
 	assert.NotNil(t, appPtr.err)
@@ -272,6 +281,7 @@ func TestAppConnLostMsg(t *testing.T) {
 
 func TestAppViewConnecting(t *testing.T) {
 	a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter", nil)
+	a.state = stateGame
 	a.width = 100
 	a.height = 30
 	v := a.View()
@@ -280,6 +290,7 @@ func TestAppViewConnecting(t *testing.T) {
 
 func TestAppViewWithState(t *testing.T) {
 	a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter", nil)
+	a.state = stateGame
 	a.width = 100
 	a.height = 30
 	resp := testPlayResponse()
@@ -291,6 +302,7 @@ func TestAppViewWithState(t *testing.T) {
 
 func TestAppCombatHotkeyD(t *testing.T) {
 	a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter", nil)
+	a.state = stateGame
 	resp := combatPlayResponse()
 	a.lastResp = &resp
 	a.input.Blur()
@@ -305,6 +317,7 @@ func TestAppCombatHotkeyD(t *testing.T) {
 
 func TestAppCombatTabFocusesInput(t *testing.T) {
 	a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter", nil)
+	a.state = stateGame
 	resp := combatPlayResponse()
 	a.lastResp = &resp
 	a.input.Blur()
@@ -316,6 +329,7 @@ func TestAppCombatTabFocusesInput(t *testing.T) {
 
 func TestAppCombatEscBlursInput(t *testing.T) {
 	a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter", nil)
+	a.state = stateGame
 	resp := combatPlayResponse()
 	a.lastResp = &resp
 	// input starts focused
@@ -350,17 +364,18 @@ func TestAppSessionResume(t *testing.T) {
 
 func TestAppStateMachine_LobbyStart(t *testing.T) {
 	a := NewApp(mockSend(`{}`), "", "", "", "", nil)
-	assert.Equal(t, stateLobby, a.state, "empty scenario+session should start in lobby")
+	assert.Equal(t, stateLobby, a.state, "empty scenario+no initialResp should start in lobby")
+}
+
+func TestAppStateMachine_LobbyStartWithSessionOnly(t *testing.T) {
+	// sessionID alone (without initialResp or scenario) means lobby mode.
+	a := NewApp(mockSend(`{}`), "sess-1", "", "", "", nil)
+	assert.Equal(t, stateLobby, a.state, "sessionID without initialResp or scenario should start in lobby")
 }
 
 func TestAppStateMachine_GameStartWithScenario(t *testing.T) {
 	a := NewApp(mockSend(`{}`), "", "dungeon", "Thorn", "fighter", nil)
 	assert.Equal(t, stateGame, a.state, "scenario should start in game")
-}
-
-func TestAppStateMachine_GameStartWithSession(t *testing.T) {
-	a := NewApp(mockSend(`{}`), "sess-1", "", "", "", nil)
-	assert.Equal(t, stateGame, a.state, "session should start in game")
 }
 
 func TestAppStateMachine_GameStartWithInitialResp(t *testing.T) {
@@ -391,6 +406,7 @@ func TestAppStateMachine_CreationToGame(t *testing.T) {
 		Scenario: "dungeon",
 		Name:     "Thorn",
 		Class:    "fighter",
+		Stats:    &model.Stats{STR: 14, DEX: 12, CON: 12, INT: 10, WIS: 10, CHA: 10},
 	})
 	appPtr := result.(*App)
 	assert.Equal(t, stateGame, appPtr.state)

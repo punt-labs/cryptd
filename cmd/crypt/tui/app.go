@@ -55,7 +55,7 @@ type App struct {
 // When scenario and sessionID are both empty, the app starts in lobby mode.
 func NewApp(send SendFn, sessionID, scenario, charName, charClass string, initialResp *protocol.PlayResponse) App {
 	startState := stateGame
-	if scenario == "" && sessionID == "" && initialResp == nil {
+	if scenario == "" && initialResp == nil {
 		startState = stateLobby
 	}
 
@@ -89,7 +89,7 @@ func (a App) Init() tea.Cmd {
 	if a.scenario != "" {
 		return tea.Batch(
 			func() tea.Msg { return LoadingMsg{} },
-			NewGameCmd(a.send, a.scenario, a.charName, a.charClass),
+			NewGameCmd(a.send, a.scenario, a.charName, a.charClass, nil),
 		)
 	}
 	return func() tea.Msg { return WelcomeMsg{} }
@@ -143,14 +143,13 @@ func (a App) updateLobby(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case ResumeSessionMsg:
 		// Transition to game state with the selected session.
+		// Re-bind the server connection by sending session.init with
+		// the chosen session ID.
 		a.state = stateGame
 		a.sessionID = msg.SessionID
-		// The session is already initialized on the server side from
-		// the session.init handshake. We need to start a new game.new
-		// or just send a "look" to get the current state.
 		a.waiting = true
 		a.input.SetWaiting(true)
-		return &a, PlayCmd(a.send, "look")
+		return &a, SessionInitCmd(a.send, msg.SessionID)
 	}
 
 	var cmd tea.Cmd
@@ -169,7 +168,7 @@ func (a App) updateCreation(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.waiting = true
 		a.input.SetWaiting(true)
 		a.narration.AppendText("Starting game...", StyleSystem)
-		return &a, NewGameCmd(a.send, msg.Scenario, msg.Name, msg.Class)
+		return &a, NewGameCmd(a.send, msg.Scenario, msg.Name, msg.Class, msg.Stats)
 	}
 
 	// Handle esc at first step to go back to lobby.
@@ -186,6 +185,21 @@ func (a App) updateCreation(msg tea.Msg) (tea.Model, tea.Cmd) {
 // updateGame handles messages while in game state (existing behavior).
 func (a App) updateGame(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+
+	case SessionInitDoneMsg:
+		a.sessionID = msg.SessionID
+		if msg.HasGame {
+			// The server will send an unsolicited PlayResponse via the
+			// game loop. For now, keep waiting — the next ServerResponseMsg
+			// or GameStartMsg will clear it.
+			return &a, nil
+		}
+		// Session exists but has no active game — show welcome.
+		a.waiting = false
+		a.input.SetWaiting(false)
+		a.narration.AppendText("Session has no active game.", StyleSystem)
+		a.narration.AppendText("Type 'new <scenario> <name> <class>' to start.", StyleSystem)
+		return &a, nil
 
 	case GameStartMsg:
 		resp := msg.Response

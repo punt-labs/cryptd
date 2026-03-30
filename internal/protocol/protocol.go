@@ -104,7 +104,7 @@ type SessionInfo struct {
 	CharacterName  string `json:"character_name,omitempty"`
 	CharacterClass string `json:"character_class,omitempty"`
 	Level          int    `json:"level,omitempty"`
-	RoomName       string `json:"room_name,omitempty"`
+	RoomID         string `json:"room_id,omitempty"`
 }
 
 // ListSessionsResult is the result of the game.list_sessions method.

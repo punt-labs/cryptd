@@ -548,14 +548,14 @@ func TestUnknownMethod(t *testing.T) {
 
 func TestGameCallBeforeInit(t *testing.T) {
 	srv := testServer(t)
-	// Send game.new without any prior session.init.
+	// Send game.new without any prior session.init — session.init IS required
+	// for game.* methods. The handler rejects calls without an active session.
 	resp := roundTrip(t, srv, newGameCall(1, map[string]any{
 		"scenario_id":     "minimal",
 		"character_name":  "Tester",
 		"character_class": "fighter",
 	}))
 
-	// Should get a JSON-RPC error telling us to init first.
 	require.NotNil(t, resp.Error)
 	assert.Equal(t, CodeInvalidRequest, resp.Error.Code)
 	assert.Contains(t, resp.Error.Message, "call session.init first")

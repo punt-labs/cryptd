@@ -121,7 +121,6 @@ var (
 
 // Lobby and creation screen colors.
 var (
-	ColorLobbyBg       = lipgloss.Color("#0a0a0a")
 	ColorMenuSelected  = ColorGold
 	ColorMenuNormal    = lipgloss.Color("#777777")
 	ColorMenuDim       = lipgloss.Color("#444444")
@@ -184,17 +183,8 @@ var (
 	StyleStepPending = lipgloss.NewStyle().
 				Foreground(ColorStepPending)
 
-	StyleClassTitle = lipgloss.NewStyle().
-			Foreground(ColorGold).
-			Bold(true)
-
 	StyleClassDesc = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#888888"))
-
-	StyleStatName = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#aaaaaa")).
-			Bold(true).
-			Width(4)
 
 	StyleStatBar = lipgloss.NewStyle().
 			Foreground(ColorGold)
@@ -227,7 +217,7 @@ func BarStyle(cur, max int) lipgloss.Style {
 // The bar is `width` characters wide. The filled portion uses `fillColor`
 // as background, the empty portion uses ColorBarBg. The text label is
 // centered across the entire bar.
-func RenderBar(label string, cur, max, width int, fillColor lipgloss.Color) string {
+func RenderBar(cur, max, width int, fillColor lipgloss.Color) string {
 	if width < 4 {
 		width = 4
 	}
@@ -308,6 +298,23 @@ func wrapLine(b *strings.Builder, line string, width int) {
 	col := 0
 	for i, word := range words {
 		wLen := len(word)
+		// Break words that exceed the width.
+		if wLen > width {
+			if col > 0 {
+				b.WriteByte('\n')
+				col = 0
+			}
+			for len(word) > width {
+				b.WriteString(word[:width])
+				b.WriteByte('\n')
+				word = word[width:]
+			}
+			if len(word) > 0 {
+				b.WriteString(word)
+				col = len(word)
+			}
+			continue
+		}
 		if i == 0 {
 			b.WriteString(word)
 			col = wLen

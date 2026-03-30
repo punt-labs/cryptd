@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/punt-labs/cryptd/internal/model"
 	"github.com/punt-labs/cryptd/internal/protocol"
 )
 
@@ -290,11 +291,21 @@ func (c GameCreation) finish() tea.Cmd {
 	}
 	class := classes[c.classIndex].name
 
+	stats := &model.Stats{
+		STR: baseStatValue + c.statPoints[0],
+		DEX: baseStatValue + c.statPoints[1],
+		CON: baseStatValue + c.statPoints[2],
+		INT: baseStatValue + c.statPoints[3],
+		WIS: baseStatValue + c.statPoints[4],
+		CHA: baseStatValue + c.statPoints[5],
+	}
+
 	return func() tea.Msg {
 		return CreationDoneMsg{
 			Scenario: scenario,
 			Name:     name,
 			Class:    class,
+			Stats:    stats,
 		}
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/punt-labs/cryptd/internal/model"
 	"github.com/punt-labs/cryptd/internal/protocol"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -147,6 +148,10 @@ func TestCreation_FinishWithAllPoints(t *testing.T) {
 	assert.Equal(t, "dungeon", doneMsg.Scenario)
 	assert.Equal(t, "priest", doneMsg.Class)
 	assert.Equal(t, "Adventurer", doneMsg.Name) // default, since we didn't type anything
+	require.NotNil(t, doneMsg.Stats, "stats must be included in CreationDoneMsg")
+	assert.Equal(t, &model.Stats{
+		STR: 12, DEX: 12, CON: 12, INT: 11, WIS: 11, CHA: 10,
+	}, doneMsg.Stats)
 }
 
 func TestCreation_EscGoesBack(t *testing.T) {

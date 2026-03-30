@@ -1,6 +1,9 @@
 package tui
 
-import "github.com/punt-labs/cryptd/internal/protocol"
+import (
+	"github.com/punt-labs/cryptd/internal/model"
+	"github.com/punt-labs/cryptd/internal/protocol"
+)
 
 // ServerResponseMsg arrives when a JSON-RPC call completes successfully.
 type ServerResponseMsg struct {
@@ -40,9 +43,19 @@ type ScenariosMsg struct {
 	Scenarios []protocol.ScenarioInfo
 }
 
+// ScenarioErrMsg arrives when game.list_scenarios fails.
+type ScenarioErrMsg struct {
+	Err error
+}
+
 // SessionsMsg arrives when game.list_sessions completes.
 type SessionsMsg struct {
 	Sessions []protocol.SessionInfo
+}
+
+// SessionErrMsg arrives when game.list_sessions fails.
+type SessionErrMsg struct {
+	Err error
 }
 
 // StartCreationMsg signals a transition from lobby to game creation.
@@ -55,9 +68,16 @@ type ResumeSessionMsg struct {
 	SessionID string
 }
 
+// SessionInitDoneMsg arrives after a successful session.init for a resumed session.
+type SessionInitDoneMsg struct {
+	SessionID string
+	HasGame   bool
+}
+
 // CreationDoneMsg signals game creation is complete and the game should start.
 type CreationDoneMsg struct {
-	Scenario  string
-	Name      string
-	Class     string
+	Scenario string
+	Name     string
+	Class    string
+	Stats    *model.Stats
 }

@@ -188,7 +188,7 @@ func TestFormatBar(t *testing.T) {
 
 func TestRenderCompass_AllDirections(t *testing.T) {
 	exits := []string{"north", "south", "east", "west", "ne", "nw", "se", "sw"}
-	out := renderCompass(exits, 28)
+	out := renderCompass(exits)
 	lines := strings.Split(out, "\n")
 	require.GreaterOrEqual(t, len(lines), 3)
 	// Each direction label should appear

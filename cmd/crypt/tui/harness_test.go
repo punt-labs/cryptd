@@ -24,8 +24,8 @@ func TestRenderLobbyHarness(t *testing.T) {
 		{ID: "castle", Title: "Castle Cryptborne", Description: "Siege the undead lord's fortress."},
 	}
 	app.lobby.sessions = []protocol.SessionInfo{
-		{ID: "s1", CharacterName: "Thorn", CharacterClass: "fighter", Level: 3, RoomName: "Entry Hall"},
-		{ID: "s2", CharacterName: "Wisp", CharacterClass: "mage", Level: 1, RoomName: "Clearing"},
+		{ID: "s1", CharacterName: "Thorn", CharacterClass: "fighter", Level: 3, RoomID: "Entry Hall"},
+		{ID: "s2", CharacterName: "Wisp", CharacterClass: "mage", Level: 1, RoomID: "Clearing"},
 	}
 
 	output := app.View()

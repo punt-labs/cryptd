@@ -86,7 +86,7 @@ func TestListSessions_MultipleSessions(t *testing.T) {
 	assert.Equal(t, "Kael", alpha.CharacterName)
 	assert.Equal(t, "mage", alpha.CharacterClass)
 	assert.Equal(t, 1, alpha.Level)
-	assert.Equal(t, "entrance", alpha.RoomName)
+	assert.Equal(t, "entrance", alpha.RoomID)
 
 	beta := result.Sessions[1]
 	assert.Equal(t, "session-beta", beta.ID)
@@ -94,7 +94,7 @@ func TestListSessions_MultipleSessions(t *testing.T) {
 	assert.Equal(t, "Liora", beta.CharacterName)
 	assert.Equal(t, "fighter", beta.CharacterClass)
 	assert.Equal(t, 1, beta.Level)
-	assert.Equal(t, "entrance", beta.RoomName)
+	assert.Equal(t, "entrance", beta.RoomID)
 }
 
 func TestListSessions_ExcludesSessionsWithoutGame(t *testing.T) {

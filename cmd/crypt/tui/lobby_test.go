@@ -21,12 +21,12 @@ func testSessions() []protocol.SessionInfo {
 		{
 			ID: "sess-1", ScenarioID: "dungeon",
 			CharacterName: "Thorn", CharacterClass: "fighter",
-			Level: 3, RoomName: "Entry Hall",
+			Level: 3, RoomID: "Entry Hall",
 		},
 		{
 			ID: "sess-2", ScenarioID: "forest",
 			CharacterName: "Wisp", CharacterClass: "mage",
-			Level: 1, RoomName: "Clearing",
+			Level: 1, RoomID: "Clearing",
 		},
 	}
 }
@@ -217,12 +217,44 @@ func TestLobby_View(t *testing.T) {
 	assert.Contains(t, v, "Quit")
 }
 
-func TestLobby_ServerErrMsgClearsLoading(t *testing.T) {
+func TestLobby_ScenarioErrMsgClearsLoading(t *testing.T) {
 	l := NewLobby(mockSend(`{}`))
 	assert.True(t, l.loadingScen)
+
+	l, _ = l.Update(ScenarioErrMsg{Err: assert.AnError})
+	assert.False(t, l.loadingScen)
+	assert.True(t, l.scenarioErr)
+	// Session loading is unaffected.
+	assert.True(t, l.loadingSess)
+}
+
+func TestLobby_SessionErrMsgClearsLoading(t *testing.T) {
+	l := NewLobby(mockSend(`{}`))
 	assert.True(t, l.loadingSess)
 
-	l, _ = l.Update(ServerErrMsg{Err: assert.AnError})
-	assert.False(t, l.loadingScen)
+	l, _ = l.Update(SessionErrMsg{Err: assert.AnError})
 	assert.False(t, l.loadingSess)
+	assert.True(t, l.sessionErr)
+	// Scenario loading is unaffected.
+	assert.True(t, l.loadingScen)
+}
+
+func TestLobby_NewGameBlockedWhenUnavailable(t *testing.T) {
+	l := NewLobby(mockSend(`{}`))
+	l.loadingScen = false
+	l.scenarioErr = true
+	l.menuIndex = 0
+
+	_, cmd := l.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	assert.Nil(t, cmd, "should not produce StartCreationMsg when scenarios errored")
+}
+
+func TestLobby_NewGameBlockedWhenNoScenarios(t *testing.T) {
+	l := NewLobby(mockSend(`{}`))
+	l.loadingScen = false
+	l.scenarios = nil
+	l.menuIndex = 0
+
+	_, cmd := l.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	assert.Nil(t, cmd, "should not produce StartCreationMsg with no scenarios")
 }

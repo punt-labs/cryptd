@@ -65,24 +65,23 @@ func (l Lobby) Update(msg tea.Msg) (Lobby, tea.Cmd) {
 	case ScenariosMsg:
 		l.scenarios = msg.Scenarios
 		l.loadingScen = false
+		l.scenarioErr = false
+		return l, nil
+
+	case ScenarioErrMsg:
+		l.loadingScen = false
+		l.scenarioErr = true
 		return l, nil
 
 	case SessionsMsg:
 		l.sessions = msg.Sessions
 		l.loadingSess = false
+		l.sessionErr = false
 		return l, nil
 
-	case ServerErrMsg:
-		// Mark loading done so the UI doesn't hang. The lobby still works
-		// even if one or both lists fail.
-		if l.loadingScen {
-			l.loadingScen = false
-			l.scenarioErr = true
-		}
-		if l.loadingSess {
-			l.loadingSess = false
-			l.sessionErr = true
-		}
+	case SessionErrMsg:
+		l.loadingSess = false
+		l.sessionErr = true
 		return l, nil
 
 	case tea.KeyMsg:
@@ -185,7 +184,7 @@ func (l Lobby) selectMenuItem() (Lobby, tea.Cmd) {
 
 	switch lobbyMenuItem(l.menuIndex) {
 	case menuNewGame:
-		if l.loadingScen {
+		if l.loadingScen || l.scenarioErr || len(l.scenarios) == 0 {
 			return l, nil // not ready yet
 		}
 		scenarios := l.scenarios
@@ -214,9 +213,13 @@ func (l Lobby) View() string {
 	// Menu items.
 	var menuLines []string
 	for i := 0; i < int(menuCount); i++ {
-		label := l.menuLabel(lobbyMenuItem(i))
+		item := lobbyMenuItem(i)
+		label := l.menuLabel(item)
+		dimmed := l.isMenuDimmed(item)
 		if i == l.menuIndex {
 			menuLines = append(menuLines, StyleMenuSelected.Render("> "+label))
+		} else if dimmed {
+			menuLines = append(menuLines, StyleMenuDim.Render("  "+label))
 		} else {
 			menuLines = append(menuLines, StyleMenuNormal.Render("  "+label))
 		}
@@ -283,7 +286,7 @@ func (l Lobby) menuLabel(item lobbyMenuItem) string {
 			return "Resume  (unavailable)"
 		}
 		if n == 0 {
-			return StyleMenuDim.Render("Resume  (no saves)")
+			return "Resume  (no saves)"
 		}
 		if n == 1 {
 			return "Resume  (1 save)"
@@ -293,6 +296,17 @@ func (l Lobby) menuLabel(item lobbyMenuItem) string {
 		return "Quit"
 	}
 	return ""
+}
+
+// isMenuDimmed returns true when a menu item should be rendered with dim style.
+func (l Lobby) isMenuDimmed(item lobbyMenuItem) bool {
+	switch item {
+	case menuNewGame:
+		return l.scenarioErr || (!l.loadingScen && len(l.scenarios) == 0)
+	case menuResume:
+		return l.sessionErr || (!l.loadingSess && len(l.sessions) == 0)
+	}
+	return false
 }
 
 // renderSessionList renders the expandable list of saved sessions.
@@ -312,8 +326,8 @@ func (l Lobby) renderSessionList() string {
 		}
 
 		line := fmt.Sprintf("%s the %s  Lv %d", name, class, s.Level)
-		if s.RoomName != "" {
-			line += "  " + StyleSessionDetail.Render("@ "+s.RoomName)
+		if s.RoomID != "" {
+			line += "  " + StyleSessionDetail.Render("@ "+s.RoomID)
 		}
 
 		if i == l.sessionIndex {

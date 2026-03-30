@@ -46,21 +46,21 @@ func (s SidebarPane) Render(resp *protocol.PlayResponse) string {
 			hpColor = ColorGold
 		}
 	}
-	sections = append(sections, RenderBar("HP", hero.HP, hero.MaxHP, innerW, hpColor))
+	sections = append(sections, RenderBar(hero.HP, hero.MaxHP, innerW, hpColor))
 
 	// --- EXPERIENCE ---
 	sections = append(sections, SectionHeader("Experience"))
 	if resp.NextLevelXP == 0 {
 		sections = append(sections, fmt.Sprintf("XP %d (MAX)", hero.XP))
 	} else {
-		sections = append(sections, RenderBar("XP", hero.XP, resp.NextLevelXP, innerW, ColorXPBar))
+		sections = append(sections, RenderBar(hero.XP, resp.NextLevelXP, innerW, ColorXPBar))
 	}
 
 	sections = append(sections, SectionDivider(innerW))
 
 	// --- EXITS ---
 	sections = append(sections, SectionHeader("Exits"))
-	sections = append(sections, renderCompass(resp.Exits, innerW))
+	sections = append(sections, renderCompass(resp.Exits))
 
 	sections = append(sections, SectionDivider(innerW))
 
@@ -151,7 +151,7 @@ var compassLabel = map[string]string{
 	"sw":        "SW ",
 }
 
-func renderCompass(exits []string, _ int) string {
+func renderCompass(exits []string) string {
 	// Cell width for each compass cell.
 	cellW := 5
 	cellH := 1

@@ -1,6 +1,8 @@
 package daemon
 
 import (
+	"sort"
+
 	"github.com/punt-labs/cryptd/internal/engine"
 	"github.com/punt-labs/cryptd/internal/model"
 )
@@ -21,7 +23,7 @@ func (s *Server) handleListSessions(req Request) Response {
 			CharacterName:  sess.characterName,
 			CharacterClass: sess.characterClass,
 			Level:          sess.level,
-			RoomName:       sess.roomName,
+			RoomID:         sess.roomName,
 		})
 	}
 
@@ -29,6 +31,11 @@ func (s *Server) handleListSessions(req Request) Response {
 	if infos == nil {
 		infos = []SessionInfo{}
 	}
+
+	// Sort by session ID for deterministic ordering.
+	sort.Slice(infos, func(i, j int) bool {
+		return infos[i].ID < infos[j].ID
+	})
 
 	return Response{
 		JSONRPC: "2.0",
