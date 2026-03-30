@@ -1,0 +1,16 @@
+{
+  "name": "crypt-dev",
+  "description": "Text adventure game engine for Claude Code. Play dungeon crawls with Claude as Dungeon Master — powered by a deterministic Go game engine.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Punt Labs",
+    "email": "hello@punt-labs.com"
+  },
+  "mcpServers": {
+    "crypt": {
+      "type": "stdio",
+      "command": "${CLAUDE_PLUGIN_ROOT}/crypt",
+      "args": ["mcp"]
+    }
+  }
+}
