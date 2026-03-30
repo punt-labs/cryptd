@@ -93,14 +93,17 @@ func TestApp(t *testing.T) {
 			},
 		},
 		{
-			name: "Init without scenario or initialResp returns nil",
+			name: "Init without scenario or initialResp returns WelcomeMsg cmd",
 			setup: func() App {
 				return NewApp(mockSend(`{}`), "sess-42", "", "Thorn", "fighter", nil)
 			},
 			msg: nil,
 			check: func(t *testing.T, a *App, cmd tea.Cmd) {
 				initCmd := a.Init()
-				assert.Nil(t, initCmd)
+				require.NotNil(t, initCmd, "should return cmd that produces WelcomeMsg")
+				msg := initCmd()
+				_, ok := msg.(WelcomeMsg)
+				assert.True(t, ok, "expected WelcomeMsg, got %T", msg)
 			},
 		},
 		{

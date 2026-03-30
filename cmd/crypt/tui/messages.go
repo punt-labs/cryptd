@@ -26,3 +26,11 @@ type SendCmdMsg struct {
 type GameStartMsg struct {
 	Response protocol.PlayResponse
 }
+
+// LoadingMsg signals that a long-running operation (e.g., initial narration
+// generation) has begun and the UI should show a loading indicator.
+type LoadingMsg struct{}
+
+// WelcomeMsg signals that no game is active and the UI should show a welcome
+// message with instructions.
+type WelcomeMsg struct{}

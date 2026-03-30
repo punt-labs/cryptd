@@ -63,9 +63,12 @@ func (a App) Init() tea.Cmd {
 		return func() tea.Msg { return GameStartMsg{Response: resp} }
 	}
 	if a.scenario != "" {
-		return NewGameCmd(a.send, a.scenario, a.charName, a.charClass)
+		return tea.Batch(
+			func() tea.Msg { return LoadingMsg{} },
+			NewGameCmd(a.send, a.scenario, a.charName, a.charClass),
+		)
 	}
-	return nil
+	return func() tea.Msg { return WelcomeMsg{} }
 }
 
 // Update routes messages to sub-components.
@@ -147,6 +150,19 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.input.Blur()
 		return &a, nil
 
+	case LoadingMsg:
+		a.waiting = true
+		a.input.SetWaiting(true)
+		a.narration.AppendText("Starting game...", StyleSystem)
+		return &a, nil
+
+	case WelcomeMsg:
+		a.narration.AppendText("Welcome to Crypt.", StyleNarration)
+		a.narration.AppendText("", StyleNarration)
+		a.narration.AppendText("Type 'new <scenario> <name> <class>' to start a game.", StyleSystem)
+		a.narration.AppendText("Type 'help' for available commands.", StyleSystem)
+		return &a, nil
+
 	case SendCmdMsg:
 		if a.dead || a.waiting {
 			return &a, nil
@@ -171,6 +187,10 @@ func (a App) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		switch msg.Type {
 		case tea.KeyEnter, tea.KeySpace, tea.KeyEscape, tea.KeyCtrlC:
 			return &a, tea.Quit
+		case tea.KeyPgUp, tea.KeyPgDown, tea.KeyHome, tea.KeyEnd:
+			var cmd tea.Cmd
+			a.narration, cmd = a.narration.Update(msg)
+			return &a, cmd
 		}
 		return &a, nil
 	}
