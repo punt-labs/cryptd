@@ -91,6 +91,8 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case GameStartMsg:
 		resp := msg.Response
+		a.waiting = false
+		a.input.SetWaiting(false)
 		a.lastResp = &resp
 		a.narration.AppendResponse(resp)
 		if a.combatActive() {
