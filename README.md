@@ -275,13 +275,12 @@ for the 14-milestone roadmap.
 | File | Contents |
 |------|---------|
 | [DESIGN.md](DESIGN.md) | Authoritative decision log (DES-001–028) |
-| [docs/gameplay.pdf](docs/gameplay.pdf) | Gameplay mechanics specification: combat, leveling, items, balance |
-| [docs/build-plan.md](docs/build-plan.md) | 14-milestone roadmap with guiding principles and red lines |
-| [docs/architecture.pdf](docs/architecture.pdf) | Technical architecture specification (LaTeX) |
-| [docs/plan.md](docs/plan.md) | Architecture evolution plan: interfaces, engine, MCP tools |
+| [docs/architecture.pdf](docs/architecture.pdf) | Technical architecture specification (LaTeX, v0.4) |
+| [docs/gameplay.pdf](docs/gameplay.pdf) | Gameplay mechanics: combat, leveling, items, balance |
+| [docs/build-plan.md](docs/build-plan.md) | 13-milestone roadmap with guiding principles and red lines |
 | [docs/testing.md](docs/testing.md) | Test architecture: pyramid, fixtures, fakes, CI config |
 | [docs/distribution.md](docs/distribution.md) | Binary distribution: GitHub Releases, GoReleaser, Homebrew tap |
-| [docs/review.md](docs/review.md) | Compliance review of predecessor project |
+| [docs/slm-improvement.md](docs/slm-improvement.md) | SLM accuracy improvement strategy for ollama tier |
 
 ## Distribution
 
