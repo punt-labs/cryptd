@@ -734,6 +734,8 @@ func dispatchContext(eng *engine.Engine, state *model.GameState) (any, *RPCError
 				}
 			}
 			currentRoom["enemies"] = enemies
+		} else if rs.Cleared {
+			currentRoom["enemies"] = []string{}
 		} else {
 			currentRoom["enemies"] = room.Enemies
 		}

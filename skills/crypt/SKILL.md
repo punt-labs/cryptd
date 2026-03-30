@@ -38,7 +38,7 @@ game state yourself.
 | Tool | When to Use |
 |------|-------------|
 | `new_game` | Start a new adventure (scenario, name, class) |
-| `context` | Get scenario overview — room map, visited rooms, description seeds. **Call this after new_game and periodically to stay aware of the full dungeon.** |
+| `context` | Get scenario overview — current room, adjacent rooms with description seeds, visited rooms. **Call this after new_game and periodically to stay aware of the surroundings.** |
 | `look` | Describe the current room |
 | `move` | Move the player in a direction |
 | `pick_up` | Pick up an item |
