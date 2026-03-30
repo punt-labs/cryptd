@@ -31,17 +31,31 @@ func NewNarrationPane(width, height int) NarrationPane {
 }
 
 // AppendText appends a styled line and scrolls to the bottom.
+// Text is word-wrapped to fit the pane width.
 func (p *NarrationPane) AppendText(text string, style lipgloss.Style) {
-	p.lines = append(p.lines, style.Render(text))
+	// Wrap text to available width (account for border+padding ~4 chars).
+	wrapW := p.width - 4
+	if wrapW < 10 {
+		wrapW = 10
+	}
+	wrapped := WrapText(text, wrapW)
+	p.lines = append(p.lines, style.Render(wrapped))
 	p.trimLines()
 	p.syncViewport()
 }
 
 // AppendResponse appends narration from a PlayResponse.
 func (p *NarrationPane) AppendResponse(resp protocol.PlayResponse) {
+	// Wrap width: account for border+padding.
+	wrapW := p.width - 4
+	if wrapW < 10 {
+		wrapW = 10
+	}
+
 	if resp.State != nil {
 		room := resp.State.Dungeon.CurrentRoom
 		if room != "" && room != p.lastRoom {
+			p.lines = append(p.lines, "")
 			p.lines = append(p.lines, StyleRoomName.Render(room))
 			p.lastRoom = room
 		}
@@ -49,11 +63,13 @@ func (p *NarrationPane) AppendResponse(resp protocol.PlayResponse) {
 
 	if resp.Text != "" {
 		for _, line := range strings.Split(resp.Text, "\n") {
-			p.lines = append(p.lines, StyleNarration.Render(line))
+			wrapped := WrapText(line, wrapW)
+			p.lines = append(p.lines, StyleNarration.Render(wrapped))
 		}
 	}
 
 	if resp.Dead {
+		p.lines = append(p.lines, "")
 		p.lines = append(p.lines, StyleDamage.Render("*** You have died ***"))
 		p.lines = append(p.lines, StyleSystem.Render("Press Enter to exit."))
 	}

@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -74,8 +75,10 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		a.width = msg.Width
 		a.height = msg.Height
-		a.narrWidth = max(a.width-SidebarWidth-3, 10)
-		a.mainHeight = max(a.height-3, 1)
+		// Sidebar gets SidebarWidth + border/padding (~4). Narration gets the rest.
+		sidebarTotal := SidebarWidth + 4
+		a.narrWidth = max(a.width-sidebarTotal-1, 10)
+		a.mainHeight = max(a.height-4, 1) // header(1) + border overhead + input(1)
 		a.narration.SetSize(a.narrWidth, a.mainHeight)
 		a.sidebar = NewSidebarPane(SidebarWidth, a.mainHeight)
 		a.combat = NewCombatOverlay(a.narrWidth)
@@ -229,8 +232,12 @@ func (a App) View() string {
 	// Header.
 	header := a.renderHeader()
 
-	// Main area.
-	narrView := a.narration.View()
+	// Main area: narration pane with border + sidebar with border.
+	narrView := StyleNarrationPane.
+		Width(a.narrWidth).
+		Height(a.mainHeight).
+		Render(a.narration.View())
+
 	sidebarView := StyleSidebar.
 		Width(SidebarWidth).
 		Height(a.mainHeight).
@@ -251,18 +258,28 @@ func (a App) View() string {
 	return lipgloss.JoinVertical(lipgloss.Left, header, mainArea, inputArea)
 }
 
-// renderHeader builds the top status line.
+// renderHeader builds the top status line with character info left-aligned
+// and session ID right-aligned.
 func (a App) renderHeader() string {
 	if a.lastResp == nil || a.lastResp.State == nil || len(a.lastResp.State.Party) == 0 {
 		return StyleHeader.Width(a.width).Render(StyleSystem.Render("Connecting..."))
 	}
 	hero := a.lastResp.State.Party[0]
-	text := fmt.Sprintf("%s %s · Lv %d · %d XP   %s",
+
+	left := fmt.Sprintf("%s %s %s",
 		StyleCharName.Render(hero.Name),
 		StyleCharClass.Render("the "+hero.Class),
-		hero.Level,
-		hero.XP,
-		StyleSessionID.Render("session "+a.sessionID),
+		StyleLevelXP.Render(fmt.Sprintf("· Lv %d · %d XP", hero.Level, hero.XP)),
 	)
-	return StyleHeader.Width(a.width).Render(text)
+	right := StyleSessionID.Render("session " + a.sessionID)
+
+	// Calculate gap to right-align session ID.
+	leftW := lipgloss.Width(left)
+	rightW := lipgloss.Width(right)
+	gap := a.width - leftW - rightW - 2 // -2 for padding
+	if gap < 1 {
+		gap = 1
+	}
+
+	return StyleHeader.Width(a.width).Render(left + strings.Repeat(" ", gap) + right)
 }
