@@ -53,7 +53,7 @@
         ┌─────────────────▼──────────────────────────────┐
         │           Data Contracts                        │
         │  Structs · Scenario YAML · Save JSON            │
-        │  MCP tool signatures                            │
+        │  JSON-RPC protocol types                        │
         └────────────────────────────────────────────────┘
 ```
 
@@ -512,29 +512,35 @@ M0  Foundation      Test infra, CI, fakes, no game code                         
 M1  Data Contracts  Structs, YAML parser, save/load, testdata                   ✓ DONE
 M2  Thin E2E Slice  Move pipeline: interpreter → engine → narrator → renderer   ✓ DONE
                     ← FIRST FULL ARCHITECTURE VALIDATION →
-M3  Full Headless   All engine mechanics; full headless mode; acceptance tests   ✓ DONE
-M4  Lux Thin Slice  LuxRenderer stub; crypt solo shows minimal HUD
+M3  Full Engine     All engine mechanics; acceptance tests                       ✓ DONE
+M4  Lux Thin Slice  LuxRenderer; element tree builder; Lux wire protocol client ✓ DONE
 M5  Full Lux HUD    Four-panel HUD; nav buttons; combat panel
-M6  Small Tier      SLMInterpreter + SLMNarrator (llama.cpp sidecar + SmolLM2-135M);
-                    movement only; four-tier failover tested (DES-023)
-M7  Full SLM+Med    All verbs; solo mode complete; ollama medium tier; --model flag
-M8  Server Slice    cryptd serve; single-session; TCP + Unix socket; MCP wire tests ✓ DONE
-M8b Twin Renderer   Renderer interface across the wire (DES-026); typed data;
-                    fancy client display; map[string]any eliminated
-M9  DM Thin Slice   LLM in the loop; Claude API; inference tier chain            ✓ DONE
+M6  SLM Thin Slice  SLMInterpreter + SLMNarrator; ollama auto-detection         ✓ DONE
+M7  Full SLM        All verbs; ollama medium tier; --model flag                 ✓ DONE
+M8  Server Slice    cryptd serve; single-session; TCP + Unix socket             ✓ DONE
+M8b Twin Renderer   RPCRenderer; typed wire protocol; fancy client display      ✓ DONE
+M9  DM Thin Slice   LLM in the loop; Claude API; inference tier chain           ✓ DONE
                     ← FIRST FULL DM MODE VALIDATION →
-M10 Daemon Routing  Concurrent sessions; game-as-goroutine; session resume       ✓ DONE
-M11 Full DM Mode    Rich narration; scenario creation
-M12 Rich World      Shops, traps, multiple scenarios
-M13 Biff            Multi-player party
+M10 Session Routing Concurrent sessions; game-as-goroutine; session resume;     ✓ DONE
+                    per-session mode; crypt mcp bridge; direct JSON-RPC protocol
+M11 Full DM Mode    DM SKILL.md for MCP; rich narration; scenario creation
+M12 Lux HUD Release Full HUD with Wizardry I theme
+M13 Rich World      Shops, traps, multiple scenarios
+M14 Biff            Multi-player party
+M15 Sound System    Ambient audio, combat SFX, narration TTS
 ```
 
-The two critical integration gates were **M2** (architecture validated end-to-end
-before any real mechanics) and **M9** (LLM in the loop before the engine is
-heavily invested in). Both gates are now complete. Neither revealed design flaws
-requiring correction — the interface-driven architecture held through full
-integration. The next focus areas are **M8b** (Twin Renderer: typed data across
-the wire) and **M11** (Full DM Mode).
+Both critical integration gates — **M2** (architecture validated end-to-end)
+and **M9** (LLM in the loop) — are complete. Neither revealed design flaws.
+
+M10 delivered beyond the original plan: direct JSON-RPC protocol (MCP framing
+removed), `crypt mcp` stdio bridge for Claude Code, per-session mode (no
+`--passthrough` flag), session resume with `--session` and `has_game`. The
+daemon is now a proper game server with Claude Code playing via MCP tools.
+
+**Next focus: M11** (Full DM Mode). The key deliverable is a DM SKILL.md that
+instructs Claude Code to act as Dungeon Master — interpreting player intent,
+calling game tools, and narrating results atmospherically.
 
 ---
 
