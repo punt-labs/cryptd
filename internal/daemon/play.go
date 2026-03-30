@@ -82,11 +82,15 @@ func (s *Server) handleNewGamePlay(req Request, sess **Session) Response {
 	var lookResult engine.LookResult
 	var stateCopy model.GameState
 	var stateForResp *model.GameState
+	var nextLevelXP int
 
 	if err := g.Inspect(s.ctx, func(eng *engine.Engine, state *model.GameState) {
 		lookResult = eng.Look(state)
-		stateCopy = *deepCopyState(state)
 		stateForResp = deepCopyState(state)
+		stateCopy = *stateForResp // value copy, no second JSON round-trip
+		if len(state.Party) > 0 {
+			nextLevelXP = engine.NextLevelXP(state.Party[0].Class, state.Party[0].Level)
+		}
 	}); err != nil {
 		return Response{
 			JSONRPC: "2.0",
@@ -108,11 +112,19 @@ func (s *Server) handleNewGamePlay(req Request, sess **Session) Response {
 	}
 	narration, narrErr := s.narr.Narrate(ctx, event, stateCopy)
 	if narrErr != nil {
-		data, _ := json.Marshal(stateCopy)
+		fallback := lookResult.Description
+		if fallback == "" {
+			fallback = "You enter the dungeon."
+		}
 		return Response{
 			JSONRPC: "2.0",
 			ID:      req.ID,
-			Result:  PlayResponse{Text: string(data)},
+			Result: PlayResponse{
+				Text:        fallback,
+				State:       stateForResp,
+				Exits:       lookResult.Exits,
+				NextLevelXP: nextLevelXP,
+			},
 		}
 	}
 
@@ -120,8 +132,10 @@ func (s *Server) handleNewGamePlay(req Request, sess **Session) Response {
 		JSONRPC: "2.0",
 		ID:      req.ID,
 		Result: PlayResponse{
-			Text:  narration,
-			State: stateForResp,
+			Text:        narration,
+			State:       stateForResp,
+			Exits:       lookResult.Exits,
+			NextLevelXP: nextLevelXP,
 		},
 	}
 }
