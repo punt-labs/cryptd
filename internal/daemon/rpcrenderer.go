@@ -56,13 +56,21 @@ func (r *RPCRenderer) Render(_ context.Context, state model.GameState, narration
 	}
 	stateCopy := deepCopyState(&state)
 
+	playResp := protocol.PlayResponse{
+		Text:  narration,
+		State: stateCopy,
+	}
+	// Populate transient display fields from the original state (not the
+	// deep copy, which strips json:"-" fields via JSON round-trip).
+	playResp.Exits = state.Dungeon.Exits
+	if len(state.Party) > 0 {
+		playResp.NextLevelXP = state.Party[0].NextLevelXP
+	}
+
 	resp := protocol.Response{
 		JSONRPC: "2.0",
 		ID:      r.getLastID(),
-		Result: protocol.PlayResponse{
-			Text:  narration,
-			State: stateCopy,
-		},
+		Result:  playResp,
 	}
 
 	data, err := json.Marshal(resp)

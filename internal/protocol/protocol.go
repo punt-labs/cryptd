@@ -56,10 +56,12 @@ type PlayRequest struct {
 
 // PlayResponse is the JSON-RPC result for the "play" method.
 type PlayResponse struct {
-	Text  string           `json:"text"`
-	State *model.GameState `json:"state,omitempty"`
-	Dead  bool             `json:"dead,omitempty"`
-	Quit  bool             `json:"quit,omitempty"`
+	Text        string           `json:"text"`
+	State       *model.GameState `json:"state,omitempty"`
+	Dead        bool             `json:"dead,omitempty"`
+	Quit        bool             `json:"quit,omitempty"`
+	Exits       []string         `json:"exits,omitempty"`        // transient: available exits from current room
+	NextLevelXP int              `json:"next_level_xp,omitempty"` // transient: XP needed for next level
 }
 
 // InitializeParams is the optional params for the "session.init" method.

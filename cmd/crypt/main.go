@@ -4,6 +4,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
+
+	"golang.org/x/term"
 )
 
 func main() {
@@ -29,6 +31,7 @@ func main() {
 	name := fs.String("name", "Adventurer", "character name (used with --scenario)")
 	class := fs.String("class", "fighter", "character class: fighter, mage, priest, thief (used with --scenario)")
 	sessionID := fs.String("session", "", "resume a previous session by ID")
+	plain := fs.Bool("plain", false, "use plain readline interface instead of TUI")
 	if err := fs.Parse(os.Args[1:]); err != nil {
 		os.Exit(1)
 	}
@@ -38,5 +41,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	os.Exit(run(*socketPath, *addr, *scenario, *name, *class, *sessionID))
+	useTUI := !*plain && term.IsTerminal(int(os.Stdin.Fd()))
+	if useTUI {
+		os.Exit(runTUI(*socketPath, *addr, *scenario, *name, *class, *sessionID))
+	} else {
+		os.Exit(run(*socketPath, *addr, *scenario, *name, *class, *sessionID))
+	}
 }
