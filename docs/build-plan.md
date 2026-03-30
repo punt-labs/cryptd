@@ -345,16 +345,17 @@ flag allows explicit model selection.
 ## Milestone 8 — Server Thin Slice
 
 **Goal:** `cryptd serve` starts and handles a single client connection over
-Unix socket or TCP. The server exposes 15 MCP tools as JSON-RPC 2.0 over NDJSON.
-This is the game server — it does not know or care what client connects (CLI,
-Claude Code plugin, future web client). See DES-025 for design rationale.
+Unix socket or TCP. The server exposes 15 game commands as JSON-RPC 2.0 over
+NDJSON (`session.init`, `game.new`, `game.move`, etc.). This is the game
+server — it does not know or care what client connects (CLI, MCP bridge,
+future web client). See DES-025 for design rationale.
 
 **What gets built:**
 
 - `internal/daemon/` — server package:
-  - `protocol.go` — JSON-RPC 2.0 types, MCP types, error codes
-  - `dispatcher.go` — maps 15 tool names → engine methods, combat orchestration
-  - `handler.go` — JSON-RPC routing (initialize, tools/list, tools/call), NDJSON framing
+  - `protocol.go` — JSON-RPC 2.0 types, error codes
+  - `game.go` — dispatch functions (15 game commands → engine methods)
+  - `handler.go` — JSON-RPC routing (`session.*`, `game.*`), NDJSON framing
   - `daemon.go` — Server struct, Unix socket lifecycle, signal handling
 - `cmd/crypt/serve.go` — `cryptd serve [--socket path] [--listen addr]`
 - TCP support alongside Unix sockets for remote play
@@ -524,19 +525,19 @@ M9  DM Thin Slice   LLM in the loop; Claude API; inference tier chain           
 M10 Session Routing Concurrent sessions; game-as-goroutine; session resume;     ✓ DONE
                     per-session mode; crypt mcp bridge; direct JSON-RPC protocol
 M11 Full DM Mode    DM SKILL.md for MCP; rich narration; scenario creation
-M12 Lux HUD Release Full HUD with Wizardry I theme
-M13 Rich World      Shops, traps, multiple scenarios
-M14 Biff            Multi-player party
-M15 Sound System    Ambient audio, combat SFX, narration TTS
+M12 Rich World      Shops, traps, multiple scenarios
+M13 Biff            Multi-player party
 ```
 
 Both critical integration gates — **M2** (architecture validated end-to-end)
 and **M9** (LLM in the loop) — are complete. Neither revealed design flaws.
 
-M10 delivered beyond the original plan: direct JSON-RPC protocol (MCP framing
-removed), `crypt mcp` stdio bridge for Claude Code, per-session mode (no
-`--passthrough` flag), session resume with `--session` and `has_game`. The
-daemon is now a proper game server with Claude Code playing via MCP tools.
+M10 delivered beyond the original plan: direct JSON-RPC protocol for the
+daemon (MCP framing removed), plus a `crypt mcp` stdio bridge that exposes
+the daemon's JSON-RPC API as MCP tools for Claude Code; per-session mode
+(no `--passthrough` flag); session resume with `--session` and `has_game`.
+The daemon is a game server behind a stable JSON-RPC API. MCP tool surfaces
+exist only in the `crypt mcp` bridge.
 
 **Next focus: M11** (Full DM Mode). The key deliverable is a DM SKILL.md that
 instructs Claude Code to act as Dungeon Master — interpreting player intent,
