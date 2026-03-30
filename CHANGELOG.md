@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **DM SKILL.md and ethos identities.** `/crypt` skill invokes Claude as Dungeon Master. Two DM personas: The Cryptkeeper (sardonic, theatrical, UNIX-gothic) and The Archivist (clinical, precise, log-like). Ethos personalities, writing styles, and talents define DM behavior. `game.context` command gives the DM full scenario awareness — room map, description seeds, visited rooms, adjacent rooms.
 - **`crypt mcp`: stdio MCP bridge for Claude Code.** Runs as an MCP server on stdio, proxies tool calls to `cryptd serve` over Unix socket/TCP. 16 game tools registered (new_game, move, look, attack, etc.). Thread-safe daemon proxy with mutex. Registration: `claude mcp add -s project crypt -- crypt mcp`.
 - **LLM inference tier (M9):** `LLMInterpreter` and `LLMNarrator` implementations that call Claude's API via the OpenAI-compatible `/v1/chat/completions` endpoint. Same two-tier fallback strategy as the SLM tier: Rules-first for deterministic commands, LLM for ambiguous input; Template fallback for tactical events, LLM for atmospheric narration. Claude-optimized system prompts.
 - **`inference.Client` auth support:** `NewClientWithOpts` constructor with `WithAPIKey(string)` and `WithTimeout(time.Duration)` functional options. When set, adds `Authorization: Bearer <key>` to every request. Existing `NewClient` is unchanged.

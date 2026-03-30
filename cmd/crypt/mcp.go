@@ -224,6 +224,11 @@ func gameTools() []toolDef {
 			},
 		},
 		{
+			name:        "context",
+			description: "Get scenario context for DM narration: room map, visited rooms, adjacent rooms with description seeds, hero status.",
+			gameMethod:  "context",
+		},
+		{
 			name:        "save_game",
 			description: "Save the current game.",
 			gameMethod:  "save_game",

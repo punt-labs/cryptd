@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"sort"
 
 	"github.com/punt-labs/cryptd/internal/engine"
 	"github.com/punt-labs/cryptd/internal/game"
@@ -271,6 +272,8 @@ func dispatch(eng *engine.Engine, state *model.GameState, name string, args json
 		return dispatchCastSpell(eng, state, args)
 	case "use_item":
 		return dispatchUseItem(eng, state, args)
+	case "context":
+		return dispatchContext(eng, state)
 	case "save_game":
 		return dispatchSaveGame(eng, state, args)
 	case "load_game":
@@ -689,6 +692,114 @@ func dispatchUseItem(eng *engine.Engine, state *model.GameState, raw json.RawMes
 		"power":   result.Power,
 		"hero_hp": result.HeroHP,
 	}, nil
+}
+
+// --- context ---
+
+func dispatchContext(eng *engine.Engine, state *model.GameState) (any, *RPCError) {
+	sc := eng.Scenario()
+
+	// Scenario-level info.
+	scenarioInfo := map[string]any{
+		"title":         sc.Title,
+		"starting_room": sc.StartingRoom,
+		"death_mode":    sc.Death,
+	}
+
+	// Current room info.
+	currentRoomID := state.Dungeon.CurrentRoom
+	currentRoom := map[string]any{"id": currentRoomID}
+	if room, ok := sc.Rooms[currentRoomID]; ok {
+		currentRoom["name"] = room.Name
+		currentRoom["description_seed"] = room.DescriptionSeed
+
+		exits := make([]string, 0, len(room.Connections))
+		for dir, conn := range room.Connections {
+			if conn.Type != "hidden" {
+				exits = append(exits, dir)
+			}
+		}
+		sort.Strings(exits)
+		currentRoom["exits"] = exits
+
+		rs := eng.EnsureRoomState(state, currentRoomID)
+		currentRoom["items"] = rs.Items
+
+		// Active enemies in combat, or scenario enemies for the room.
+		if state.Dungeon.Combat.Active {
+			var enemies []string
+			for _, e := range state.Dungeon.Combat.Enemies {
+				if e.HP > 0 {
+					enemies = append(enemies, e.ID)
+				}
+			}
+			currentRoom["enemies"] = enemies
+		} else {
+			currentRoom["enemies"] = room.Enemies
+		}
+	}
+
+	// Adjacent rooms.
+	var adjacentRooms []map[string]any
+	if room, ok := sc.Rooms[currentRoomID]; ok {
+		for dir, conn := range room.Connections {
+			if conn.Type == "hidden" {
+				continue
+			}
+			adj := map[string]any{
+				"id":        conn.Room,
+				"direction": dir,
+				"visited":   containsString(state.Dungeon.VisitedRooms, conn.Room),
+			}
+			if adjRoom, ok := sc.Rooms[conn.Room]; ok {
+				adj["name"] = adjRoom.Name
+				adj["description_seed"] = adjRoom.DescriptionSeed
+			}
+			adjacentRooms = append(adjacentRooms, adj)
+		}
+		// Sort by direction for deterministic output.
+		sort.Slice(adjacentRooms, func(i, j int) bool {
+			return adjacentRooms[i]["direction"].(string) < adjacentRooms[j]["direction"].(string)
+		})
+	}
+
+	// Hero summary.
+	hs := heroSummary(state)
+	// Add inventory and equipped details for context.
+	if len(state.Party) > 0 {
+		h := &state.Party[0]
+		var invNames []string
+		for _, item := range h.Inventory {
+			invNames = append(invNames, item.ID)
+		}
+		hs["inventory"] = invNames
+		hs["equipped"] = map[string]any{
+			"weapon": h.Equipped.Weapon,
+			"armor":  h.Equipped.Armor,
+			"ring":   h.Equipped.Ring,
+			"amulet": h.Equipped.Amulet,
+		}
+	}
+
+	return map[string]any{
+		"scenario":       scenarioInfo,
+		"current_room":   currentRoom,
+		"adjacent_rooms": adjacentRooms,
+		"hero":           hs,
+		"visited_rooms":  state.Dungeon.VisitedRooms,
+		"rooms_total":    len(sc.Rooms),
+		"combat_active":  state.Dungeon.Combat.Active,
+	}, nil
+}
+
+// containsString checks whether s is in the slice.
+func containsString(slice []string, s string) bool {
+	for _, v := range slice {
+		if v == s {
+			return true
+		}
+	}
+	return false
 }
 
 // --- save/load ---

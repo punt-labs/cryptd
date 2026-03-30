@@ -122,6 +122,78 @@ func TestProtocol_UnknownGameMethod(t *testing.T) {
 	assert.Nil(t, resp.Result)
 }
 
+func TestProtocol_GameContext(t *testing.T) {
+	srv := testServer(t)
+	reqs := []Request{
+		initRequest(0),
+		newGameCall(1, map[string]any{
+			"scenario_id":     "minimal",
+			"character_name":  "Hero",
+			"character_class": "fighter",
+		}),
+		gameCall(2, "context", nil),
+	}
+	resps := multiRoundTrip(t, srv, reqs)
+	require.Len(t, resps, 3)
+	require.Nil(t, resps[0].Error, "session.init failed")
+	require.Nil(t, resps[1].Error, "game.new failed")
+
+	result := extractResult(t, resps[2])
+
+	// Verify scenario info.
+	scenario, ok := result["scenario"].(map[string]any)
+	require.True(t, ok, "result missing scenario map")
+	assert.Equal(t, "Minimal Dungeon", scenario["title"])
+	assert.Equal(t, "entrance", scenario["starting_room"])
+	assert.Equal(t, "respawn", scenario["death_mode"])
+
+	// Verify current room.
+	room, ok := result["current_room"].(map[string]any)
+	require.True(t, ok, "result missing current_room map")
+	assert.Equal(t, "entrance", room["id"])
+	assert.Equal(t, "Entrance Hall", room["name"])
+	assert.NotEmpty(t, room["description_seed"])
+
+	exits, ok := room["exits"].([]any)
+	require.True(t, ok)
+	assert.Greater(t, len(exits), 0)
+
+	// Verify adjacent rooms.
+	adjacent, ok := result["adjacent_rooms"].([]any)
+	require.True(t, ok, "result missing adjacent_rooms")
+	assert.Greater(t, len(adjacent), 0)
+
+	// Check first adjacent room has expected fields.
+	adjRoom, ok := adjacent[0].(map[string]any)
+	require.True(t, ok)
+	assert.Contains(t, adjRoom, "id")
+	assert.Contains(t, adjRoom, "name")
+	assert.Contains(t, adjRoom, "direction")
+	assert.Contains(t, adjRoom, "visited")
+	assert.Contains(t, adjRoom, "description_seed")
+
+	// Verify hero.
+	hero, ok := result["hero"].(map[string]any)
+	require.True(t, ok, "result missing hero map")
+	assert.Equal(t, "Hero", hero["name"])
+	assert.Equal(t, "fighter", hero["class"])
+	assert.Contains(t, hero, "inventory")
+	assert.Contains(t, hero, "equipped")
+
+	// Verify visited rooms.
+	visited, ok := result["visited_rooms"].([]any)
+	require.True(t, ok)
+	assert.Contains(t, visited, "entrance")
+
+	// Verify rooms_total.
+	roomsTotal, ok := result["rooms_total"].(float64)
+	require.True(t, ok)
+	assert.Equal(t, float64(4), roomsTotal) // minimal has 4 rooms
+
+	// Verify combat_active.
+	assert.Equal(t, false, result["combat_active"])
+}
+
 func TestProtocol_GamePlayRejectedInPassthrough(t *testing.T) {
 	srv := testServer(t) // testServer has no interp/narr, so sessions default to passthrough
 
