@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>crypt TUI mockup — Bubble Tea + Lip Gloss</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0a;
+    color: #c0c0c0;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+  }
+  .terminal {
+    width: 900px;
+    border: 1px solid #333;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 0 40px rgba(0,0,0,0.8);
+  }
+  .titlebar {
+    background: #1a1a1a;
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid #333;
+  }
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dot-red { background: #ff5f56; }
+  .dot-yellow { background: #ffbd2e; }
+  .dot-green { background: #27c93f; }
+  .titlebar-text {
+    flex: 1;
+    text-align: center;
+    color: #666;
+    font-size: 12px;
+  }
+  .content {
+    padding: 16px;
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    grid-template-rows: auto 1fr auto;
+    gap: 12px;
+    height: 620px;
+  }
+
+  /* Header bar */
+  .header {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 6px;
+  }
+  .char-name {
+    color: #e0a040;
+    font-weight: bold;
+    font-size: 15px;
+  }
+  .char-class {
+    color: #888;
+    font-size: 12px;
+  }
+  .level-xp {
+    color: #7a7a7a;
+    font-size: 12px;
+  }
+  .session-id {
+    color: #444;
+    font-size: 10px;
+    font-family: monospace;
+  }
+
+  /* Stats panel */
+  .stats {
+    grid-column: 2;
+    grid-row: 2;
+    padding: 12px;
+    background: #111;
+    border: 1px solid #333;
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+  }
+  .stat-label {
+    font-size: 11px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 2px;
+  }
+  .bar-container {
+    width: 100%;
+    height: 16px;
+    background: #222;
+    border-radius: 3px;
+    overflow: hidden;
+    position: relative;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s ease;
+  }
+  .bar-hp { background: linear-gradient(90deg, #c0392b, #e74c3c); }
+  .bar-hp-healthy { background: linear-gradient(90deg, #27ae60, #2ecc71); }
+  .bar-mp { background: linear-gradient(90deg, #2980b9, #3498db); }
+  .bar-xp { background: linear-gradient(90deg, #8e44ad, #9b59b6); }
+  .bar-text {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+  }
+
+  .divider {
+    border: none;
+    border-top: 1px solid #2a2a2a;
+    margin: 4px 0;
+  }
+
+  /* Exits */
+  .exits-label {
+    font-size: 11px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+  }
+  .exits-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: 1fr 1fr 1fr;
+    gap: 4px;
+    width: 140px;
+    margin: 0 auto;
+  }
+  .exit-btn {
+    padding: 4px 2px;
+    text-align: center;
+    font-size: 11px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .exit-active {
+    background: #1a2a1a;
+    border: 1px solid #2d5a2d;
+    color: #4a9a4a;
+  }
+  .exit-active:hover {
+    background: #2a3a2a;
+    color: #6aba6a;
+  }
+  .exit-empty {
+    background: transparent;
+    border: 1px solid #1a1a1a;
+    color: #333;
+  }
+
+  /* Inventory */
+  .inv-item {
+    font-size: 12px;
+    color: #aaa;
+    padding: 2px 0;
+    display: flex;
+    justify-content: space-between;
+  }
+  .inv-item-name { color: #c0c0c0; }
+  .inv-item-equipped { color: #e0a040; }
+  .inv-item-slot { color: #666; font-size: 10px; }
+
+  /* Combat panel */
+  .combat {
+    padding: 10px;
+    background: #1a0a0a;
+    border: 1px solid #4a1a1a;
+    border-radius: 6px;
+  }
+  .combat-title {
+    color: #c0392b;
+    font-size: 12px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+  }
+  .enemy-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  .enemy-name { color: #e07050; font-size: 12px; }
+  .enemy-bar {
+    width: 80px;
+    height: 10px;
+    background: #2a1a1a;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .enemy-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #c0392b, #e74c3c);
+    border-radius: 2px;
+  }
+  .enemy-hp { color: #888; font-size: 10px; }
+  .combat-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+  }
+  .combat-btn {
+    padding: 4px 10px;
+    font-size: 11px;
+    border-radius: 4px;
+    cursor: pointer;
+    background: #2a1a1a;
+    border: 1px solid #5a2a2a;
+    color: #e07050;
+  }
+  .combat-btn:hover {
+    background: #3a2a2a;
+    color: #ff9070;
+  }
+  .turn-indicator {
+    color: #e0a040;
+    font-size: 11px;
+    margin-top: 6px;
+    text-align: center;
+  }
+
+  /* Narration viewport */
+  .narration {
+    grid-column: 1;
+    grid-row: 2;
+    padding: 12px;
+    background: #0f0f0f;
+    border: 1px solid #333;
+    border-radius: 6px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .narration-entry {
+    padding-bottom: 10px;
+    border-bottom: 1px solid #1a1a1a;
+  }
+  .narration-entry:last-child { border-bottom: none; }
+  .room-name {
+    color: #e0a040;
+    font-weight: bold;
+    font-size: 14px;
+    margin-bottom: 4px;
+  }
+  .narration-text {
+    color: #b0b0b0;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  .action-text {
+    color: #7a9a7a;
+    font-size: 12px;
+    font-style: italic;
+  }
+  .combat-text {
+    color: #c07050;
+    font-size: 12px;
+  }
+  .system-text {
+    color: #666;
+    font-size: 11px;
+  }
+  .damage-text {
+    color: #e05050;
+  }
+  .xp-text {
+    color: #9b59b6;
+  }
+
+  /* Input */
+  .input-area {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .prompt {
+    color: #e0a040;
+    font-size: 14px;
+    font-weight: bold;
+  }
+  .input-field {
+    flex: 1;
+    background: #111;
+    border: 1px solid #333;
+    border-radius: 4px;
+    padding: 8px 12px;
+    color: #e0e0e0;
+    font-family: inherit;
+    font-size: 13px;
+    outline: none;
+  }
+  .input-field:focus {
+    border-color: #e0a040;
+  }
+  .input-hint {
+    color: #444;
+    font-size: 10px;
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: #111; }
+  ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #444; }
+</style>
+</head>
+<body>
+
+<div class="terminal">
+  <div class="titlebar">
+    <div class="dot dot-red"></div>
+    <div class="dot dot-yellow"></div>
+    <div class="dot dot-green"></div>
+    <div class="titlebar-text">crypt &mdash; /etc/shadow</div>
+  </div>
+
+  <div class="content">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <span class="char-name">Claude</span>
+        <span class="char-class">the Thief</span>
+        <span class="level-xp">&nbsp;&middot; Lv 2 &middot; 48 XP</span>
+      </div>
+      <div class="session-id">session e697dc2d</div>
+    </div>
+
+    <!-- Narration viewport -->
+    <div class="narration">
+      <div class="narration-entry">
+        <div class="room-name">/etc/shadow</div>
+        <div class="narration-text">
+          The secrets of the system lie bare before you in this forbidden vault of encrypted credentials. Password hashes line the walls like ancient runes, each one a cryptographic incantation protecting a user's identity. The air crackles with the residual energy of failed authentication attempts, and somewhere in the shadows, corrupted processes stir restlessly.
+        </div>
+      </div>
+
+      <div class="narration-entry">
+        <div class="action-text">You pick up the Shadow File.</div>
+      </div>
+
+      <div class="narration-entry">
+        <div class="action-text">You equip the Kill Nine.</div>
+      </div>
+
+      <div class="narration-entry">
+        <div class="combat-text">A Zombie Process lurches from the darkness, its undead PID still consuming resources!</div>
+      </div>
+
+      <div class="narration-entry">
+        <div class="combat-text">
+          You send <span style="color:#e0a040">SIGKILL</span> to the Zombie Process. <span class="damage-text">5 damage.</span>
+          <br>The Zombie Process thrashes blindly. <span class="damage-text">1 damage to you.</span> Your alias shield absorbs the worst of it.
+        </div>
+      </div>
+
+      <div class="narration-entry">
+        <div class="combat-text">
+          You deliver the final <span style="color:#e0a040">kill -9</span>. <span class="damage-text">8 damage.</span> The Zombie Process dissolves into freed memory.
+          <br><span class="xp-text">+6 XP</span>
+        </div>
+      </div>
+
+      <div class="narration-entry">
+        <div class="narration-text">
+          The chamber falls silent. Dust motes of deallocated memory drift through the air. A Shadow File and a Health Draught lie among the remains.
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats panel -->
+    <div class="stats">
+      <div>
+        <div class="stat-label">Hit Points</div>
+        <div class="bar-container">
+          <div class="bar-fill bar-hp-healthy" style="width: 95%"></div>
+          <div class="bar-text">20 / 21</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="stat-label">Experience</div>
+        <div class="bar-container">
+          <div class="bar-fill bar-xp" style="width: 24%"></div>
+          <div class="bar-text">48 / 200</div>
+        </div>
+      </div>
+
+      <hr class="divider">
+
+      <div class="exits-label">Exits</div>
+      <div class="exits-grid">
+        <div class="exit-btn exit-empty"></div>
+        <div class="exit-btn exit-active">N</div>
+        <div class="exit-btn exit-empty"></div>
+        <div class="exit-btn exit-empty">W</div>
+        <div class="exit-btn exit-empty" style="color:#222">&bull;</div>
+        <div class="exit-btn exit-empty">E</div>
+        <div class="exit-btn exit-empty"></div>
+        <div class="exit-btn exit-empty">S</div>
+        <div class="exit-btn exit-empty"></div>
+      </div>
+
+      <hr class="divider">
+
+      <div class="stat-label">Equipped</div>
+      <div class="inv-item">
+        <span class="inv-item-equipped">Kill Nine</span>
+        <span class="inv-item-slot">weapon</span>
+      </div>
+      <div class="inv-item">
+        <span class="inv-item-equipped">Alias Shield</span>
+        <span class="inv-item-slot">armor</span>
+      </div>
+      <div class="inv-item">
+        <span class="inv-item-equipped">Grep Tool</span>
+        <span class="inv-item-slot">amulet</span>
+      </div>
+
+      <hr class="divider">
+
+      <div class="stat-label">Inventory</div>
+      <div class="inv-item">
+        <span class="inv-item-name">Man Page</span>
+        <span class="inv-item-slot">0.1 lb</span>
+      </div>
+      <div class="inv-item">
+        <span class="inv-item-name">Health Potion</span>
+        <span class="inv-item-slot">0.5 lb</span>
+      </div>
+      <div class="inv-item">
+        <span class="inv-item-name">Shadow File</span>
+        <span class="inv-item-slot">0.2 lb</span>
+      </div>
+      <div style="color:#555; font-size:10px; margin-top:4px">
+        Weight: 4.1 / 50.0 lbs
+      </div>
+
+      <hr class="divider">
+
+      <!-- Combat panel (shown during combat) -->
+      <!--
+      <div class="combat">
+        <div class="combat-title">Combat &mdash; Round 2</div>
+        <div class="enemy-row">
+          <span class="enemy-name">Zombie Process</span>
+          <div class="enemy-bar">
+            <div class="enemy-bar-fill" style="width: 17%"></div>
+          </div>
+          <span class="enemy-hp">1/6</span>
+        </div>
+        <div class="combat-actions">
+          <div class="combat-btn">Attack</div>
+          <div class="combat-btn">Defend</div>
+          <div class="combat-btn">Flee</div>
+          <div class="combat-btn">Use Item</div>
+        </div>
+        <div class="turn-indicator">Your turn</div>
+      </div>
+      -->
+
+      <div class="stat-label">Stats</div>
+      <div style="font-size:11px; color:#777; display:grid; grid-template-columns:1fr 1fr; gap:2px 12px;">
+        <span>STR <span style="color:#aaa">14</span></span>
+        <span>INT <span style="color:#aaa">10</span></span>
+        <span>DEX <span style="color:#aaa">12</span></span>
+        <span>WIS <span style="color:#aaa">10</span></span>
+        <span>CON <span style="color:#aaa">12</span></span>
+        <span>CHA <span style="color:#aaa">10</span></span>
+      </div>
+    </div>
+
+    <!-- Input -->
+    <div class="input-area">
+      <span class="prompt">&gt;</span>
+      <input class="input-field" type="text" placeholder="search the walls for hidden doors..." autofocus>
+      <span class="input-hint">Tab: complete &middot; &uarr;: history</span>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
