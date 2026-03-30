@@ -56,27 +56,3 @@ func NewGameCmd(send SendFn, scenario, name, class string) tea.Cmd {
 	}
 }
 
-// InitCmd returns a tea.Cmd that sends session.init.
-func InitCmd(send SendFn, sessionID string) tea.Cmd {
-	return func() tea.Msg {
-		var params any
-		if sessionID != "" {
-			params = protocol.InitializeParams{SessionID: sessionID}
-		}
-		result, err := send("session.init", params)
-		if err != nil {
-			if errors.Is(err, ErrConnLost) {
-				return ConnLostMsg{Err: err}
-			}
-			return ServerErrMsg{Err: err}
-		}
-		var resp protocol.InitializeResult
-		if err := json.Unmarshal(result, &resp); err != nil {
-			return ServerErrMsg{Err: fmt.Errorf("parse init response: %w", err)}
-		}
-		return SessionReadyMsg{
-			SessionID: resp.SessionID,
-			HasGame:   resp.HasGame,
-		}
-	}
-}

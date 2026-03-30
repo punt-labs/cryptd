@@ -112,11 +112,15 @@ func (s *Server) handleNewGamePlay(req Request, sess **Session) Response {
 	}
 	narration, narrErr := s.narr.Narrate(ctx, event, stateCopy)
 	if narrErr != nil {
+		fallback := lookResult.Description
+		if fallback == "" {
+			fallback = "You enter the dungeon."
+		}
 		return Response{
 			JSONRPC: "2.0",
 			ID:      req.ID,
 			Result: PlayResponse{
-				Text:        "You enter the dungeon.",
+				Text:        fallback,
 				State:       stateForResp,
 				Exits:       lookResult.Exits,
 				NextLevelXP: nextLevelXP,

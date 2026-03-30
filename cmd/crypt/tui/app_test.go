@@ -62,7 +62,7 @@ func TestApp(t *testing.T) {
 		{
 			name: "Init returns non-nil Cmd",
 			setup: func() App {
-				return NewApp(mockSend(`{}`), "sess-1", "dungeon", "Thorn", "fighter")
+				return NewApp(mockSend(`{}`), "sess-1", "dungeon", "Thorn", "fighter", nil)
 			},
 			msg: nil, // use Init() instead
 			check: func(t *testing.T, a *App, cmd tea.Cmd) {
@@ -73,7 +73,7 @@ func TestApp(t *testing.T) {
 		{
 			name: "WindowSizeMsg updates dimensions",
 			setup: func() App {
-				return NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter")
+				return NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter", nil)
 			},
 			msg: tea.WindowSizeMsg{Width: 120, Height: 40},
 			check: func(t *testing.T, a *App, cmd tea.Cmd) {
@@ -82,31 +82,31 @@ func TestApp(t *testing.T) {
 			},
 		},
 		{
-			name: "SessionReadyMsg with scenario returns non-nil Cmd",
+			name: "Init with scenario returns non-nil Cmd",
 			setup: func() App {
-				return NewApp(mockSend(`{}`), "", "dungeon", "Thorn", "fighter")
+				return NewApp(mockSend(`{}`), "sess-42", "dungeon", "Thorn", "fighter", nil)
 			},
-			msg: SessionReadyMsg{SessionID: "sess-42"},
+			msg: nil,
 			check: func(t *testing.T, a *App, cmd tea.Cmd) {
-				assert.Equal(t, "sess-42", a.sessionID)
-				assert.NotNil(t, cmd, "should return NewGameCmd when scenario is set")
+				initCmd := a.Init()
+				assert.NotNil(t, initCmd, "should return NewGameCmd when scenario is set")
 			},
 		},
 		{
-			name: "SessionReadyMsg without scenario returns nil Cmd",
+			name: "Init without scenario or initialResp returns nil",
 			setup: func() App {
-				return NewApp(mockSend(`{}`), "", "", "Thorn", "fighter")
+				return NewApp(mockSend(`{}`), "sess-42", "", "Thorn", "fighter", nil)
 			},
-			msg: SessionReadyMsg{SessionID: "sess-42"},
+			msg: nil,
 			check: func(t *testing.T, a *App, cmd tea.Cmd) {
-				assert.Equal(t, "sess-42", a.sessionID)
-				assert.Nil(t, cmd)
+				initCmd := a.Init()
+				assert.Nil(t, initCmd)
 			},
 		},
 		{
 			name: "ServerResponseMsg updates state",
 			setup: func() App {
-				a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter")
+				a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter", nil)
 				a.waiting = true
 				return a
 			},
@@ -121,7 +121,7 @@ func TestApp(t *testing.T) {
 		{
 			name: "combat hotkey a dispatches attack",
 			setup: func() App {
-				a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter")
+				a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter", nil)
 				resp := combatPlayResponse()
 				a.lastResp = &resp
 				a.input.Blur() // hotkey mode
@@ -139,7 +139,7 @@ func TestApp(t *testing.T) {
 		{
 			name: "combat hotkey ignored when input focused",
 			setup: func() App {
-				a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter")
+				a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter", nil)
 				resp := combatPlayResponse()
 				a.lastResp = &resp
 				// input starts focused by default
@@ -162,7 +162,7 @@ func TestApp(t *testing.T) {
 		{
 			name: "dead state: enter quits",
 			setup: func() App {
-				a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter")
+				a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter", nil)
 				a.dead = true
 				return a
 			},
@@ -178,7 +178,7 @@ func TestApp(t *testing.T) {
 		{
 			name: "dead state: random key does not quit",
 			setup: func() App {
-				a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter")
+				a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter", nil)
 				a.dead = true
 				return a
 			},
@@ -190,7 +190,7 @@ func TestApp(t *testing.T) {
 		{
 			name: "SendCmdMsg sets waiting",
 			setup: func() App {
-				return NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter")
+				return NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter", nil)
 			},
 			msg: SendCmdMsg{Text: "look"},
 			check: func(t *testing.T, a *App, cmd tea.Cmd) {
@@ -201,7 +201,7 @@ func TestApp(t *testing.T) {
 		{
 			name: "SendCmdMsg ignored when dead",
 			setup: func() App {
-				a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter")
+				a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter", nil)
 				a.dead = true
 				return a
 			},
@@ -214,7 +214,7 @@ func TestApp(t *testing.T) {
 		{
 			name: "SendCmdMsg ignored when already waiting",
 			setup: func() App {
-				a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter")
+				a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter", nil)
 				a.waiting = true
 				return a
 			},
@@ -242,7 +242,7 @@ func TestApp(t *testing.T) {
 }
 
 func TestAppGameStartMsg(t *testing.T) {
-	a := NewApp(mockSend(`{}`), "sess-1", "dungeon", "Thorn", "fighter")
+	a := NewApp(mockSend(`{}`), "sess-1", "dungeon", "Thorn", "fighter", nil)
 	resp := testPlayResponse()
 	result, cmd := a.Update(GameStartMsg{Response: resp})
 	appPtr := result.(*App)
@@ -252,7 +252,7 @@ func TestAppGameStartMsg(t *testing.T) {
 }
 
 func TestAppServerErrMsg(t *testing.T) {
-	a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter")
+	a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter", nil)
 	a.waiting = true
 	result, _ := a.Update(ServerErrMsg{Err: assert.AnError})
 	appPtr := result.(*App)
@@ -260,7 +260,7 @@ func TestAppServerErrMsg(t *testing.T) {
 }
 
 func TestAppConnLostMsg(t *testing.T) {
-	a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter")
+	a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter", nil)
 	result, _ := a.Update(ConnLostMsg{Err: assert.AnError})
 	appPtr := result.(*App)
 	assert.NotNil(t, appPtr.err)
@@ -268,7 +268,7 @@ func TestAppConnLostMsg(t *testing.T) {
 }
 
 func TestAppViewConnecting(t *testing.T) {
-	a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter")
+	a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter", nil)
 	a.width = 100
 	a.height = 30
 	v := a.View()
@@ -276,7 +276,7 @@ func TestAppViewConnecting(t *testing.T) {
 }
 
 func TestAppViewWithState(t *testing.T) {
-	a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter")
+	a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter", nil)
 	a.width = 100
 	a.height = 30
 	resp := testPlayResponse()
@@ -287,7 +287,7 @@ func TestAppViewWithState(t *testing.T) {
 }
 
 func TestAppCombatHotkeyD(t *testing.T) {
-	a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter")
+	a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter", nil)
 	resp := combatPlayResponse()
 	a.lastResp = &resp
 	a.input.Blur()
@@ -301,7 +301,7 @@ func TestAppCombatHotkeyD(t *testing.T) {
 }
 
 func TestAppCombatTabFocusesInput(t *testing.T) {
-	a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter")
+	a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter", nil)
 	resp := combatPlayResponse()
 	a.lastResp = &resp
 	a.input.Blur()
@@ -312,7 +312,7 @@ func TestAppCombatTabFocusesInput(t *testing.T) {
 }
 
 func TestAppCombatEscBlursInput(t *testing.T) {
-	a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter")
+	a := NewApp(mockSend(`{}`), "sess-1", "", "Thorn", "fighter", nil)
 	resp := combatPlayResponse()
 	a.lastResp = &resp
 	// input starts focused
@@ -320,4 +320,27 @@ func TestAppCombatEscBlursInput(t *testing.T) {
 	result, _ := a.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	appPtr := result.(*App)
 	assert.False(t, appPtr.input.Focused())
+}
+
+func TestAppSessionResume(t *testing.T) {
+	resp := testPlayResponse()
+	a := NewApp(mockSend(`{}`), "sess-resume", "", "Thorn", "fighter", &resp)
+
+	// Init should return a Cmd that produces GameStartMsg with the pre-fetched response.
+	initCmd := a.Init()
+	require.NotNil(t, initCmd, "Init must return a Cmd for resumed sessions")
+
+	msg := initCmd()
+	gsMsg, ok := msg.(GameStartMsg)
+	require.True(t, ok, "expected GameStartMsg, got %T", msg)
+	assert.Equal(t, "You enter a dark room.", gsMsg.Response.Text)
+	assert.Equal(t, []string{"north", "east"}, gsMsg.Response.Exits)
+
+	// Process the GameStartMsg through Update and verify state is set.
+	result, cmd := a.Update(gsMsg)
+	appPtr := result.(*App)
+	require.NotNil(t, appPtr.lastResp)
+	assert.Equal(t, "You enter a dark room.", appPtr.lastResp.Text)
+	assert.Equal(t, "Thorn", appPtr.lastResp.State.Party[0].Name)
+	assert.Nil(t, cmd)
 }

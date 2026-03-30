@@ -41,7 +41,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	useTUI := !*plain && term.IsTerminal(int(os.Stdin.Fd()))
+	useTUI := !*plain && term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd()))
 	if useTUI {
 		os.Exit(runTUI(*socketPath, *addr, *scenario, *name, *class, *sessionID))
 	} else {

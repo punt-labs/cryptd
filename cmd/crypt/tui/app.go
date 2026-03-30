@@ -17,6 +17,8 @@ type App struct {
 	charName  string
 	charClass string
 
+	initialResp *protocol.PlayResponse
+
 	width, height int
 	narrWidth     int
 	mainHeight    int
@@ -34,23 +36,37 @@ type App struct {
 }
 
 // NewApp creates an App wired to the given RPC send function.
-func NewApp(send SendFn, sessionID, scenario, charName, charClass string) App {
+// If initialResp is non-nil (session resume), Init() will use it directly
+// instead of making a network call.
+func NewApp(send SendFn, sessionID, scenario, charName, charClass string, initialResp *protocol.PlayResponse) App {
 	return App{
-		send:      send,
-		sessionID: sessionID,
-		scenario:  scenario,
-		charName:  charName,
-		charClass: charClass,
-		narration: NewNarrationPane(80, 20),
-		sidebar:   NewSidebarPane(SidebarWidth, 20),
-		combat:    NewCombatOverlay(80),
-		input:     NewInputBar(),
+		send:        send,
+		sessionID:   sessionID,
+		scenario:    scenario,
+		charName:    charName,
+		charClass:   charClass,
+		initialResp: initialResp,
+		narration:   NewNarrationPane(80, 20),
+		sidebar:     NewSidebarPane(SidebarWidth, 20),
+		combat:      NewCombatOverlay(80),
+		input:       NewInputBar(),
 	}
 }
 
-// Init starts the session handshake.
+// Init returns the initial command. For resumed sessions, it produces a
+// GameStartMsg from the pre-fetched response. For new games with a scenario,
+// it sends game.new. Otherwise it returns nil.
 func (a App) Init() tea.Cmd {
-	return InitCmd(a.send, a.sessionID)
+	if a.initialResp != nil {
+		resp := *a.initialResp
+		return func() tea.Msg { return GameStartMsg{Response: resp} }
+	}
+	if a.scenario != "" {
+		a.waiting = true
+		a.input.SetWaiting(true)
+		return NewGameCmd(a.send, a.scenario, a.charName, a.charClass)
+	}
+	return nil
 }
 
 // Update routes messages to sub-components.
@@ -72,22 +88,6 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var inputCmd tea.Cmd
 		a.input, inputCmd = a.input.Update(msg)
 		return &a, tea.Batch(cmd, inputCmd)
-
-	case SessionReadyMsg:
-		a.sessionID = msg.SessionID
-		if a.scenario != "" {
-			a.waiting = true
-			a.input.SetWaiting(true)
-			return &a, NewGameCmd(a.send, a.scenario, a.charName, a.charClass)
-		}
-		if msg.HasGame {
-			a.waiting = true
-			a.input.SetWaiting(true)
-			return &a, PlayCmd(a.send, "look")
-		}
-		// No game, no scenario — show instructions.
-		a.narration.AppendText("No active game. Start with: new <scenario> <name> <class>", StyleSystem)
-		return &a, nil
 
 	case GameStartMsg:
 		resp := msg.Response

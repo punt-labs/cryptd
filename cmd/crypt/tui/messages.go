@@ -26,9 +26,3 @@ type SendCmdMsg struct {
 type GameStartMsg struct {
 	Response protocol.PlayResponse
 }
-
-// SessionReadyMsg carries the session ID after session.init completes.
-type SessionReadyMsg struct {
-	SessionID string
-	HasGame   bool
-}

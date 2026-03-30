@@ -68,7 +68,41 @@ func runTUI(socketPath, addr, scenario, charName, charClass, sessionID string) i
 		return resp.Result, nil
 	})
 
-	app := tui.NewApp(send, sessionID, scenario, charName, charClass)
+	// Handshake: session.init before starting Bubble Tea.
+	var initParams any
+	if sessionID != "" {
+		initParams = protocol.InitializeParams{SessionID: sessionID}
+	}
+	initResult, err := send("session.init", initParams)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "session init failed: %v\n", err)
+		return 1
+	}
+	var initResp protocol.InitializeResult
+	if err := json.Unmarshal(initResult, &initResp); err != nil {
+		fmt.Fprintf(os.Stderr, "parse init response: %v\n", err)
+		return 1
+	}
+
+	// If resuming an existing game, consume the unsolicited initial PlayResponse.
+	var initialResp *protocol.PlayResponse
+	if initResp.HasGame {
+		if !scanner.Scan() {
+			fmt.Fprintf(os.Stderr, "connection lost during resume\n")
+			return 1
+		}
+		var envelope struct {
+			Result json.RawMessage `json:"result"`
+		}
+		if err := json.Unmarshal(scanner.Bytes(), &envelope); err == nil && envelope.Result != nil {
+			var pr protocol.PlayResponse
+			if err := json.Unmarshal(envelope.Result, &pr); err == nil {
+				initialResp = &pr
+			}
+		}
+	}
+
+	app := tui.NewApp(send, initResp.SessionID, scenario, charName, charClass, initialResp)
 	p := tea.NewProgram(app, tea.WithAltScreen())
 
 	if _, err := p.Run(); err != nil {
