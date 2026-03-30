@@ -62,8 +62,6 @@ func (a App) Init() tea.Cmd {
 		return func() tea.Msg { return GameStartMsg{Response: resp} }
 	}
 	if a.scenario != "" {
-		a.waiting = true
-		a.input.SetWaiting(true)
 		return NewGameCmd(a.send, a.scenario, a.charName, a.charClass)
 	}
 	return nil
@@ -130,15 +128,13 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ServerErrMsg:
 		a.waiting = false
 		a.input.SetWaiting(false)
-		if a.sessionID == "" {
-			// Init failed — fatal.
-			a.narration.AppendText(fmt.Sprintf("Failed to connect: %v", msg.Err), StyleDamage)
+		a.narration.AppendText(fmt.Sprintf("Error: %v", msg.Err), StyleSystem)
+		if a.lastResp == nil {
+			// No game started yet — fatal, no recovery possible.
 			a.narration.AppendText("Press Ctrl+C to exit.", StyleSystem)
 			a.input.Blur()
 			a.err = msg.Err
-			return &a, nil
 		}
-		a.narration.AppendText(fmt.Sprintf("Error: %v", msg.Err), StyleSystem)
 		return &a, nil
 
 	case ConnLostMsg:
