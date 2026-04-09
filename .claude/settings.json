@@ -36,7 +36,8 @@
       "WebFetch(domain:ics.uci.edu)",
       "WebFetch(domain:survey.stackoverflow.co)",
       "WebFetch(domain:venturebeat.com)",
-      "WebFetch(domain:www.anthropic.com)"
+      "WebFetch(domain:www.anthropic.com)",
+      "Edit"
     ],
     "deny": [
       "Bash(rm -rf /:*)",
