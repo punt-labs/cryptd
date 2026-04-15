@@ -1117,9 +1117,9 @@ when Biff multi-player (Phase~5) is added.
 \begin{itemize}
   \item \texttt{GameState.Party} is always a \texttt{[]Character}
     slice; single-player sets \texttt{len(Party) == 1}.
-  \item \tool{move}, \tool{attack}, \tool{flee}, \tool{defend} all
-    accept an optional \field{character\_id}; omitting it targets
-    the primary character.
+  \item \texttt{game.move}, \texttt{game.attack}, \texttt{game.flee},
+    \texttt{game.defend} all accept an optional \field{character\_id};
+    omitting it targets the primary character.
   \item Combat turn order already handles multiple actors.
   \item Save files carry a \field{party} array (empty until Biff).
 \end{itemize}
