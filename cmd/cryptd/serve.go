@@ -150,6 +150,7 @@ func runTestingMode(scenarioID, charName, charClass, scriptFile string, jsonMode
 	}
 
 	var hero model.Character
+	var stdinBuf *bufio.Reader // shared buffer for interactive mode
 
 	if scriptFile != "" || luxMode {
 		// Scripted or Lux mode: use defaults (no interactive prompt).
@@ -159,8 +160,13 @@ func runTestingMode(scenarioID, charName, charClass, scriptFile string, jsonMode
 			os.Exit(1)
 		}
 	} else {
-		// Interactive mode: prompt for character creation.
-		hero, err = promptCharacterCreation(os.Stdout, os.Stdin)
+		// Interactive mode: wrap stdin in a shared bufio.Reader so
+		// character creation and the CLI renderer read from the same
+		// buffer. Without this, promptCharacterCreation's internal
+		// bufio.Scanner consumes stdin ahead of what it needs, and the
+		// renderer's scanner sees EOF.
+		stdinBuf = bufio.NewReader(os.Stdin)
+		hero, err = promptCharacterCreation(os.Stdout, stdinBuf)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
@@ -211,9 +217,10 @@ func runTestingMode(scenarioID, charName, charClass, scriptFile string, jsonMode
 			os.Exit(1)
 		}
 	} else {
-		// Interactive mode: probe for SLM, fall back to rules+templates.
+		// Interactive mode: use the shared buffered reader so the
+		// renderer picks up where character creation left off.
 		interp, narr := resolveInterpreterNarrator(anthropicKey, modelName)
-		rend := renderer.NewCLI(os.Stdout, os.Stdin)
+		rend := renderer.NewCLI(os.Stdout, stdinBuf)
 		loop := game.NewLoop(eng, interp, narr, rend)
 		if err := loop.Run(context.Background(), &state); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -289,15 +296,17 @@ func resolveInterpreterNarrator(anthropicKey, modelName string) (model.CommandIn
 }
 
 // promptCharacterCreation runs an interactive character creation flow,
-// asking for name, class, and stat allocation.
-func promptCharacterCreation(out io.Writer, in io.Reader) (model.Character, error) {
-	scanner := bufio.NewScanner(in)
+// asking for name, class, and stat allocation. It reads from br using
+// ReadString so it consumes only the bytes it needs; the caller can
+// continue reading from the same *bufio.Reader afterward.
+func promptCharacterCreation(out io.Writer, br *bufio.Reader) (model.Character, error) {
 	prompt := func(msg string) string {
 		fmt.Fprint(out, msg)
-		if !scanner.Scan() {
+		line, err := br.ReadString('\n')
+		if err != nil && line == "" {
 			return ""
 		}
-		return strings.TrimSpace(scanner.Text())
+		return strings.TrimSpace(line)
 	}
 
 	fmt.Fprintln(out, "=== Character Creation ===")
