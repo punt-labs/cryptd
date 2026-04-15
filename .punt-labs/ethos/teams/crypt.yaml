@@ -1,0 +1,12 @@
+name: crypt
+repositories:
+  - punt-labs/cryptd
+members:
+  - identity: archivist
+    role: dungeon-master
+  - identity: cryptkeeper
+    role: dungeon-master
+  - identity: gax
+    role: game-designer
+  - identity: cht
+    role: tui-specialist
