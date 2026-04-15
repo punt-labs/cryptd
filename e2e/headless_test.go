@@ -18,7 +18,7 @@ func TestServeT_MinimalRunCommands(t *testing.T) {
 	root := repoRoot(t)
 
 	// Provide commands via stdin.
-	stdin := "go south\nlook\ngo north\nquit\n"
+	stdin := "Adventurer\nfighter\n\ngo south\nlook\ngo north\nquit\n"
 
 	cmd := exec.Command(bin, "serve", "-t", "--scenario", "minimal")
 	cmd.Dir = root
