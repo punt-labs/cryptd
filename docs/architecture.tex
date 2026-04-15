@@ -411,9 +411,11 @@ Three command types flow through the channel:
 \textbf{Type} & \textbf{Purpose} \\
 \midrule
 \texttt{tool}
-  & Method dispatch: execute a named \texttt{game.*} JSON-RPC method
-    against the engine and return the result.  Used by passthrough
-    mode for every request and by normal mode for \tool{game.new}. \\
+  & Internal method dispatch: the goroutine receives an unprefixed
+    command name (e.g., \texttt{new\_game}, \texttt{move},
+    \texttt{look}) --- the JSON-RPC handler strips the \texttt{game.}
+    prefix before sending.  Used by passthrough mode for every
+    request and by normal mode for \texttt{new\_game}. \\
 \texttt{run\_loop}
   & Normal mode game loop: the game goroutine runs
     \texttt{game.NewLoop().Run()} internally, blocking until the
@@ -737,7 +739,7 @@ Save files live at \texttt{.dungeon/saves/<slot>.json} (gitignored).
       "xp": 1240, "gold": 48,
       "stats": {"str":16,"int":9,"dex":12,"con":14,"wis":10,"cha":11},
       "inventory": [],
-      "equipped": {"weapon_id": "rusty_sword"},
+      "equipped": {"weapon": "rusty_sword"},
       "conditions": []
     }
   ],
@@ -783,7 +785,11 @@ standard JSON-RPC error).
     \field{has\_game} \\
 \texttt{session.quit}
   & ---
-  & \field{ok} \\
+  & Only meaningful inside an active normal-mode game loop:
+    \texttt{RPCRenderer} injects a \texttt{quit} input event,
+    the game loop narrates a farewell, and the final response is
+    \texttt{PlayResponse} with \field{quit}=\texttt{true}. A bare
+    \texttt{session.quit} outside the play loop is ignored. \\
 \texttt{game.new}
   & \field{scenario\_id?}, \field{character\_name?},
     \field{character\_class?}, \field{stats?}

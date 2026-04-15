@@ -33,7 +33,7 @@ test-integration:                          ## Integration tests (race detector o
 test-e2e: build                            ## E2E tests (compiles binary first)
 	go test -tags e2e ./e2e/...
 
-test-acceptance: build                     ## Acceptance tests (YAML scripts, race detector on)
+test-acceptance: build                     ## Acceptance tests (YAML scripts; -race covers test harness only, not the cryptd subprocess)
 	go test -race -count=1 -tags acceptance ./e2e/...
 
 coverage:                                  ## Engine coverage (fails below 90%)
