@@ -436,18 +436,6 @@ notation before a player encounters them at runtime.
 
 Run in CI as a pre-check on any changed `scenarios/*.yaml`.
 
-### MCP Schema Contract
-
-The MCP tool definitions (tool names, argument shapes, return shapes) are
-serialised to `testdata/mcp-schema.json` by a generator. A CI step diffs the
-generated schema against the committed version. Any accidental API change fails
-the build before any consumer breaks.
-
-```bash
-go run ./cmd/dump-mcp-schema > /tmp/schema.json
-diff testdata/mcp-schema.json /tmp/schema.json
-```
-
 ### Race Detection
 
 `go test -race` is mandatory on CI for all packages that touch the daemon's

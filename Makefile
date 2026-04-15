@@ -1,4 +1,4 @@
-.PHONY: help vet test test-integration test-e2e lint markdownlint coverage \
+.PHONY: help vet test test-integration test-e2e test-acceptance lint markdownlint coverage \
        check check-full build build-server build-client build-admin clean help \
        install uninstall man play play-unix \
        ollama-install ollama-start ollama-pull ollama-setup eval-slm \
@@ -18,7 +18,7 @@ all: build check                           ## Build binaries and run quality gat
 
 ##@ Quality Gates
 check: vet test lint markdownlint          ## Quick gate (before every commit)
-check-full: vet test test-integration coverage lint markdownlint build test-e2e  ## Full gate (before PR)
+check-full: vet test test-integration coverage lint markdownlint build test-e2e test-acceptance  ## Full gate (before PR)
 
 ##@ Testing
 vet:                                       ## Run go vet
@@ -32,6 +32,9 @@ test-integration:                          ## Integration tests (race detector o
 
 test-e2e: build                            ## E2E tests (compiles binary first)
 	go test -tags e2e ./e2e/...
+
+test-acceptance: build                     ## Acceptance tests (YAML scripts, race detector on)
+	go test -race -tags acceptance ./e2e/...
 
 coverage:                                  ## Engine coverage (fails below 90%)
 	go test -cover -coverprofile=coverage.out ./internal/engine/...
