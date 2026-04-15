@@ -303,7 +303,7 @@ func promptCharacterCreation(out io.Writer, br *bufio.Reader) (model.Character, 
 	prompt := func(msg string) string {
 		fmt.Fprint(out, msg)
 		line, err := br.ReadString('\n')
-		if err != nil && line == "" {
+		if err != nil && err != io.EOF {
 			return ""
 		}
 		return strings.TrimSpace(line)
