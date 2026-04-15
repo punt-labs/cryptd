@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- **Acceptance test tier split out.** `e2e/acceptance_test.go` now uses `//go:build acceptance` (separate from the `e2e` tag). New `make test-acceptance` target and dedicated CI job. `helpers_test.go` uses `e2e || acceptance` so both build. `make check-full` runs both.
+- **README badges added.** License, CI status, Go Report Card, and Go Reference.
+- **CLAUDE.md M10 status clarified.** M10 session-routing infrastructure (concurrent sessions, per-session isolation) is complete; DM/player privilege gating, `tools/list_changed` notifications, and multi-session integration tests (cryptd-90e.2, .3, .5) remain open.
+- **Package map updated.** CLAUDE.md adds `cmd/crypt-admin`; both CLAUDE.md and README.md drop the removed `cmd/dump-mcp-schema`. README's JSON-RPC API surface replaces the stale MCP tool list. `docs/build-plan.md` and `docs/testing.md` drop references to the deleted schema contract.
+- **architecture.tex synced to current protocol.** Rewrote MCP tool-surface sections (15 tools, `tools/call` dispatch, `--passthrough` flag) as JSON-RPC method-surface sections (direct named methods, per-session mode via `session.init`). PDF rebuilt.
 - **Per-session mode replaces server-level `--passthrough` flag.** Session mode (normal vs passthrough) is now set during `session.init` via the `mode` field in `InitializeParams`. The daemon serves both `crypt` (normal) and `crypt mcp` (passthrough) clients simultaneously on the same socket. The `--passthrough` CLI flag is removed.
 - **Protocol: direct JSON-RPC methods replace MCP framing.** Daemon protocol refactored from `tools/call` dispatch to direct named methods: `session.init`, `game.new`, `game.move`, `game.look`, `game.play`, `session.quit`, etc. Response results are direct JSON objects instead of `ToolResult{content:[{text:"..."}]}` wrappers. Error responses use standard JSON-RPC error objects instead of `ToolResult{isError:true}`.
 - **Removed MCP schema infrastructure.** Deleted `cmd/dump-mcp-schema`, `testdata/mcp-schema.json`, and the `mcp-schema` CI job. The daemon is a game server, not an MCP server.

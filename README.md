@@ -1,5 +1,10 @@
 # cryptd
 
+[![License](https://img.shields.io/github/license/punt-labs/cryptd)](LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/punt-labs/cryptd/test.yml?label=CI)](https://github.com/punt-labs/cryptd/actions/workflows/test.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/punt-labs/cryptd)](https://goreportcard.com/report/github.com/punt-labs/cryptd)
+[![Go Reference](https://pkg.go.dev/badge/github.com/punt-labs/cryptd.svg)](https://pkg.go.dev/github.com/punt-labs/cryptd)
+
 Game engine and server for [crypt](https://github.com/punt-labs/crypt) — a text
 adventure game playable via Claude Code, CLI, or (future) web client.
 
@@ -17,7 +22,7 @@ adventure game playable via Claude Code, CLI, or (future) web client.
 cryptd serve                           # daemonize, default Unix socket (~/.crypt/daemon.sock)
 cryptd serve -f --listen :9000         # foreground, TCP
 cryptd serve -t --scenario minimal     # testing mode (stdin/stdout, no network)
-cryptd serve --passthrough             # raw MCP tool surface for Claude Code
+cryptd serve --api-key sk-...          # enable Claude LLM tier (or CRYPTD_API_KEY env)
 cryptd serve -t --scenario minimal --script demo.txt  # scripted playthrough
 ```
 
@@ -84,7 +89,8 @@ produces nodes and edges, BFS direction assignment creates valid bidirectional
 YAML directory format that `cryptd` loads directly.
 
 The [crypt plugin](https://github.com/punt-labs/crypt) for Claude Code connects
-to `cryptd serve --passthrough` for raw MCP tool access.
+via `crypt mcp`, a stdio MCP bridge that proxies tool calls to `cryptd serve`.
+Session mode (normal vs passthrough) is set per-session during `session.init`.
 
 ## Architecture
 
@@ -124,10 +130,9 @@ linked only into `crypt-admin` — never into `cryptd` or `crypt`.
 
 | Package | Purpose |
 |---------|---------|
-| `cmd/cryptd` | Server binary: `serve` (with `-f`, `-t`, `--passthrough`), `validate` (deprecated) |
+| `cmd/cryptd` | Server binary: `serve` (with `-f`, `-t`, `--api-key`), `validate` |
 | `cmd/crypt` | Thin client binary: connects to server, Bubble Tea TUI + readline fallback |
 | `cmd/crypt-admin` | Author binary: `generate`, `validate`, `export` |
-| `cmd/dump-mcp-schema` | Generates MCP schema JSON for CI contract check |
 | `cmd/eval-slm` | SLM accuracy evaluation harness (65+ inputs, needs ollama) |
 | `cmd/eval-balance` | Monkey test harness for game balance tuning (parallel sessions, JSON reports) |
 | `internal/monkeytest` | MonkeyRenderer, SessionMetrics, AggregateReport, parallel runner |
@@ -179,15 +184,18 @@ scenarios/unix-catacombs/
 `scenariodir.Load()` tries directory format first (`id/scenario.yaml`), then
 falls back to single-file (`id.yaml`).
 
-### MCP Tool Surface
+### JSON-RPC API Surface
 
-15 tools exposed via JSON-RPC 2.0 over NDJSON (Unix socket or TCP):
+The daemon exposes direct JSON-RPC 2.0 methods over NDJSON (Unix socket or TCP).
+Methods: `session.init`, `session.quit`, `game.new`, `game.list_scenarios`,
+`game.list_sessions`, `game.move`, `game.look`, `game.play`, `game.context`,
+plus action methods (`pick_up`, `drop`, `equip`, `unequip`, `examine`,
+`inventory`, `attack`, `defend`, `flee`, `cast_spell`, `save_game`,
+`load_game`). Session mode (normal vs passthrough) is set during `session.init`
+via the `mode` field in `InitializeParams`.
 
-`new_game`, `move`, `look`, `pick_up`, `drop`, `equip`, `unequip`, `examine`,
-`inventory`, `attack`, `defend`, `flee`, `cast_spell`, `save_game`, `load_game`
-
-Schema contract: `testdata/mcp-schema.json` committed; CI diffs against
-`go run ./cmd/dump-mcp-schema`.
+The `crypt mcp` client binary provides a stdio MCP bridge for Claude Code,
+translating MCP `tools/call` into daemon RPCs.
 
 ### Game Systems
 
