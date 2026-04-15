@@ -202,10 +202,6 @@ complete, playable mode. The acceptance test suite runs for the first time.
 - Save/load: mid-combat save → load → assert state identical
 - All five acceptance scripts passing for the first time
 
-**MCP schema contract introduced:**
-- `cmd/dump-mcp-schema` generates `testdata/mcp-schema.json`
-- CI diffs generated vs. committed; any unintentional API change fails build
-
 **Done when:** All five acceptance scripts pass. Engine coverage ≥ 90%.
 A real human can play a complete game via `cryptd headless`.
 

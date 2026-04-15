@@ -232,12 +232,15 @@ Game engine
   & Presents game state to the player (Lux HUD or ANSI CLI). \\
 \cmd{cryptd} server
   & Go binary
-  & JSON-RPC 2.0 daemon; exposes 15 MCP tools over Unix socket or TCP.
+  & JSON-RPC 2.0 daemon; exposes direct named methods
+    (\texttt{session.init}, \texttt{game.new}, \texttt{game.play},
+    \texttt{game.move}, \dots) over Unix socket or TCP.
     Game-as-goroutine architecture: each game is a goroutine that
     exclusively owns its engine and state.  Session registry tracks
-    connections; game registry tracks game goroutines.  Normal mode
-    (interpreter + narrator + RPCRenderer) and passthrough mode (raw
-    MCP tool dispatch). \\
+    connections; game registry tracks game goroutines.  Session mode
+    (normal: interpreter + narrator + RPCRenderer; passthrough:
+    direct \texttt{game.*} dispatch) is selected per-session during
+    \texttt{session.init}. \\
 LLM inference
   & Go (\pkg{internal/\allowbreak inference})
   & OpenAI-compatible HTTP client for
@@ -314,22 +317,29 @@ goroutine via \texttt{RunLoop}, driven by an \texttt{RPCRenderer}
 that bridges the network connection to the game loop's
 \iface{Renderer} interface.
 
-\begin{lstlisting}[title={Passthrough mode (Claude Code plugin -> cryptd serve --passthrough)}]
+\begin{lstlisting}[title={Passthrough mode (crypt mcp -> cryptd serve)}]
 Claude Code session
+    |
+    | stdio MCP <-> crypt mcp bridge
     |
     | NDJSON over Unix socket or TCP
     v
-cryptd serve --passthrough
+cryptd serve
     |-- Session/Game registries (same as normal)
-    |-- tools/call dispatched directly to engine
+    |-- session.init { mode: "passthrough" }
+    |-- game.* methods dispatched directly to engine
     `-- Structured JSON result returned (no interpretation/narration)
 \end{lstlisting}
 
-Passthrough mode: Claude Code calls MCP tools directly.  No
-interpreter or narrator is involved.  Each \texttt{tools/call}
-request is routed through the game goroutine's command channel for
-serialized state access.  The LLM (Claude) acts as its own
-interpreter and narrator.
+Passthrough mode: the client selects mode by sending
+\texttt{session.init} with \field{mode}=\texttt{"passthrough"}.  No
+interpreter or narrator is involved.  Each \texttt{game.*} request
+(\texttt{game.move}, \texttt{game.look}, \texttt{game.attack}, \dots)
+is routed through the game goroutine's command channel for
+serialized state access and returns a structured JSON result.  The
+LLM (Claude) acts as its own interpreter and narrator.  The daemon
+serves normal and passthrough sessions simultaneously on the same
+socket; mode is per-session, not per-server.
 
 \subsection{Data Flow: Normal Mode}
 
@@ -338,19 +348,22 @@ In normal mode, the game loop runs inside the game goroutine.  The
 
 \begin{enumerate}
   \item \textbf{Connection.}
-    Client connects and sends \texttt{initialize} with an optional
-    \field{session\_id}.  Server returns \field{session\_id} and
-    \field{has\_game} (true if this session already has an active
-    game from a previous connection).
+    Client connects and sends \texttt{session.init} with an optional
+    \field{session\_id} and optional \field{mode} (omitted or
+    \texttt{""} selects normal mode).  Server returns
+    \field{session\_id} and \field{has\_game} (true if this session
+    already has an active game from a previous connection).  The
+    response is a direct JSON result, not a \texttt{ToolResult}
+    wrapper.
   \item \textbf{Game start or resume.}
-    If \field{has\_game} is false, client sends \texttt{tools/call}
-    with \tool{new\_game}.  Server creates a game goroutine, sends
-    the initial room, then enters the game loop via
+    If \field{has\_game} is false, client calls \texttt{game.new}
+    with scenario and character params.  Server creates a game
+    goroutine, sends the initial room, then enters the game loop via
     \texttt{Game.RunLoop()}.  If \field{has\_game} is true, the
     server enters \texttt{resume\-Game\-Loop} immediately --- no
-    \tool{new\_game} needed.  The current room is re-rendered.
+    \texttt{game.new} needed.  The current room is re-rendered.
   \item \textbf{Play loop.}
-    Client sends \texttt{play} requests with free text.  Inside
+    Client sends \texttt{game.play} requests with free text.  Inside
     the game goroutine: \texttt{RPC\-Renderer.\-Events()} reads
     the text, the interpreter converts it to an
     \texttt{Engine\-Action}, the engine executes it, the narrator
@@ -368,11 +381,12 @@ narrator implementations are injected at startup.
 
 \subsection{Data Flow: Passthrough Mode}
 
-Passthrough mode has no game loop.  Each \texttt{tools/call} request
-is dispatched to the game goroutine via \texttt{Game.Send()}.  The
-game goroutine executes the tool, returns structured JSON, and the
-handler writes it back as a \texttt{ToolResult}.  Claude Code acts
-as its own interpreter and narrator.
+Passthrough mode has no game loop.  Each \texttt{game.*} JSON-RPC
+request is dispatched to the game goroutine via \texttt{Game.Send()}.
+The game goroutine executes the method, returns structured JSON,
+and the handler writes it back as a direct JSON-RPC result.  Claude
+Code (running as the \cmd{crypt mcp} stdio bridge) acts as its own
+interpreter and narrator.
 
 % ===================================================================
 \subsection{Daemon Concurrency Model}
@@ -397,9 +411,11 @@ Three command types flow through the channel:
 \textbf{Type} & \textbf{Purpose} \\
 \midrule
 \texttt{tool}
-  & Passthrough dispatch: execute a named MCP tool against the engine
-    and return the result.  Used by passthrough mode for every request
-    and by normal mode for \tool{new\_game}. \\
+  & Internal method dispatch: the goroutine receives an unprefixed
+    command name (e.g., \texttt{new\_game}, \texttt{move},
+    \texttt{look}) --- the JSON-RPC handler strips the \texttt{game.}
+    prefix before sending.  Used by passthrough mode for every
+    request and by normal mode for \texttt{new\_game}. \\
 \texttt{run\_loop}
   & Normal mode game loop: the game goroutine runs
     \texttt{game.NewLoop().Run()} internally, blocking until the
@@ -711,42 +727,48 @@ Save files live at \texttt{.dungeon/saves/<slot>.json} (gitignored).
 
 \begin{lstlisting}[title={.dungeon/saves/1.json (excerpt)}]
 {
-  "version": 1,
-  "scenario": "classic-fantasy-dungeon",
+  "schema_version": "1.0",
   "play_mode": "dm",
+  "scenario": "classic-fantasy-dungeon",
   "timestamp": "2026-03-10T18:00:00Z",
-  "character": {
-    "name": "Aldric", "class": "fighter", "level": 3,
-    "hp": 45, "max_hp": 60, "mp": 0, "max_mp": 0,
-    "stats": {"str":16,"dex":12,"con":14,"int":9,"wis":10,"cha":11},
-    "xp": 1240, "gold": 48,
-    "inventory": [],
-    "equipped": {"weapon": "rusty_sword"},
-    "conditions": []
-  },
-  "party": [],
+  "party": [
+    {
+      "id": "hero",
+      "name": "Aldric", "class": "fighter", "level": 3,
+      "hp": 45, "max_hp": 60, "mp": 0, "max_mp": 0,
+      "xp": 1240, "gold": 48,
+      "stats": {"str":16,"int":9,"dex":12,"con":14,"wis":10,"cha":11},
+      "inventory": [],
+      "equipped": {"weapon": "rusty_sword"},
+      "conditions": []
+    }
+  ],
   "dungeon": {
     "current_room": "goblin_lair",
     "visited_rooms": ["entrance", "corridor_a", "goblin_lair"],
     "room_state": {
-      "goblin_lair":    {"cleared": true, "items_taken": ["rusty_key"]},
-      "treasure_vault": {"door_locked": false}
-    }
+      "goblin_lair":    {"cleared": true, "items": []},
+      "treasure_vault": {"cleared": false, "items": ["rusty_key"]}
+    },
+    "combat": {"active": false}
   },
   "adventure_log": []
 }
 \end{lstlisting}
 
-\texttt{party} is always present (empty for single-player).
-\texttt{play\_mode} is advisory; \cmd{--mode} overrides on resume.
+\texttt{party} is always present (single-element array for single-player).
+\texttt{schema\_version} is a string; \texttt{internal/save} refuses loads
+when it does not match \texttt{save.SchemaVersion}.  \texttt{play\_mode}
+is advisory metadata captured at save time.
 
 % ===================================================================
-\section{MCP Tool Surface (Game Engine)}
+\section{JSON-RPC Method Surface (Game Engine)}
 % ===================================================================
 
-The engine exposes game actions as MCP tools over JSON-RPC 2.0.
-The protocol methods are \texttt{initialize}, \texttt{tools/list},
-\texttt{tools/call}, and \texttt{play} (normal mode text input).
+The engine exposes game actions as direct named methods on JSON-RPC
+2.0.  There is no MCP \texttt{tools/call} framing: each method has
+its own params shape and returns a direct JSON result object (or a
+standard JSON-RPC error).
 
 \subsection{Protocol Methods}
 
@@ -755,97 +777,112 @@ The protocol methods are \texttt{initialize}, \texttt{tools/list},
 \toprule
 \textbf{Method} & \textbf{Params} & \textbf{Returns} \\
 \midrule
-\texttt{initialize}
-  & \field{session\_id?}
+\texttt{session.init}
+  & \field{session\_id?}, \field{mode?}
+    (\texttt{""} or \texttt{"passthrough"})
   & \field{protocolVersion}, \field{serverInfo},
     \field{capabilities}, \field{session\_id},
     \field{has\_game} \\
-\texttt{tools/list}
+\texttt{session.quit}
   & ---
-  & Array of 15 tool definitions \\
-\texttt{tools/call}
-  & \field{name}, \field{arguments}
-  & \texttt{ToolResult} (content array + isError) \\
-\texttt{play}
+  & Only meaningful inside an active normal-mode game loop:
+    \texttt{RPCRenderer} injects a \texttt{quit} input event,
+    the game loop narrates a farewell, and the final response is
+    \texttt{PlayResponse} with \field{quit}=\texttt{true}. A bare
+    \texttt{session.quit} outside the play loop is ignored. \\
+\texttt{game.new}
+  & \field{scenario\_id?}, \field{character\_name?},
+    \field{character\_class?}, \field{stats?}
+  & Initial room state (normal: \texttt{PlayResponse};
+    passthrough: structured room JSON) \\
+\texttt{game.list\_scenarios}
+  & ---
+  & \field{scenarios[]}: \field{id}, \field{title},
+    \field{description} \\
+\texttt{game.list\_sessions}
+  & ---
+  & \field{sessions[]}: session + character metadata \\
+\texttt{game.play}
   & \field{text}
   & \texttt{PlayResponse}: \field{text}, \field{state?},
-    \field{dead?}, \field{quit?} \\
+    \field{dead?}, \field{quit?}, \field{exits?},
+    \field{next\_level\_xp?} \\
+\texttt{game.context}
+  & ---
+  & DM-facing scenario/room context \\
+\texttt{game.move}
+  & \field{direction}
+  & Room transition result \\
+\texttt{game.look}
+  & ---
+  & Current room description \\
+\texttt{game.attack}, \texttt{game.defend}, \texttt{game.flee}
+  & (action-specific)
+  & Combat result \\
+\texttt{game.examine}, \texttt{game.inventory},
+  \texttt{game.drop}, \texttt{game.equip}, \texttt{game.unequip},
+  \texttt{game.use\_item}
+  & (action-specific)
+  & Item/inventory result \\
+\texttt{game.save\_game}, \texttt{game.load\_game}
+  & \field{slot?}
+  & Slot name + file path (save); room state (load) \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-\subsection{Session Management Tools}
+\subsection{Navigation Methods}
 
 \begin{center}
 \begin{tabular}{lp{4cm}p{5cm}}
 \toprule
-\textbf{Tool} & \textbf{Arguments} & \textbf{Returns} \\
+\textbf{Method} & \textbf{Params} & \textbf{Returns} \\
 \midrule
-\tool{new\_game}
-  & \field{scenario\_id}, \field{character\_name},
-    \field{character\_class}
-  & Room description, exits, items, hero summary \\
-\tool{save\_game}
-  & \field{slot?}
-  & Slot name and save file path \\
-\tool{load\_game}
-  & \field{slot?}
-  & Room description, exits, items, hero summary \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-\subsection{Navigation}
-
-\begin{center}
-\begin{tabular}{lp{4cm}p{5cm}}
-\toprule
-\textbf{Tool} & \textbf{Arguments} & \textbf{Returns} \\
-\midrule
-\tool{move}
+\texttt{game.move}
   & \field{direction}
   & Room, exits, items; combat if enemies present \\
-\tool{look}
+\texttt{game.look}
   & ---
   & Current room description, exits, items, combat state \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-\subsection{Inventory}
+\subsection{Inventory Methods}
 
 \begin{center}
 \begin{tabular}{lp{4cm}p{5cm}}
 \toprule
-\textbf{Tool} & \textbf{Arguments} & \textbf{Returns} \\
+\textbf{Method} & \textbf{Params} & \textbf{Returns} \\
 \midrule
-\tool{pick\_up}   & \field{item\_id}  & Item details, hero summary \\
-\tool{drop}       & \field{item\_id}  & Item details, hero summary \\
-\tool{equip}      & \field{item\_id}  & Item, slot, hero summary \\
-\tool{unequip}    & \field{slot}      & Item, slot, hero summary \\
-\tool{examine}    & \field{item\_id}  & Item details \\
-\tool{inventory}  & ---               & Items, equipped, weight, capacity \\
+\texttt{game.pick\_up}  & \field{item\_id} & Item details, hero summary \\
+\texttt{game.drop}      & \field{item\_id} & Item details, hero summary \\
+\texttt{game.equip}     & \field{item\_id} & Item, slot, hero summary \\
+\texttt{game.unequip}   & \field{slot}     & Item, slot, hero summary \\
+\texttt{game.examine}   & \field{item\_id} & Item details \\
+\texttt{game.inventory} & ---              & Items, equipped, weight, capacity \\
+\texttt{game.use\_item} & \field{item\_id} & Effect applied, hero summary \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-\subsection{Combat}
+\subsection{Combat Methods}
 
 \begin{center}
 \begin{tabular}{lp{4cm}p{5cm}}
 \toprule
-\textbf{Tool} & \textbf{Arguments} & \textbf{Returns} \\
+\textbf{Method} & \textbf{Params} & \textbf{Returns} \\
 \midrule
-\tool{attack}
+\texttt{game.attack}
   & \field{target\_id?}
   & Damage, killed, hero summary, enemy turns \\
-\tool{defend}
+\texttt{game.defend}
   & ---
   & Defence status, hero summary, enemy turns \\
-\tool{flee}
+\texttt{game.flee}
   & ---
   & Success (DEX check), hero summary \\
-\tool{cast\_spell}
+\texttt{game.cast\_spell}
   & \field{spell\_id}, \field{target\_id?}
   & Spell effect, MP cost, hero summary \\
 \bottomrule
@@ -959,9 +996,9 @@ identity header.
 The daemon uses session identity to:
 
 \begin{itemize}
-  \item Route DM-privileged tools only to the DM session.
-  \item Push \texttt{tools/list\_changed} to the DM when a player
-    takes an action.
+  \item Route DM-privileged methods only to the DM session.
+  \item Push \texttt{tools/list\_changed} notifications to the DM
+    when a player takes an action (future; see cryptd-90e.3).
   \item Route DM narration output to all player sessions.
 \end{itemize}
 
@@ -973,10 +1010,10 @@ game daemon handles:
 
 \begin{itemize}
   \item Game state (authoritative \texttt{GameState} for the session).
-  \item MCP tool dispatch (receive call \textrightarrow{} engine method \textrightarrow{}
-    return result).
-  \item Push routing (\texttt{tools/list\_changed}, narration
-    broadcast).
+  \item JSON-RPC method dispatch (receive call \textrightarrow{}
+    engine method \textrightarrow{} return result).
+  \item Push routing (future: \texttt{tools/list\_changed},
+    narration broadcast).
 \end{itemize}
 
 It does not handle: orchestration logic, plugin lifecycle, or
@@ -1086,9 +1123,9 @@ when Biff multi-player (Phase~5) is added.
 \begin{itemize}
   \item \texttt{GameState.Party} is always a \texttt{[]Character}
     slice; single-player sets \texttt{len(Party) == 1}.
-  \item \tool{move}, \tool{attack}, \tool{flee}, \tool{defend} all
-    accept an optional \field{character\_id}; omitting it targets
-    the primary character.
+  \item \texttt{game.move}, \texttt{game.attack}, \texttt{game.flee},
+    \texttt{game.defend} all accept an optional \field{character\_id};
+    omitting it targets the primary character.
   \item Combat turn order already handles multiple actors.
   \item Save files carry a \field{party} array (empty until Biff).
 \end{itemize}
@@ -1134,7 +1171,8 @@ When Biff is added:
 \textbf{M8 — Server Thin Slice}
   & \cmd{cryptd serve} daemon with JSON-RPC 2.0 over Unix socket
     and TCP; \cmd{crypt} thin client; passthrough and normal modes;
-    15 MCP tools; daemonization; PID file management.
+    direct named \texttt{game.*} methods; daemonization; PID file
+    management.
   & Complete \\
 \midrule
 \textbf{M9 — LLM Integration}
@@ -1146,7 +1184,7 @@ When Biff is added:
 \midrule
 \textbf{M10 — Concurrent Sessions}
   & Game-as-goroutine; session registry; game registry; session
-    resume via \field{session\_id} in initialize; concurrent
+    resume via \field{session\_id} in \texttt{session.init}; concurrent
     connection handling; \texttt{RPCRenderer}; panic recovery;
     graceful shutdown.
   & Complete \\

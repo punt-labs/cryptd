@@ -24,9 +24,9 @@ There is no such thing as a "pre-existing" issue. If you see a problem — in co
 
 ## Project State
 
-**M0 (foundation), M1 (data contracts), M2 (thin E2E slice), M8 (server thin slice), M9 (DM thin slice), and M10 (session routing) are complete.**
+**M0 (foundation), M1 (data contracts), M2 (thin E2E slice), M8 (server thin slice), and M9 (DM thin slice) are complete. M10 (session routing) is partially complete: concurrent session infrastructure is live, but DM/player privilege gating, `tools/list_changed` notifications, and multi-session integration tests (cryptd-90e.2, .3, .5) remain open.**
 
-Two binaries (DES-025): `cryptd` (server/daemon) and `crypt` (thin client). Server subcommands: `cryptd serve`, `cryptd validate`. The client (`crypt`) takes no subcommands — it connects to `cryptd serve`, auto-starts the server if needed, and sends natural language text via the `play` JSON-RPC method. `cryptd serve` will daemonize by default (bead cryptd-ydf); `-f` for foreground, `-t` for testing on stdin/stdout.
+Three binaries (DES-025): `cryptd` (server/daemon), `crypt` (thin client), `crypt-admin` (authoring). The client (`crypt`) connects to `cryptd serve`, auto-starts the server if needed, and sends natural language text via the `game.play` JSON-RPC method. `cryptd serve` daemonizes by default (bead cryptd-ydf); `-f` for foreground, `-t` for testing on stdin/stdout. Claude Code connects via the `crypt mcp` stdio bridge.
 
 Check `bd ready` for current unblocked work.
 
@@ -49,10 +49,10 @@ The engine always runs as a server (`cryptd serve`). Two modes:
 
 | Mode | Interpreter | Narrator | Response | Client |
 |------|-------------|----------|----------|--------|
-| **Normal** | SLM → Rules fallback | SLM → Template fallback | Display-ready text | `crypt` (CLI) |
-| **Passthrough** | None (MCP tool names) | None (structured JSON) | MCP ToolResult | Claude Code plugin |
+| **Normal** | LLM/SLM → Rules fallback | LLM/SLM → Template fallback | Display-ready text | `crypt` (CLI/TUI) |
+| **Passthrough** | None (direct `game.*` methods) | None (structured JSON) | Direct JSON-RPC result | `crypt mcp` bridge (Claude Code) |
 
-Normal mode auto-detects ollama for SLM inference, falls back to deterministic Rules + Template when no inference server is available. `cryptd serve --passthrough` enables passthrough mode for MCP clients.
+Normal mode probes Claude API (`--api-key`/`CRYPTD_API_KEY`) → ollama SLM → rules+templates. Mode is selected per session during `session.init` via the `mode` field in `InitializeParams`; both modes coexist on the same socket. There is no server-level `--passthrough` flag.
 
 `cryptd serve -t` runs the engine on stdin/stdout for testing (no network, implies `-f`). `-f` keeps the daemon in the foreground without daemonizing.
 
@@ -93,10 +93,10 @@ The engine knows nothing about interpreters. Interpreters know nothing about nar
 
 | Package | What It Does |
 |---------|-------------|
-| `cmd/cryptd` | Server/daemon binary; `cryptd serve` (with `-f`, `-t`, `--passthrough`), `cryptd validate` |
-| `cmd/crypt` | Thin client binary; connects to `cryptd serve`, sends text, displays narrated responses |
-| `cmd/dump-mcp-schema` | Generates MCP schema JSON for CI contract check |
-| `internal/daemon` | Game server: JSON-RPC 2.0 handler, tool dispatcher, Unix socket/TCP listener |
+| `cmd/cryptd` | Server/daemon binary; `cryptd serve` (with `-f`, `-t`, `--api-key`), `cryptd validate` |
+| `cmd/crypt` | Thin client binary; Bubble Tea TUI (readline via `--plain`); auto-starts server; `crypt mcp` stdio bridge |
+| `cmd/crypt-admin` | Scenario authoring binary: `generate`, `validate`, `export` |
+| `internal/daemon` | Game server: JSON-RPC 2.0 handler, session registry, Unix socket/TCP listener |
 | `internal/engine` | Deterministic game rules: `NewGame`, `Move`, `Look` |
 | `internal/inference` | OpenAI-compatible HTTP client for `/v1/chat/completions` (DES-024) |
 | `internal/game` | Game loop: drives engine + interpreter + narrator + renderer |
@@ -115,7 +115,6 @@ The engine knows nothing about interpreters. Interpreters know nothing about nar
 
 - **Scenarios:** YAML in `testdata/scenarios/`, parsed by `internal/scenario`. `gopkg.in/yaml.v3`.
 - **Save files:** JSON with `schema_version` field. `internal/save` handles marshal/unmarshal. Unknown fields silently ignored (forward compat).
-- **MCP schema contract:** `testdata/mcp-schema.json` committed; CI diffs against `go run ./cmd/dump-mcp-schema`.
 
 ## Go Standards
 
