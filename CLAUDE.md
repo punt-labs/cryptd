@@ -26,7 +26,7 @@ There is no such thing as a "pre-existing" issue. If you see a problem — in co
 
 **M0 (foundation), M1 (data contracts), M2 (thin E2E slice), M8 (server thin slice), and M9 (DM thin slice) are complete. M10 (session routing) is partially complete: concurrent session infrastructure is live, but DM/player privilege gating, `tools/list_changed` notifications, and multi-session integration tests (cryptd-90e.2, .3, .5) remain open.**
 
-Two binaries (DES-025): `cryptd` (server/daemon) and `crypt` (thin client). Server subcommands: `cryptd serve`, `cryptd validate`. The client (`crypt`) takes no subcommands — it connects to `cryptd serve`, auto-starts the server if needed, and sends natural language text via the `play` JSON-RPC method. `cryptd serve` will daemonize by default (bead cryptd-ydf); `-f` for foreground, `-t` for testing on stdin/stdout.
+Three binaries (DES-025): `cryptd` (server/daemon), `crypt` (thin client), `crypt-admin` (authoring). The client (`crypt`) connects to `cryptd serve`, auto-starts the server if needed, and sends natural language text via the `game.play` JSON-RPC method. `cryptd serve` daemonizes by default (bead cryptd-ydf); `-f` for foreground, `-t` for testing on stdin/stdout. Claude Code connects via the `crypt mcp` stdio bridge.
 
 Check `bd ready` for current unblocked work.
 
@@ -49,10 +49,10 @@ The engine always runs as a server (`cryptd serve`). Two modes:
 
 | Mode | Interpreter | Narrator | Response | Client |
 |------|-------------|----------|----------|--------|
-| **Normal** | SLM → Rules fallback | SLM → Template fallback | Display-ready text | `crypt` (CLI) |
-| **Passthrough** | None (MCP tool names) | None (structured JSON) | MCP ToolResult | Claude Code plugin |
+| **Normal** | LLM/SLM → Rules fallback | LLM/SLM → Template fallback | Display-ready text | `crypt` (CLI/TUI) |
+| **Passthrough** | None (direct `game.*` methods) | None (structured JSON) | Direct JSON-RPC result | `crypt mcp` bridge (Claude Code) |
 
-Normal mode auto-detects ollama for SLM inference, falls back to deterministic Rules + Template when no inference server is available. `cryptd serve --passthrough` enables passthrough mode for MCP clients.
+Normal mode probes Claude API (`--api-key`/`CRYPTD_API_KEY`) → ollama SLM → rules+templates. Mode is selected per session during `session.init` via the `mode` field in `InitializeParams`; both modes coexist on the same socket. There is no server-level `--passthrough` flag.
 
 `cryptd serve -t` runs the engine on stdin/stdout for testing (no network, implies `-f`). `-f` keeps the daemon in the foreground without daemonizing.
 

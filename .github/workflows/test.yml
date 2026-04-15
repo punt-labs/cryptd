@@ -41,7 +41,7 @@ jobs:
         with:
           go-version-file: go.mod
       - name: Run acceptance tests
-        run: go test -race -tags acceptance ./e2e/...
+        run: go test -race -count=1 -tags acceptance ./e2e/...
 
   coverage:
     name: Engine Coverage

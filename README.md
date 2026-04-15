@@ -187,12 +187,13 @@ falls back to single-file (`id.yaml`).
 ### JSON-RPC API Surface
 
 The daemon exposes direct JSON-RPC 2.0 methods over NDJSON (Unix socket or TCP).
-Methods: `session.init`, `session.quit`, `game.new`, `game.list_scenarios`,
-`game.list_sessions`, `game.move`, `game.look`, `game.play`, `game.context`,
-plus action methods (`pick_up`, `drop`, `equip`, `unequip`, `examine`,
-`inventory`, `attack`, `defend`, `flee`, `cast_spell`, `save_game`,
-`load_game`). Session mode (normal vs passthrough) is set during `session.init`
-via the `mode` field in `InitializeParams`.
+Methods (all fully-qualified): `session.init`, `session.quit`, `game.new`,
+`game.list_scenarios`, `game.list_sessions`, `game.move`, `game.look`,
+`game.play`, `game.context`, `game.pick_up`, `game.drop`, `game.equip`,
+`game.unequip`, `game.examine`, `game.inventory`, `game.attack`,
+`game.defend`, `game.flee`, `game.cast_spell`, `game.use_item`,
+`game.save_game`, `game.load_game`. Session mode (normal vs passthrough) is
+set during `session.init` via the `mode` field in `InitializeParams`.
 
 The `crypt mcp` client binary provides a stdio MCP bridge for Claude Code,
 translating MCP `tools/call` into daemon RPCs.

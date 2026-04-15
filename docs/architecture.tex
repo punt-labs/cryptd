@@ -725,34 +725,39 @@ Save files live at \texttt{.dungeon/saves/<slot>.json} (gitignored).
 
 \begin{lstlisting}[title={.dungeon/saves/1.json (excerpt)}]
 {
-  "version": 1,
-  "scenario": "classic-fantasy-dungeon",
+  "schema_version": "1.0",
   "play_mode": "dm",
+  "scenario": "classic-fantasy-dungeon",
   "timestamp": "2026-03-10T18:00:00Z",
-  "character": {
-    "name": "Aldric", "class": "fighter", "level": 3,
-    "hp": 45, "max_hp": 60, "mp": 0, "max_mp": 0,
-    "stats": {"str":16,"dex":12,"con":14,"int":9,"wis":10,"cha":11},
-    "xp": 1240, "gold": 48,
-    "inventory": [],
-    "equipped": {"weapon": "rusty_sword"},
-    "conditions": []
-  },
-  "party": [],
+  "party": [
+    {
+      "id": "hero",
+      "name": "Aldric", "class": "fighter", "level": 3,
+      "hp": 45, "max_hp": 60, "mp": 0, "max_mp": 0,
+      "xp": 1240, "gold": 48,
+      "stats": {"str":16,"int":9,"dex":12,"con":14,"wis":10,"cha":11},
+      "inventory": [],
+      "equipped": {"weapon_id": "rusty_sword"},
+      "conditions": []
+    }
+  ],
   "dungeon": {
     "current_room": "goblin_lair",
     "visited_rooms": ["entrance", "corridor_a", "goblin_lair"],
     "room_state": {
-      "goblin_lair":    {"cleared": true, "items_taken": ["rusty_key"]},
-      "treasure_vault": {"door_locked": false}
-    }
+      "goblin_lair":    {"cleared": true, "items": []},
+      "treasure_vault": {"cleared": false, "items": ["rusty_key"]}
+    },
+    "combat": {"active": false}
   },
   "adventure_log": []
 }
 \end{lstlisting}
 
-\texttt{party} is always present (empty for single-player).
-\texttt{play\_mode} is advisory; \cmd{--mode} overrides on resume.
+\texttt{party} is always present (single-element array for single-player).
+\texttt{schema\_version} is a string; \texttt{internal/save} refuses loads
+when it does not match \texttt{save.SchemaVersion}.  \texttt{play\_mode}
+is advisory metadata captured at save time.
 
 % ===================================================================
 \section{JSON-RPC Method Surface (Game Engine)}
@@ -809,85 +814,69 @@ standard JSON-RPC error).
   & (action-specific)
   & Combat result \\
 \texttt{game.examine}, \texttt{game.inventory},
-  \texttt{game.drop}, \texttt{game.equip}, \texttt{game.unequip}
+  \texttt{game.drop}, \texttt{game.equip}, \texttt{game.unequip},
+  \texttt{game.use\_item}
   & (action-specific)
   & Item/inventory result \\
+\texttt{game.save\_game}, \texttt{game.load\_game}
+  & \field{slot?}
+  & Slot name + file path (save); room state (load) \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-\subsection{Session Management Tools}
+\subsection{Navigation Methods}
 
 \begin{center}
 \begin{tabular}{lp{4cm}p{5cm}}
 \toprule
-\textbf{Tool} & \textbf{Arguments} & \textbf{Returns} \\
+\textbf{Method} & \textbf{Params} & \textbf{Returns} \\
 \midrule
-\tool{new\_game}
-  & \field{scenario\_id}, \field{character\_name},
-    \field{character\_class}
-  & Room description, exits, items, hero summary \\
-\tool{save\_game}
-  & \field{slot?}
-  & Slot name and save file path \\
-\tool{load\_game}
-  & \field{slot?}
-  & Room description, exits, items, hero summary \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-\subsection{Navigation}
-
-\begin{center}
-\begin{tabular}{lp{4cm}p{5cm}}
-\toprule
-\textbf{Tool} & \textbf{Arguments} & \textbf{Returns} \\
-\midrule
-\tool{move}
+\texttt{game.move}
   & \field{direction}
   & Room, exits, items; combat if enemies present \\
-\tool{look}
+\texttt{game.look}
   & ---
   & Current room description, exits, items, combat state \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-\subsection{Inventory}
+\subsection{Inventory Methods}
 
 \begin{center}
 \begin{tabular}{lp{4cm}p{5cm}}
 \toprule
-\textbf{Tool} & \textbf{Arguments} & \textbf{Returns} \\
+\textbf{Method} & \textbf{Params} & \textbf{Returns} \\
 \midrule
-\tool{pick\_up}   & \field{item\_id}  & Item details, hero summary \\
-\tool{drop}       & \field{item\_id}  & Item details, hero summary \\
-\tool{equip}      & \field{item\_id}  & Item, slot, hero summary \\
-\tool{unequip}    & \field{slot}      & Item, slot, hero summary \\
-\tool{examine}    & \field{item\_id}  & Item details \\
-\tool{inventory}  & ---               & Items, equipped, weight, capacity \\
+\texttt{game.pick\_up}  & \field{item\_id} & Item details, hero summary \\
+\texttt{game.drop}      & \field{item\_id} & Item details, hero summary \\
+\texttt{game.equip}     & \field{item\_id} & Item, slot, hero summary \\
+\texttt{game.unequip}   & \field{slot}     & Item, slot, hero summary \\
+\texttt{game.examine}   & \field{item\_id} & Item details \\
+\texttt{game.inventory} & ---              & Items, equipped, weight, capacity \\
+\texttt{game.use\_item} & \field{item\_id} & Effect applied, hero summary \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-\subsection{Combat}
+\subsection{Combat Methods}
 
 \begin{center}
 \begin{tabular}{lp{4cm}p{5cm}}
 \toprule
-\textbf{Tool} & \textbf{Arguments} & \textbf{Returns} \\
+\textbf{Method} & \textbf{Params} & \textbf{Returns} \\
 \midrule
-\tool{attack}
+\texttt{game.attack}
   & \field{target\_id?}
   & Damage, killed, hero summary, enemy turns \\
-\tool{defend}
+\texttt{game.defend}
   & ---
   & Defence status, hero summary, enemy turns \\
-\tool{flee}
+\texttt{game.flee}
   & ---
   & Success (DEX check), hero summary \\
-\tool{cast\_spell}
+\texttt{game.cast\_spell}
   & \field{spell\_id}, \field{target\_id?}
   & Spell effect, MP cost, hero summary \\
 \bottomrule
