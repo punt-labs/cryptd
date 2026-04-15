@@ -406,7 +406,7 @@ Work is NOT complete until `git push` succeeds.
 
 ## Design Decisions
 
-**Before proposing any design change, read `DESIGN.md`.** It contains 26 settled decisions (DES-001-026) with alternatives considered and outcomes. Do not revisit a settled decision without new evidence. Log any new decision there before implementing.
+**Before proposing any design change, read `DESIGN.md`.** It contains 28 settled decisions (DES-001-028) with alternatives considered and outcomes. Do not revisit a settled decision without new evidence. Log any new decision there before implementing.
 
 ## Documentation Maintenance
 

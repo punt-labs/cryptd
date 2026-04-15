@@ -300,20 +300,23 @@ func resolveInterpreterNarrator(anthropicKey, modelName string) (model.CommandIn
 // ReadString so it consumes only the bytes it needs; the caller can
 // continue reading from the same *bufio.Reader afterward.
 func promptCharacterCreation(out io.Writer, br *bufio.Reader) (model.Character, error) {
-	prompt := func(msg string) string {
+	prompt := func(msg string) (string, error) {
 		fmt.Fprint(out, msg)
 		line, err := br.ReadString('\n')
 		if err != nil && err != io.EOF {
-			return ""
+			return "", err
 		}
-		return strings.TrimSpace(line)
+		return strings.TrimSpace(line), nil
 	}
 
 	fmt.Fprintln(out, "=== Character Creation ===")
 	fmt.Fprintln(out)
 
 	// Name.
-	name := prompt("Name: ")
+	name, err := prompt("Name: ")
+	if err != nil {
+		return model.Character{}, fmt.Errorf("reading name: %w", err)
+	}
 	if name == "" {
 		name = "Adventurer"
 	}
@@ -321,7 +324,11 @@ func promptCharacterCreation(out io.Writer, br *bufio.Reader) (model.Character, 
 	// Class.
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Classes: fighter, mage, priest, thief")
-	class := strings.ToLower(prompt("Class: "))
+	classInput, err := prompt("Class: ")
+	if err != nil {
+		return model.Character{}, fmt.Errorf("reading class: %w", err)
+	}
+	class := strings.ToLower(classInput)
 	if !engine.ValidClasses[class] {
 		return model.Character{}, fmt.Errorf("unknown class %q", class)
 	}
@@ -351,7 +358,10 @@ func promptCharacterCreation(out io.Writer, br *bufio.Reader) (model.Character, 
 	}
 	fmt.Fprintln(out)
 
-	line := prompt("Allocation (6 numbers, or Enter for defaults): ")
+	line, err := prompt("Allocation (6 numbers, or Enter for defaults): ")
+	if err != nil {
+		return model.Character{}, fmt.Errorf("reading stat allocation: %w", err)
+	}
 
 	var stats model.Stats
 	if line == "" {
