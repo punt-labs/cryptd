@@ -156,15 +156,11 @@ func TestNoArmorNoPenalty(t *testing.T) {
 		}
 		if e.IsHeroTurn(&state) {
 			_, err := e.Attack(&state, e.FirstAliveEnemy(&state))
-			if err != nil {
-				break
-			}
+			require.NoError(t, err, "iteration %d: hero attack failed unexpectedly", i)
 			continue
 		}
 		result, err := e.ProcessEnemyTurn(&state)
-		if err != nil {
-			break
-		}
+		require.NoError(t, err, "iteration %d: enemy turn failed unexpectedly", i)
 		if result.Action == "attack" {
 			damages = append(damages, result.Damage)
 		}
