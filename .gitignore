@@ -1,6 +1,5 @@
 # Build output (root-only, not cmd/ subdirs)
-/cryptd
-/crypt
+/crypt*
 dist/
 
 # Go
@@ -33,3 +32,9 @@ copilot-session-*.md
 .claude/settings.local.json
 .biff.local
 .envrc.local
+
+# Lux UI runtime state
+Lux.ini
+
+# Vox cached audio
+.vox/*.mp3
