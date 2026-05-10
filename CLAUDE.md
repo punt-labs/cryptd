@@ -289,7 +289,7 @@ Note: write-set admission is advisory — the leader verifies compliance during 
 
 ### Evaluator defaults
 
-Two specialists per domain. Worker and evaluator must be distinct handles with no shared role.
+Two specialists per domain. Within each row, the worker and evaluator must be distinct handles.
 
 | Task type | Worker | Evaluator |
 |-----------|--------|-----------|
