@@ -257,7 +257,7 @@ Do NOT use missions for: exploratory research, work you do yourself, epics that 
 
 ```yaml
 leader: claude
-worker: bwk                    # org pool: bwk|rsc|mdm|rop|adb|kth|djb|bcs|rmh|gvr — game pool: cht|gax|archivist|cryptkeeper
+worker: bwk                    # org pool: bwk|rsc|mdm|rop|adb|kth|djb|bcs|kpz|ylc|jms|jra|mcg|tdt — game pool: cht|gax|archivist|cryptkeeper
 evaluator:
   handle: mdm                  # must differ from worker, no shared role
 inputs:
@@ -334,7 +334,7 @@ Start every session with `/tty cryptd` to register the session, `/plan` to decla
 
 Identity is managed by ethos. The SessionStart hook resolves identity from `.punt-labs/ethos.yaml` (agent field), loads personality and writing style, and injects them into context. PreCompact re-injects the persona before context compression.
 
-- **Team submodule**: `.punt-labs/ethos/` — shared identity registry across all Punt Labs projects
+- **Identity registry**: `.punt-labs/ethos/` — repo-local in this repo, holding both crypt-specific game-team identities and references to the org engineering roster. Other Punt Labs repos mount this path as a git submodule of `punt-labs/team`; cryptd does not, because it overlays repo-local game identities (`cht`, `gax`, `archivist`, `cryptkeeper`) under `.punt-labs/ethos/identities/`.
 - **Repo config**: `.punt-labs/ethos.yaml` — `agent: claude`, `team: engineering`
 - **Crypt team**: `.punt-labs/ethos/teams/crypt.yaml` — game-specific roles (dungeon-master, game-designer, tui-specialist)
 - **Sub-agent matching**: `subagent_type` in Agent() calls matches ethos identity handles. Engine/CLI/security/infra pool from the engineering team submodule: `bwk`/`rsc` (Go), `mdm`/`rop` (CLI), `djb`/`bcs` (security), `adb`/`kth` (infra), `kpz`/`ylc` (ML for SLM tier), `jms`/`jra` (formal methods), `mcg`/`tdt` (product). Game-team pool from repo-local `.punt-labs/ethos/identities/`: `cht` (Charm TUI), `gax` (game design / balance), `archivist` (lore/voice), `cryptkeeper` (DM). Each loads its agent definition with full personality, writing style, and tool restrictions.
