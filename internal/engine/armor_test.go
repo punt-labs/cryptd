@@ -123,11 +123,22 @@ func TestArmorPlusDefendStance(t *testing.T) {
 
 func TestNoArmorNoPenalty(t *testing.T) {
 	// Without armor, damage should pass through at full (only defend stance reduces).
+	//
+	// This is a probabilistic test: with 1d4 (range 1-4), the probability of
+	// a single roll being 1 is 1/4. To make all-ones essentially impossible
+	// even on a deterministic CI RNG, we use a goblin with enough HP to give
+	// us at least 25 enemy turns of damage samples. P(all 25 samples = 1)
+	// = (1/4)^25 ≈ 9e-16, statistically impossible.
 	s := armorScenario()
+	// Override goblin HP for this test only — needs to survive long enough
+	// for a statistically meaningful sample of attack rolls.
+	s.Enemies["goblin"] = &scenario.EnemyTemplate{
+		Name: "Tough Goblin", HP: 200, Attack: "1d4", AI: "aggressive",
+	}
 	e := engine.New(s)
 	char := model.Character{
 		ID: "hero", Name: "Naked", Class: "fighter", Level: 1,
-		HP: 100, MaxHP: 100,
+		HP: 1000, MaxHP: 1000, // high HP to survive many rounds
 		Stats: model.Stats{STR: 14, DEX: 12, CON: 12, INT: 10, WIS: 10, CHA: 10},
 	}
 	state, err := e.NewGame(char)
@@ -137,9 +148,9 @@ func TestNoArmorNoPenalty(t *testing.T) {
 	_, err = e.StartCombat(&state)
 	require.NoError(t, err)
 
-	// Collect some enemy damage samples.
+	// Collect a statistically robust sample of enemy damages.
 	var damages []int
-	for i := 0; i < 30; i++ {
+	for i := 0; i < 200; i++ {
 		if !state.Dungeon.Combat.Active {
 			break
 		}
@@ -159,7 +170,14 @@ func TestNoArmorNoPenalty(t *testing.T) {
 		}
 	}
 
+	// We need at least 25 samples for the probabilistic assertion to be
+	// meaningful. If we got fewer (e.g. hero died, combat ended early),
+	// the test setup is broken — fail loudly rather than silently skipping.
+	require.GreaterOrEqual(t, len(damages), 25,
+		"setup error: needed >= 25 enemy damage samples, got %d (%v)", len(damages), damages)
+
 	// Without armor, 1d4 should produce values 1-4. At least one should be > 1.
+	// Probability of all 25+ samples being 1 with proper RNG: (1/4)^25 ≈ 9e-16.
 	hasAboveOne := false
 	for _, d := range damages {
 		if d > 1 {
@@ -167,7 +185,7 @@ func TestNoArmorNoPenalty(t *testing.T) {
 			break
 		}
 	}
-	if len(damages) >= 5 {
-		assert.True(t, hasAboveOne, "without armor, 1d4 should sometimes deal > 1 damage (got %v)", damages)
-	}
+	assert.True(t, hasAboveOne,
+		"without armor, 1d4 should sometimes deal > 1 damage (got %d samples, all=1: %v)",
+		len(damages), damages)
 }
