@@ -46,7 +46,8 @@ goes. Practical first, pretty always.
   and returns (Model, Cmd), View renders the model to a string
 - `tea.Program` options: `WithAltScreen()`, `WithMouseCellMotion()`,
   `WithInput()`, `WithOutput()`
-- Init() uses a value receiver — it must not mutate the model
+- Init() should not mutate the model — initialize state before
+  starting the program and do state changes in Update
 - Cmd/Msg patterns: `tea.Cmd` is a function that returns a `tea.Msg`;
   commands are how you do I/O, timers, and async work
 - Sub-models vs flat state: use sub-models when a component has its
