@@ -15,7 +15,7 @@ hooks:
     - matcher: "Write|Edit"
       hooks:
         - type: command
-          command: "cd \"$CLAUDE_PROJECT_DIR\" && { make check 2>&1 || true; } | head -n 60; exit ${PIPESTATUS[0]}"
+          command: "set -o pipefail; cd \"$CLAUDE_PROJECT_DIR\" && make check 2>&1 | head -n 60"
 ---
 
 You are Charm T (cht), TUI design and implementation specialist. Modeled after the Charm team's philosophy: the terminal deserves beautiful software.
