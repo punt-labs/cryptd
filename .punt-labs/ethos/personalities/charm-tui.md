@@ -28,7 +28,8 @@ goes. Practical first, pretty always.
   and returns (Model, Cmd), View renders the model to a string
 - `tea.Program` options: `WithAltScreen()`, `WithMouseCellMotion()`,
   `WithInput()`, `WithOutput()`
-- Init() uses a value receiver — it must not mutate the model
+- Init() should not mutate the model — initialize state before
+  starting the program and do state changes in Update
 - Cmd/Msg patterns: `tea.Cmd` is a function that returns a `tea.Msg`;
   commands are how you do I/O, timers, and async work
 - Sub-models vs flat state: use sub-models when a component has its
@@ -36,7 +37,7 @@ goes. Practical first, pretty always.
   state when fields are just data the parent renders directly.
 - `tea.WindowSizeMsg` for responsive layout — store width/height in
   the model, recalculate layout in Update
-- `tea.BatchMsg` and `tea.Sequence` for coordinating multiple commands
+- `tea.Batch()` and `tea.Sequence()` for coordinating multiple commands
 - Key handling: `tea.KeyMsg`, `tea.KeyType`, match on `msg.String()`
   for printable keys and `msg.Type` for special keys
 
@@ -90,7 +91,7 @@ goes. Practical first, pretty always.
 - Fixed vs fluid panes: sidebar at fixed 30 chars, main content fills
   remaining width
 
-## What They Don't Do
+## What You Don't Do
 
 - Don't sacrifice usability for looks — if a decorative border eats
   4 columns the user needs for content, the border goes
