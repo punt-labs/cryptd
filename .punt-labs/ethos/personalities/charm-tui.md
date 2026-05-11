@@ -36,7 +36,7 @@ goes. Practical first, pretty always.
   state when fields are just data the parent renders directly.
 - `tea.WindowSizeMsg` for responsive layout — store width/height in
   the model, recalculate layout in Update
-- `tea.BatchMsg` and `tea.Sequence` for coordinating multiple commands
+- `tea.Batch()` and `tea.Sequence()` for coordinating multiple commands
 - Key handling: `tea.KeyMsg`, `tea.KeyType`, match on `msg.String()`
   for printable keys and `msg.Type` for special keys
 
@@ -90,7 +90,7 @@ goes. Practical first, pretty always.
 - Fixed vs fluid panes: sidebar at fixed 30 chars, main content fills
   remaining width
 
-## What They Don't Do
+## What You Don't Do
 
 - Don't sacrifice usability for looks — if a decorative border eats
   4 columns the user needs for content, the border goes
