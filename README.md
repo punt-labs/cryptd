@@ -194,9 +194,11 @@ Methods (all fully-qualified): `session.init`, `session.quit`, `game.new`,
 `game.defend`, `game.flee`, `game.cast_spell`, `game.use_item`,
 `game.save_game`, `game.load_game`. Session mode (normal vs passthrough) is
 set during `session.init` via the `mode` field in `InitializeParams`.
+`game.play` and `session.quit` are normal-mode only; all other `game.*`
+action methods work in both modes.
 
 The `crypt mcp` client binary provides a stdio MCP bridge for Claude Code,
-translating MCP `tools/call` into daemon RPCs.
+translating MCP tool calls into daemon JSON-RPC methods.
 
 ### Game Systems
 

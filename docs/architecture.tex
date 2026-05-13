@@ -788,8 +788,9 @@ standard JSON-RPC error).
   & Only meaningful inside an active normal-mode game loop:
     \texttt{RPCRenderer} injects a \texttt{quit} input event,
     the game loop narrates a farewell, and the final response is
-    \texttt{PlayResponse} with \field{quit}=\texttt{true}. A bare
-    \texttt{session.quit} outside the play loop is ignored. \\
+    \texttt{PlayResponse} with \field{quit}=\texttt{true}. A
+    \texttt{session.quit} sent outside the play loop returns a
+    JSON-RPC method-not-found error. \\
 \texttt{game.new}
   & \field{scenario\_id?}, \field{character\_name?},
     \field{character\_class?}, \field{stats?}
