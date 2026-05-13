@@ -93,7 +93,7 @@ The engine knows nothing about interpreters. Interpreters know nothing about nar
 
 | Package | What It Does |
 |---------|-------------|
-| `cmd/cryptd` | Server/daemon binary; `cryptd serve` (with `-f`, `-t`, `--api-key`), `cryptd validate` |
+| `cmd/cryptd` | Server/daemon binary; `cryptd serve` (with `-f`, `-t`, `--api-key`), `cryptd validate` (deprecated — use `crypt-admin validate`) |
 | `cmd/crypt` | Thin client binary; Bubble Tea TUI (readline via `--plain`); auto-starts server; `crypt mcp` stdio bridge |
 | `cmd/crypt-admin` | Scenario authoring binary: `generate`, `validate`, `export` |
 | `internal/daemon` | Game server: JSON-RPC 2.0 handler, session registry, Unix socket/TCP listener |

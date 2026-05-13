@@ -130,7 +130,7 @@ linked only into `crypt-admin` — never into `cryptd` or `crypt`.
 
 | Package | Purpose |
 |---------|---------|
-| `cmd/cryptd` | Server binary: `serve` (with `-f`, `-t`, `--api-key`), `validate` |
+| `cmd/cryptd` | Server binary: `serve` (with `-f`, `-t`, `--api-key`), `validate` (deprecated — use `crypt-admin validate`) |
 | `cmd/crypt` | Thin client binary: connects to server, Bubble Tea TUI + readline fallback |
 | `cmd/crypt-admin` | Author binary: `generate`, `validate`, `export` |
 | `cmd/eval-slm` | SLM accuracy evaluation harness (65+ inputs, needs ollama) |
