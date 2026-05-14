@@ -6,14 +6,18 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- **Per-session mode replaces server-level `--passthrough` flag.** Session mode (normal vs passthrough) is now set during `session.init` via the `mode` field in `InitializeParams`. The daemon serves both `crypt` (normal) and `crypt mcp` (passthrough) clients simultaneously on the same socket. The `--passthrough` CLI flag is removed.
+- **Acceptance test tier split out.** `e2e/acceptance_test.go` now uses `//go:build acceptance` (separate from the `e2e` tag). New `make test-acceptance` target and dedicated CI job. `helpers_test.go` uses `e2e || acceptance` so both build. `make check-full` runs both.
+- **README badges added.** License, CI status, Go Report Card, and Go Reference.
+- **CLAUDE.md M10 status clarified.** M10 session-routing infrastructure (concurrent sessions, per-session isolation) is complete; DM/player privilege gating, `tools/list_changed` notifications, and multi-session integration tests (cryptd-90e.2, .3, .5) remain open.
+- **Package map updated.** CLAUDE.md adds `cmd/crypt-admin`; both CLAUDE.md and README.md drop the removed `cmd/dump-mcp-schema`. README's JSON-RPC API surface replaces the stale MCP tool list. `docs/build-plan.md` and `docs/testing.md` drop references to the deleted schema contract.
+- **architecture.tex synced to current protocol.** Rewrote MCP tool-surface sections (15 tools, `tools/call` dispatch, `--passthrough` flag) as JSON-RPC method-surface sections (direct named methods, per-session mode via `session.init`). PDF rebuilt.
 - **Protocol: direct JSON-RPC methods replace MCP framing.** Daemon protocol refactored from `tools/call` dispatch to direct named methods: `session.init`, `game.new`, `game.move`, `game.look`, `game.play`, `session.quit`, etc. Response results are direct JSON objects instead of `ToolResult{content:[{text:"..."}]}` wrappers. Error responses use standard JSON-RPC error objects instead of `ToolResult{isError:true}`.
 - **Removed MCP schema infrastructure.** Deleted `cmd/dump-mcp-schema`, `testdata/mcp-schema.json`, and the `mcp-schema` CI job. The daemon is a game server, not an MCP server.
 - **Client updated for new protocol.** `crypt` sends `session.init` instead of `initialize`, `game.new` instead of `tools/call` with `name=new_game`, and `game.play` instead of `play`.
 
 ### Added
 
-- **Bubble Tea TUI client.** `crypt` now launches a rich terminal UI by default on TTY: scrolling narration viewport, HP/XP bars with text overlays, 3×3 compass grid with styled exits, equipped items, inventory with weights, stat block, and a combat overlay with single-key shortcuts (A/D/F/U). `--plain` flag falls back to the readline REPL. Visual styling matches `docs/crypt-tui-mockup.html`: bordered panes, section headers, gold accents, color-coded narration text (room names, actions, combat, system). Wire change: `PlayResponse` now carries `exits` and `next_level_xp` for sidebar rendering.
+- **Bubble Tea TUI client.** `crypt` now launches a rich terminal UI by default on TTY: scrolling narration viewport, HP/XP bars with text overlays, 3x3 compass grid with styled exits, equipped items, inventory with weights, stat block, and a combat overlay with single-key shortcuts (A/D/F/U). `--plain` flag falls back to the readline REPL. Visual styling matches `docs/crypt-tui-mockup.html`: bordered panes, section headers, gold accents, color-coded narration text (room names, actions, combat, system). Wire change: `PlayResponse` now carries `exits` and `next_level_xp` for sidebar rendering.
 - **TUI lobby and game creation.** Launching `crypt` without `--scenario` shows a centered lobby screen with New Game / Resume / Quit menu. New Game enters a 4-step character creation wizard: scenario picker (from `game.list_scenarios` RPC), name input, class selection with stat previews, and point-buy stat allocation (8 points, base 10). Resume shows saved sessions from `game.list_sessions` RPC. `--scenario`/`--session` flags skip to gameplay.
 - **`game.list_scenarios` RPC.** Returns available scenarios with id, title, and description. Scans the scenario directory for both single-file and directory-format scenarios.
 - **`game.list_sessions` RPC.** Returns active sessions with game metadata (scenario, character name/class, level, room). Session metadata cached at creation time.
@@ -53,7 +57,7 @@ All notable changes to this project will be documented in this file.
 - `internal/scenariodir` tests — directory fallback, precedence, path traversal protection.
 
 - **Thin client architecture (DES-025 revised):** `crypt` is now a thin client — connects to `cryptd serve`, sends natural language text via the `play` JSON-RPC method, displays narrated text. No engine, interpreter, or narrator in the client. Auto-starts `cryptd serve` if the socket is not present.
-- **Two daemon modes (DES-025):** `cryptd serve` runs in Normal mode (interpreter → engine → narrator → display text for CLI) or `--passthrough` mode (raw MCP tool surface with structured JSON for Claude Code). Normal mode auto-detects ollama for SLM inference, falls back to Rules + Template.
+- **Two daemon modes (DES-025):** `cryptd serve` runs in Normal mode (interpreter → engine → narrator → display text for CLI) or Passthrough mode (direct `game.*` methods with structured JSON for Claude Code). Session mode is selected per-session during `session.init` via the `mode` field in `InitializeParams`; both modes coexist on the same socket. Normal mode auto-detects ollama for SLM inference, falls back to Rules + Template.
 - `internal/daemon/play.go` — `handlePlay()` processes text input through the full interpreter → engine → narrator pipeline; `handleNewGamePlay()` starts a game and narrates the initial room description.
 - `internal/daemon` ServerOption functional options: `WithPassthrough()`, `WithInterpreter()`, `WithNarrator()`.
 - `internal/game.Loop.Dispatch()` exported so the daemon can reuse the game loop's orchestration logic (combat, enemy turns, level-ups) without duplicating 300+ lines.
@@ -182,4 +186,3 @@ All notable changes to this project will be documented in this file.
 - `testdata/scenarios/minimal.yaml` — 2-room scenario matching DES-016 schema
 - `testdata/scenarios/invalid/` — 6 broken scenario fixtures for parser tests
 - `testdata/saves/fighter-level-3.json` — known-state fixture for save/load tests
-
