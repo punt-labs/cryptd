@@ -38,3 +38,6 @@ Lux.ini
 
 # Vox cached audio
 .vox/*.mp3
+
+# Quarry session-transcript captures (pkit-kcps)
+.punt-labs/quarry/captures/
