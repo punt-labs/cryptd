@@ -67,6 +67,7 @@ All notable changes to this project will be documented in this file.
 
 - `crypt` REPL now uses `ergochat/readline` for proper terminal line editing, history, and Ctrl-C handling (was broken with bare `bufio.Scanner`).
 - `TestSLMLoop_HappyPath` integration test no longer hangs — test inputs changed to phrases the Rules interpreter can't parse, so the SLM is actually invoked.
+- CI `staticcheck` pin bumped from v0.7.0 to v0.8.1 — v0.7.0 can't parse the Go 1.27+ stdlib export data format, so `make check` failed on any machine with Go 1.27 as the default local toolchain.
 
 ### Removed
 
