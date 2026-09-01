@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- **unix-megadungeon room descriptions use portable paths.** The generated `description_seed` texts in `scenarios/unix-megadungeon/regions/default.yaml` now show `~/`-relative paths instead of machine-specific absolute ones.
 - **Acceptance test tier split out.** `e2e/acceptance_test.go` now uses `//go:build acceptance` (separate from the `e2e` tag). New `make test-acceptance` target and dedicated CI job. `helpers_test.go` uses `e2e || acceptance` so both build. `make check-full` runs both.
 - **README badges added.** License, CI status, Go Report Card, and Go Reference.
 - **CLAUDE.md M10 status clarified.** M10 session-routing infrastructure (concurrent sessions, per-session isolation) is complete; DM/player privilege gating, `tools/list_changed` notifications, and multi-session integration tests (cryptd-90e.2, .3, .5) remain open.
