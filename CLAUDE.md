@@ -241,7 +241,7 @@ The cryptd repo has a mix of pools: the org engineering specialists for the Go e
 - Any bounded task with clear success criteria, a known set of files, and design ambiguity that benefits from write-set enforcement.
 - Sized for 1-3 rounds of one worker plus one evaluator.
 
-Do NOT use missions for: exploratory research, work you do yourself, epics that need decomposition first (decompose into multiple missions), or review-cycle fix rounds (Copilot/Bugbot findings are mechanical — tight scope, no design ambiguity, 1 round. Use bare `Agent()` calls for fix rounds).
+Do NOT use missions for: exploratory research, work you do yourself, epics that need decomposition first (decompose into multiple missions), or review-cycle fix rounds (Qodo/Bugbot findings are mechanical — tight scope, no design ambiguity, 1 round. Use bare `Agent()` calls for fix rounds).
 
 ### Workflow
 
@@ -357,17 +357,16 @@ All code changes go on feature branches. Never commit directly to main. **Pushin
 
 ### Code Review
 
-Copilot auto-reviews every push via branch ruleset.
+PR review follows punt-kit/standards/pr-review.md: local review (qodo review + silent-failure-hunter + code-reviewer) before the PR, then Qodo and Bugbot once at open, at most two rounds, Copilot only on request.
 
-**Every PR takes 2-6 review cycles.** Do not assume a clean CI run means the PR is ready. Reviewers (Copilot, Bugbot) post comments minutes after CI completes. Read and address every comment before merging.
+Do not assume a clean CI run means the PR is ready: Qodo and Bugbot post comments minutes after CI completes. Read and address every comment before merging.
 
 1. **Create PR** via `mcp__github__create_pull_request`. Include summary and test plan.
-2. **Request Copilot review** via `mcp__github__request_copilot_review`. Never skip.
-3. **Wait for CI + reviews** — `gh pr checks <number> --watch` in background, plus `/loop 2m` poll of `mcp__github__pull_request_read` because Bugbot can take 3+ minutes.
-4. **Read all feedback** via `mcp__github__pull_request_read`. Address every finding — no "pre-existing" excuses.
-5. **Fix, re-push, repeat.** Each push triggers a new review cycle. Run `make check` before each push. After pushing, go back to step 3.
-6. **Merge only when the last cycle produces no actionable comments** — all checks green. Use `mcp__github__merge_pull_request`.
-7. **Post-merge: check for late comments.** Read review comments one final time after merging. Fix in a follow-up PR if needed.
+2. **Wait for CI + reviews** — `/loop 2m` poll of `mcp__github__pull_request_read`, because Bugbot can take 3+ minutes.
+3. **Read all feedback** via `mcp__github__pull_request_read`. Address every finding — no "pre-existing" excuses.
+4. **Fix and push once per round.** Run `make check` before each push.
+5. **Merge when CI is green and every review thread is resolved.** Use `mcp__github__merge_pull_request`.
+6. **Post-merge: check for late comments.** Read review comments one final time after merging. Fix in a follow-up PR if needed.
 
 ### Micro-Commits
 
