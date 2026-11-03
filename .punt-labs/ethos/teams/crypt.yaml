@@ -10,3 +10,31 @@ members:
     role: game-designer
   - identity: cht
     role: tui-specialist
+  - identity: claude
+    role: coo
+  - identity: adb
+    role: infra-engineer
+  - identity: bwk
+    role: go-specialist
+  - identity: djb
+    role: security-engineer
+  - identity: kpz
+    role: ml-specialist
+  - identity: mdm
+    role: cli-specialist
+collaborations:
+  - from: infra-engineer
+    to: coo
+    type: reports_to
+  - from: go-specialist
+    to: coo
+    type: reports_to
+  - from: security-engineer
+    to: coo
+    type: reports_to
+  - from: ml-specialist
+    to: coo
+    type: reports_to
+  - from: cli-specialist
+    to: coo
+    type: reports_to
