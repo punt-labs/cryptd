@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- **Ethos agent files match the crypt team.** Agent files under `.claude/agents/` for handles not on the crypt team were removed. The infra, Go, security, ML and CLI specialists that CLAUDE.md delegates to (`adb`, `bwk`, `djb`, `kpz`, `mdm`) and the `claude` leader were added to the team, so their agent files stay.
 - **unix-megadungeon room descriptions use portable paths.** The generated `description_seed` texts in `scenarios/unix-megadungeon/regions/default.yaml` now show `~/`-relative paths instead of machine-specific absolute ones.
 - **Acceptance test tier split out.** `e2e/acceptance_test.go` now uses `//go:build acceptance` (separate from the `e2e` tag). New `make test-acceptance` target and dedicated CI job. `helpers_test.go` uses `e2e || acceptance` so both build. `make check-full` runs both.
 - **README badges added.** License, CI status, Go Report Card, and Go Reference.
