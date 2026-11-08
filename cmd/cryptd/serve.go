@@ -18,7 +18,6 @@ import (
 	"github.com/punt-labs/cryptd/internal/game"
 	"github.com/punt-labs/cryptd/internal/inference"
 	"github.com/punt-labs/cryptd/internal/interpreter"
-	"github.com/punt-labs/cryptd/internal/lux"
 	"github.com/punt-labs/cryptd/internal/model"
 	"github.com/punt-labs/cryptd/internal/narrator"
 	"github.com/punt-labs/cryptd/internal/renderer"
@@ -46,7 +45,6 @@ func runServe(args []string) {
 	charClass := fs.String("class", "fighter", "character class for -t mode")
 	scriptFile := fs.String("script", "", "read commands from file instead of stdin (-t mode)")
 	jsonMode := fs.Bool("json", false, "output JSON transcript (-t mode, requires --script)")
-	luxMode := fs.Bool("lux", false, "render to Lux ImGui display instead of terminal (-t mode)")
 
 	if err := fs.Parse(args); err != nil {
 		os.Exit(1)
@@ -76,7 +74,7 @@ func runServe(args []string) {
 			fmt.Fprintln(os.Stderr, "error: --json requires --script")
 			os.Exit(1)
 		}
-		runTestingMode(*scenarioID, *charName, *charClass, *scriptFile, *jsonMode, *luxMode, resolvedKey, *modelFlag)
+		runTestingMode(*scenarioID, *charName, *charClass, *scriptFile, *jsonMode, resolvedKey, *modelFlag)
 		return
 	}
 
@@ -140,9 +138,9 @@ func runServe(args []string) {
 }
 
 // runTestingMode runs the engine on stdin/stdout. Scripted mode uses
-// Rules+Template (deterministic, no inference). Interactive and Lux modes
-// probe for available inference (Claude API → SLM → rules+templates).
-func runTestingMode(scenarioID, charName, charClass, scriptFile string, jsonMode, luxMode bool, anthropicKey, modelName string) {
+// Rules+Template (deterministic, no inference). Interactive mode probes
+// for available inference (Claude API → SLM → rules+templates).
+func runTestingMode(scenarioID, charName, charClass, scriptFile string, jsonMode bool, anthropicKey, modelName string) {
 	s, err := scenariodir.Load(scenariodir.Dir(), scenarioID)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -152,8 +150,8 @@ func runTestingMode(scenarioID, charName, charClass, scriptFile string, jsonMode
 	var hero model.Character
 	var stdinBuf *bufio.Reader // shared buffer for interactive mode
 
-	if scriptFile != "" || luxMode {
-		// Scripted or Lux mode: use defaults (no interactive prompt).
+	if scriptFile != "" {
+		// Scripted mode: use defaults (no interactive prompt).
 		hero, err = engine.NewCharacter(charName, charClass, nil)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error creating character: %v\n", err)
@@ -200,21 +198,6 @@ func runTestingMode(scenarioID, charName, charClass, scriptFile string, jsonMode
 				fmt.Fprintf(os.Stderr, "error writing JSON: %v\n", err)
 				os.Exit(1)
 			}
-		}
-	} else if luxMode {
-		// Lux mode: render to Lux ImGui display, input via button clicks.
-		interp, narr := resolveInterpreterNarrator(anthropicKey, modelName)
-		rend, cleanup, err := createLuxRenderer()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			fmt.Fprintln(os.Stderr, "hint: start Lux first, or omit --lux for terminal mode")
-			os.Exit(1)
-		}
-		defer cleanup()
-		loop := game.NewLoop(eng, interp, narr, rend)
-		if err := loop.Run(context.Background(), &state); err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			os.Exit(1)
 		}
 	} else {
 		// Interactive mode: use the shared buffered reader so the
@@ -405,37 +388,4 @@ func promptCharacterCreation(out io.Writer, br *bufio.Reader) (model.Character, 
 	fmt.Fprintln(out)
 
 	return hero, nil
-}
-
-// createLuxRenderer connects to a running Lux display and returns a
-// renderer that draws into a "cryptd" frame. The returned cleanup
-// function closes the display and client.
-func createLuxRenderer() (model.Renderer, func(), error) {
-	client := lux.NewClient(
-		lux.WithName("cryptd"),
-		lux.WithConnectTimeout(5*time.Second),
-		lux.WithRecvTimeout(30*time.Second),
-	)
-	if err := client.Connect(); err != nil {
-		_ = client.Close() // release resources allocated by NewClient
-		return nil, nil, fmt.Errorf("cannot connect to Lux display: %w", err)
-	}
-	fmt.Fprintln(os.Stderr, "cryptd: connected to Lux display")
-
-	display := lux.NewDisplay(client, "cryptd-game", &lux.ShowOpts{
-		FrameID:    "cryptd",
-		FrameTitle: "Crypt",
-		FrameSize:  [2]int{450, 650},
-	})
-
-	rend := renderer.NewLux(display)
-	cleanup := func() {
-		if err := display.Close(); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: lux display close: %v\n", err)
-		}
-		if err := client.Close(); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: lux client close: %v\n", err)
-		}
-	}
-	return rend, cleanup, nil
 }
