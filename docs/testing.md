@@ -11,7 +11,7 @@ immediately and unambiguously whether a change broke something. That means:
   output for the same input. Every test that touches engine logic asserts a
   deterministic outcome. No probabilistic assertions, no "roughly correct."
 - **Interface seams are the injection points.** `CommandInterpreter`, `Narrator`,
-  and `Renderer` are the only coupling points to external systems (LLM, SLM, Lux).
+  and `Renderer` are the only coupling points to external systems (LLM, SLM).
   All tests above the unit level use test doubles at these seams. Real external
   services are never required to run CI.
 - **Headless mode is the CI workhorse.** `headless` uses `RulesInterpreter` +
@@ -49,7 +49,7 @@ immediately and unambiguously whether a change broke something. That means:
 | End-to-End | Every PR | < 2 min | Nothing (embedded fakes) |
 | Acceptance | Release branch | < 10 min | Nothing (headless mode) |
 
-No layer requires a real LLM, real SLM, or running Lux instance.
+No layer requires a real LLM or real SLM instance.
 
 ---
 
@@ -198,19 +198,6 @@ Use `net/http/httptest.NewServer` to serve canned responses. Test that:
 // testdata/fixtures/ollama-move-response.json
 {"response": "{\"action\": \"move\", \"direction\": \"north\"}"}
 ```
-
-### Mock Lux MCP Server
-
-An in-process fake that records all `show()` and `update()` calls and can inject
-synthetic interaction events (button presses) via a channel.
-
-Test that `LuxRenderer`:
-
-- Calls `show()` on scene transitions (room entry, combat start/end).
-- Calls `update()` (not `show()`) for incremental HP, MP, and log changes.
-- Routes `recv()` events correctly to the engine as `InputEvent`s.
-- Does not call `show()` for every HP tick (regression guard against performance
-  anti-pattern).
 
 ### Daemon: Game-as-Goroutine Architecture
 
@@ -379,7 +366,6 @@ testdata/
 | LLM (Claude) | `FakeLLMNarrator` — returns fixture string | Integration: full-loop sequences |
 | LLM (Claude API) | `FakeSLMServer` with `WithAPIKey` — same server, auth header verified | Integration: LLM interpreter/narrator timeout + fallback |
 | SLM (ollama) | `FakeSLMServer` — `httptest.Server` with auth header recording, configurable delay | Integration: SLM timeout fallback, auth verification |
-| Lux MCP | `FakeLuxServer` — records calls, injects events via channel | Integration: LuxRenderer |
 | Game goroutine | `Game.Inspect()` — runs function inside game goroutine for safe state access | Unit: game\_test.go, resume\_test.go |
 | Daemon socket | In-process fake transport | Integration: mcp-proxy routing |
 | CLI stdin | `bytes.Buffer` | Integration: headless mode |
@@ -457,7 +443,6 @@ migration to the current format. Old saves must never silently corrupt.
 |---|---|
 | LLM narration quality | Non-deterministic; evaluated by human playtest |
 | SLM command accuracy against real ollama | Requires model; evaluated by model eval harness, not CI |
-| Lux visual rendering | ImGui pixel output; evaluated by human inspection |
 | mcp-proxy (pre-ship) | Does not exist yet; contract test stubs only |
 | Permadeath roguelike balance | Game design, not correctness; playtesting |
 
