@@ -2,23 +2,36 @@
 # verify this set is complete under `resolution: repo-only`.
 # Do not edit by hand — re-run `ethos vendor --apply` instead.
 version: 1
-generated_at: 2026-11-08T16:25:37Z
+generated_at: 2026-11-08T18:59:01Z
 seeds:
     - adb
     - archivist
+    - bcs
     - bwk
     - cht
     - claude
     - cryptkeeper
     - djb
     - gax
+    - gstack-qa
+    - jms
+    - jra
     - kpz
+    - kth
+    - mcg
     - mdm
+    - rop
+    - rsc
+    - tdt
+    - ylc
 identities:
     - handle: adb
       ext:
         - quarry.yaml
     - handle: archivist
+    - handle: bcs
+      ext:
+        - quarry.yaml
     - handle: bwk
       ext:
         - quarry.yaml
@@ -33,52 +46,137 @@ identities:
       ext:
         - quarry.yaml
     - handle: gax
+    - handle: gstack-qa
+    - handle: jms
+      ext:
+        - quarry.yaml
+    - handle: jra
+      ext:
+        - quarry.yaml
     - handle: kpz
+      ext:
+        - quarry.yaml
+    - handle: kth
+      ext:
+        - quarry.yaml
+    - handle: mcg
       ext:
         - quarry.yaml
     - handle: mdm
       ext:
         - quarry.yaml
+    - handle: rop
+      ext:
+        - quarry.yaml
+    - handle: rsc
+      ext:
+        - quarry.yaml
+    - handle: tdt
+      ext:
+        - quarry.yaml
+    - handle: ylc
+      ext:
+        - quarry.yaml
 personalities:
+    - abrial
     - archivist
     - bernstein
+    - cagan
     - charm-tui
+    - cox
     - cryptkeeper
     - friendly-direct
+    - gstack-qa
     - gygax
+    - hightower
     - karpathy
     - kernighan
+    - lecun
     - lovelace
     - mcilroy
+    - pike
+    - schneier
+    - spivey
+    - torres
 writing_styles:
+    - abrial-prose
     - bernstein-prose
+    - cagan-prose
     - charm-docs
+    - cox-prose
     - direct-with-quips
+    - gstack-tester
     - gygax-prose
+    - hightower-prose
     - karpathy-prose
     - kernighan-prose
+    - lecun-prose
     - lovelace-prose
     - mcilroy-prose
     - measured-prose
+    - pike-prose
+    - schneier-prose
+    - spivey-prose
     - terminal-gothic
+    - torres-prose
 talents:
+    - assumption-testing
+    - b-method
+    - cli
+    - cloud-native
+    - convnets
+    - cryptography
+    - customer-interviewing
+    - deep-learning
+    - dependency-management
+    - devops
     - dungeon-mastery
+    - empowered-teams
     - engineering
+    - event-b
+    - formal-methods
+    - go
     - infrastructure
+    - kubernetes
+    - language-design
+    - machine-learning
     - management
     - operations
+    - plan9
+    - policy
     - product-development
+    - product-discovery
+    - product-management
+    - product-strategy
+    - refinement
     - security
+    - self-supervised-learning
+    - supply-chain-security
+    - threat-modeling
+    - tooling
+    - type-systems
+    - unix
     - unix-lore
+    - z-notation
 roles:
+    - b-specialist
+    - cli-minimalist
     - cli-specialist
+    - cloud-native-engineer
     - coo
     - dungeon-master
     - game-designer
     - go-specialist
+    - go-toolchain
     - infra-engineer
+    - ml-foundations
     - ml-specialist
+    - product-discovery
+    - product-strategy
+    - qa-engineer
+    - security-architect
     - security-engineer
     - tui-specialist
+    - z-specialist
 teams:
     - crypt

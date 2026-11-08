@@ -22,6 +22,26 @@ members:
     role: ml-specialist
   - identity: mdm
     role: cli-specialist
+  - identity: rsc
+    role: go-toolchain
+  - identity: rop
+    role: cli-minimalist
+  - identity: bcs
+    role: security-architect
+  - identity: kth
+    role: cloud-native-engineer
+  - identity: ylc
+    role: ml-foundations
+  - identity: jms
+    role: z-specialist
+  - identity: jra
+    role: b-specialist
+  - identity: mcg
+    role: product-strategy
+  - identity: tdt
+    role: product-discovery
+  - identity: gstack-qa
+    role: qa-engineer
 collaborations:
   - from: infra-engineer
     to: coo
@@ -36,5 +56,35 @@ collaborations:
     to: coo
     type: reports_to
   - from: cli-specialist
+    to: coo
+    type: reports_to
+  - from: go-toolchain
+    to: coo
+    type: reports_to
+  - from: cli-minimalist
+    to: coo
+    type: reports_to
+  - from: security-architect
+    to: coo
+    type: reports_to
+  - from: cloud-native-engineer
+    to: coo
+    type: reports_to
+  - from: ml-foundations
+    to: coo
+    type: reports_to
+  - from: z-specialist
+    to: coo
+    type: reports_to
+  - from: b-specialist
+    to: coo
+    type: reports_to
+  - from: product-strategy
+    to: coo
+    type: reports_to
+  - from: product-discovery
+    to: coo
+    type: reports_to
+  - from: qa-engineer
     to: coo
     type: reports_to
