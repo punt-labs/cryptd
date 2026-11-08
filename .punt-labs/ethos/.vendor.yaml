@@ -1,0 +1,84 @@
+# Written by `ethos vendor`. Records the vendored closure so ethos can
+# verify this set is complete under `resolution: repo-only`.
+# Do not edit by hand — re-run `ethos vendor --apply` instead.
+version: 1
+generated_at: 2026-11-08T16:25:37Z
+seeds:
+    - adb
+    - archivist
+    - bwk
+    - cht
+    - claude
+    - cryptkeeper
+    - djb
+    - gax
+    - kpz
+    - mdm
+identities:
+    - handle: adb
+      ext:
+        - quarry.yaml
+    - handle: archivist
+    - handle: bwk
+      ext:
+        - quarry.yaml
+    - handle: cht
+    - handle: claude
+      ext:
+        - beadle.yaml
+        - quarry.yaml
+        - vox.yaml
+    - handle: cryptkeeper
+    - handle: djb
+      ext:
+        - quarry.yaml
+    - handle: gax
+    - handle: kpz
+      ext:
+        - quarry.yaml
+    - handle: mdm
+      ext:
+        - quarry.yaml
+personalities:
+    - archivist
+    - bernstein
+    - charm-tui
+    - cryptkeeper
+    - friendly-direct
+    - gygax
+    - karpathy
+    - kernighan
+    - lovelace
+    - mcilroy
+writing_styles:
+    - bernstein-prose
+    - charm-docs
+    - direct-with-quips
+    - gygax-prose
+    - karpathy-prose
+    - kernighan-prose
+    - lovelace-prose
+    - mcilroy-prose
+    - measured-prose
+    - terminal-gothic
+talents:
+    - dungeon-mastery
+    - engineering
+    - infrastructure
+    - management
+    - operations
+    - product-development
+    - security
+    - unix-lore
+roles:
+    - cli-specialist
+    - coo
+    - dungeon-master
+    - game-designer
+    - go-specialist
+    - infra-engineer
+    - ml-specialist
+    - security-engineer
+    - tui-specialist
+teams:
+    - crypt
