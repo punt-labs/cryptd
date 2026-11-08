@@ -34,11 +34,6 @@ All notable changes to this project will be documented in this file.
 - **`crypt --session <id>`** flag for session resumption. Sends the session ID in the `initialize` handshake to reconnect to an existing game. Server automatically re-enters the game loop and renders the current room on reconnect.
 - **Session ID in protocol (M10 prep):** `initialize` handshake now accepts an optional `session_id` param and returns a `session_id` in the result. Server assigns a 32-char hex ID via `crypto/rand` when the client doesn't provide one. Foundation for M10 session routing.
 - **DM pipeline integration tests:** full game loop and daemon-level tests wiring `FakeLLMInterpreter` + `FakeLLMNarrator` through the interpreter → engine → narrator pipeline. Verifies state transitions are identical to headless mode.
-- **`cryptd serve -t --lux`**: renders the game in a Lux ImGui frame instead of the terminal. Horizontal quick-action buttons, text input + Send for free-form commands, separators between sections. Requires a running Lux display.
-- **Lux wire protocol client** (`internal/lux`): Go `Client` that connects to a running Lux display over Unix domain socket using the length-prefixed JSON wire protocol (port of the Python `LuxClient`). `Display` adapter wires `Client` + `SceneToElements`/`UpdateToPatches` into the `LuxDisplay` interface, enabling the game engine to render to a real Lux ImGui window.
-- **Lux element tree builder:** pure-function translation layer (`SceneToElements`, `UpdateToPatches`, `TranslateLuxEvent`) converts `LuxScene`/`LuxUpdate` Go structs into Lux-native element dicts (`[]map[string]any`). Bidirectional: button click events translate back to `InputEvent`.
-- **`LuxElementDisplay`:** test double that wires translation + recording + event injection, proving the full Lux round trip (game state → elements → display, interaction → input → engine).
-
 - **EnemyVisitor:** distance-based enemy placement with 5-tier progression (rat→goblin→skeleton→troll→dragon). 40% spawn rate, hub skipping, ±1 tier jitter for variety.
 - **ItemVisitor:** distance-based item placement with 5-tier weapons (dagger→sword→longsword→axe→vorpal blade), matching armor tiers (leather→chain→plate→dragon scale), and scaling health potions. Starter weapon at distance 1, starter potion at start, potions at hub rest stops.
 - **DefaultSpells():** standard spell catalog (fireball, heal, lightning, blessing) added to generated scenarios.
@@ -76,6 +71,7 @@ All notable changes to this project will be documented in this file.
 
 ### Removed
 
+- **Lux renderer integration (abandoned).** Deleted the `internal/lux` wire-protocol client, the `renderer.Lux` renderer and its element/transport translation layer, the `FakeLuxServer`/`LuxElementDisplay` test doubles, the Lux integration tests, and the `cryptd serve -t --lux` flag (~3,300 lines). The game's player-facing display is the `crypt` client's Bubble Tea TUI, fed typed state over the twin-renderer wire (DES-026); the engine keeps `CLIRenderer` and `Autoplay`. The Go Lux client had drifted to wire protocol `0.1` against Lux 0.33.1 and no play mode shipped on it. See DES-029; operator ruling 2026-11-08 (bead cryptd-oal). The M5 Lux HUD and M12 Lux HUD Release Pass milestones are abandoned.
 - `cmd/crypt/embedded.go` — deleted fat client that embedded the game engine. Engine access is always through the server.
 - `crypt solo`, `crypt headless`, `crypt autoplay`, `crypt connect` subcommands — replaced by plain `crypt` thin client.
 - `cryptd headless` and `cryptd autoplay` subcommands — replaced by `cryptd serve -t` (testing mode on stdin/stdout).
@@ -107,13 +103,6 @@ All notable changes to this project will be documented in this file.
 - Rules interpreter: `descend` → move down, `ascend` → move up (directional synonyms)
 - SLM system prompt: few-shot examples, stronger unknown guidance ("do not guess"), item ID resolution instructions referencing game state context; eval accuracy 98.4% → 100%
 
-- `LuxUpdate.Log`: recent adventure log entries included in incremental updates, enabling the frontend to render a scrolling narration panel without waiting for a full scene rebuild; truncated to last 5 entries (same as `LuxScene.Log`)
-- `LuxScene.Exits` and `LuxScene.Actions` / `LuxUpdate.Actions`: navigation exits and context-sensitive action buttons in Lux payloads — exploration mode shows directional exits + look/inventory; combat mode shows attack/defend/flee/cast; game loop populates exits via `enrichForDisplay()` transient field on `DungeonState`
-- `cryptd solo --lux` — Lux JSON-lines display mode; writes scene/update payloads as newline-delimited JSON to stdout, reads `InputEvent` JSON from stdin; falls back to CLI renderer when `--lux` is omitted
-- `renderer.JSONTransport`: `LuxDisplay` implementation over JSON-lines on arbitrary `io.Reader`/`io.Writer` streams — the wire format for Lux frontends
-- `renderer.Lux`: Lux ImGui display surface renderer (Wizardry I layout) — `show()` on scene transitions (room change, combat start/end), `update()` for incremental changes (HP tick, narration); `LuxDisplay` interface abstracts MCP transport; FakeLuxServer-backed tests with performance red line guard (no `show()` for incremental updates)
-- Lux integration tests: 6 tests wiring full game loop (engine + interpreter + narrator + LuxRenderer) through FakeLuxServer — two-room navigation, show/update regression guards, combat state transitions, synthetic event injection, party data structure verification
-- `LuxHero.XP` and `LuxHero.NextLevelXP` fields: XP and next-level threshold included in both `show()` scene and `update()` payloads for stats panel progress bar rendering; game loop enriches display state via `engine.NextLevelXP()` before each render
 - `cmd/eval-slm`: model evaluation harness — runs 65+ natural-language inputs through a real SLM and scores classification accuracy against the full verb table; auto-detects ollama/llama.cpp, supports `--server`, `--model`, `--timeout`, `--verbose` flags; exits non-zero below 80% accuracy
 - `interpreter.SystemPrompt` and `interpreter.ParseSLMResponse` exported for eval harness reuse
 - `narrator.SLM`: atmospheric narration via local SLM for room descriptions (moved/looked), combat moments (combat_started, combat_won, hero_died), item examination, and level-up; tactical events (damage, errors) use deterministic template narrator for speed and precision; all SLM events fall back gracefully on inference failure
@@ -176,7 +165,7 @@ All notable changes to this project will be documented in this file.
 - Narrator templates for all inventory events: picked_up, dropped, equipped, unequipped, examined, inventory_listed, plus error events
 - Game loop dispatch for all inventory action types
 - `short_sword` weapon added to minimal scenario entrance room
-- `cryptd headless --scenario <id>` — runs the game in headless mode (no LLM, no Lux) using `RulesInterpreter`, `TemplateNarrator`, and `CLIRenderer` wired through the new game loop; supports `CRYPT_SCENARIO_DIR` env override
+- `cryptd headless --scenario <id>` — runs the game in headless mode (no LLM) using `RulesInterpreter`, `TemplateNarrator`, and `CLIRenderer` wired through the new game loop; supports `CRYPT_SCENARIO_DIR` env override
 - `internal/engine` — deterministic game rules engine: `NewGame`, `Move`, `Look`; typed errors `NoExitError` and `LockedError`
 - `internal/interpreter` — `RulesInterpreter`: maps `go <dir>`, `look`, `quit` (and aliases) to `EngineAction` without LLM involvement
 - `internal/narrator` — `TemplateNarrator`: fixed-template narrations for `moved`, `looked`, `unknown_action`, `quit`, and fallback events

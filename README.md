@@ -104,7 +104,7 @@ machine. No game rule or state transition is left to probabilistic LLM output.
 L4 — Claude (SKILL.md)      Narrates, interprets free text, generates scenario YAML
          │ MCP tools
 L1 — Go engine              State transitions, combat, inventory, fog-of-war, save/load
-L1 — Lux (ImGui)            Display surface (receives element trees via MCP)
+Display                     CLIRenderer (terminal) + twin-renderer wire to the crypt client
 ```
 
 ### Dependency Direction
@@ -142,7 +142,7 @@ linked only into `crypt-admin` — never into `cryptd` or `crypt`.
 | `internal/inference` | OpenAI-compatible HTTP client for `/v1/chat/completions` |
 | `internal/interpreter` | `RulesInterpreter` (keyword/regex), `SLM` (ollama), `LLM` (Claude API) |
 | `internal/narrator` | `TemplateNarrator` (fixed), `SLM` (ollama), `LLM` (Claude atmospheric narration) |
-| `internal/renderer` | `CLIRenderer` (stdout/stdin), `Lux` (ImGui via MCP), `JSONTransport` |
+| `internal/renderer` | `CLIRenderer` (stdout/stdin), `Autoplay` (scripted `-t` mode) |
 | `internal/model` | All data types: `GameState`, `Character`, `EngineAction`, `EngineEvent`, interfaces |
 | `internal/scenario` | YAML parser, validator, directory-format loader (`LoadDir`) |
 | `internal/scenariodir` | Scenario ID resolution with path-traversal protection |
@@ -150,7 +150,7 @@ linked only into `crypt-admin` — never into `cryptd` or `crypt`.
 | `internal/save` | JSON save/load with `schema_version` and forward compatibility |
 | `internal/dice` | Dice notation parser: `NdS`, `NdS+M`, `NdS-M` |
 | `internal/protocol` | JSON-RPC 2.0 protocol types shared by daemon and client |
-| `internal/testutil` | Test doubles: `FakeLLMInterpreter`, `FakeLLMNarrator`, `FakeSLMServer`, `FakeLuxServer` |
+| `internal/testutil` | Test doubles: `FakeLLMInterpreter`, `FakeLLMNarrator`, `FakeSLMServer` |
 | `e2e` | End-to-end tests (build tag `e2e`): compiled binary, scripted sessions |
 
 ### Scenario Formats
@@ -247,7 +247,7 @@ make markdownlint   # markdown lint
 | Integration | `integration` | < 30s | Real implementations wired together, fakes for external |
 | E2E | `e2e` | < 2min | Compiled binary, black-box stdin/stdout |
 
-No real LLM, SLM, or Lux instance is ever required for CI. Every external
+No real LLM or SLM instance is ever required for CI. Every external
 dependency has a fake in `internal/testutil/`.
 
 ## Demos

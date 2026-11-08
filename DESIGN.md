@@ -16,7 +16,7 @@ This file is the authoritative record of design decisions, prior approaches, and
 
 The initial system is a pure-prompt text adventure — Claude is the parser, rules engine,
 narrator, and state machine. The architecture below reflects this baseline. DES-009 onward
-documents the evolution to a proper engine with a Go core, Lux display, and three play modes.
+documents the evolution to a proper engine with a Go core, terminal display, and three play modes.
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
@@ -427,7 +427,7 @@ DES-001 says "no code, only prompts." This MCP server is ~90 lines of JavaScript
 │  │  Narrator:      │  │  Narrator:      │  │  Narrator:              │  │
 │  │    LLM (Claude) │  │    SLM (ollama) │  │    template             │  │
 │  │  Renderer:      │  │  Renderer:      │  │  Renderer:              │  │
-│  │    Lux          │  │    Lux or CLI   │  │    CLI / stdout         │  │
+│  │    wire → crypt │  │    CLI          │  │    CLI / stdout         │  │
 │  │  Engine:        │  │  Engine:        │  │  Engine:                │  │
 │  │    daemon       │  │    embedded     │  │    embedded             │  │
 │  └─────────────────┘  └─────────────────┘  └─────────────────────────┘  │
@@ -477,8 +477,8 @@ Separate the game into bounded layers by responsibility:
   Does not enforce rules or manage state — it calls engine tools and narrates their results.
 - **L1 — Go engine:** Deterministic rules. State transitions, combat resolution, inventory
   limits, fog-of-war, save/load. Exposes a stable MCP tool interface. No LLM calls.
-- **L1 — Lux:** Display surface. Native ImGui window rendering map canvas, HP bars, combat
-  UI, narration log. Driven by the engine via Lux MCP tools.
+- **Display:** Terminal rendering. The `CLIRenderer` draws the game to ANSI/stdout; the
+  twin-renderer wire path (DES-026) carries typed state to the `crypt` client for its TUI.
 
 The Node.js MCP server (DES-008) is replaced by the Go engine. The SKILL.md prompt is
 rewritten: instead of being the rules engine, it is now the DM.
@@ -540,8 +540,8 @@ mid-adventure is valid.
 
 | Mode | Interpreter | Narrator | Renderer | Engine deployment |
 |---|---|---|---|---|
-| `dm` | LLM (Claude) | LLM (Claude) | Lux | daemon |
-| `solo` | SLM (ollama) | SLM (ollama) | Lux or CLI | embedded |
+| `dm` | LLM (Claude) | LLM (Claude) | wire → crypt | daemon |
+| `solo` | SLM (ollama) | SLM (ollama) | CLI | embedded |
 | `headless` | SLM or rules | template | CLI / stdout | embedded |
 
 The mode is recorded in the save file (`"play_mode"`) as advisory context for the next
@@ -602,7 +602,7 @@ Implementations:
 |---|---|---|---|
 | `CommandInterpreter` | `LLMInterpreter` | `SLMInterpreter` | `RulesInterpreter` |
 | `Narrator` | `LLMNarrator` | `SLMNarrator` | `TemplateNarrator` |
-| `Renderer` | `LuxRenderer` | `LuxRenderer` or `CLIRenderer` | `CLIRenderer` |
+| `Renderer` | wire → `crypt` TUI | `CLIRenderer` | `CLIRenderer` |
 
 ### Why Three Separate Interfaces (Not One)
 
@@ -611,7 +611,7 @@ The three concerns have different call frequency and latency budgets:
 - `CommandInterpreter` is called only on free-text input (infrequent, high latency OK)
 - `Narrator` is called after each state-changing event (moderate frequency)
 - `Renderer` is called after every state change, including button-driven ones
-  (high frequency — must be non-blocking for LuxRenderer)
+  (high frequency — must be non-blocking)
 
 Combining them into one interface would force every implementation to satisfy all three
 contracts, coupling concerns that are independently replaceable.
@@ -919,7 +919,7 @@ the engine — not Claude — reads and writes saves. JSON is:
 - Easier to diff in git (if a player commits their save) than YAML
 
 The adventure log loses its narrative markdown rendering and becomes a JSON array of
-strings. This is an acceptable trade — the log is visible in the Lux narration panel
+strings. This is an acceptable trade — the log is visible in the client's narration panel
 during play regardless.
 
 ### Rejected: SQLite
@@ -933,42 +933,22 @@ debuggable, and portable. Revisit if Biff multi-player requires write contention
 ## DES-018: Lux as Primary Display Surface
 
 **Date:** 2026-03-10
-**Status:** SETTLED
+**Status:** SUPERSEDED by DES-029 (2026-11-08)
 **Topic:** How the game is rendered to the player
 
-### Design
+This decision made the `LuxRenderer` (a persistent native ImGui window driven by Lux MCP
+tools) the primary display surface, with `CLIRenderer` as a fallback. It was reversed on
+2026-11-08 — see **DES-029** for the reversal and its rationale. The original design is
+retained below for the record; it no longer describes the system.
 
-The `LuxRenderer` calls Lux MCP tools (`show`, `update`, `recv`) to maintain a persistent
-native ImGui window alongside the Claude Code terminal. The window layout uses multiple
-floating `window` elements:
+### Original design (no longer in effect)
 
-- Map canvas (`draw` element): grid rooms, corridors, fog of war, player position
-- Stats panel: HP/MP progress bars, class, level, XP
-- Navigation buttons: directional exits as Lux `button` elements (no LLM round-trip)
-- Narration log: scrolling `markdown` element
-- Combat panel (when active): enemy HP bars, action buttons (Attack, Defend, Item, Flee)
-
-`show()` is called on scene transitions (new room, enter/exit combat). `update()` is called
-for incremental changes (HP change, log entry, fog reveal). Navigation and combat buttons
-feed directly to the engine via `recv()` — no LLM round-trip for mechanical actions.
-
-### Why Lux (Not ASCII Art in Terminal, Not a Web UI)
-
-- **Persistent, live state.** The map and HP bars update in real time without the narration
-  terminal being cluttered. A terminal renderer would require re-printing the full state
-  after every action.
-- **Native performance.** ImGui at 60fps means the UI never lags even during engine
-  computation. No HTML rendering pipeline.
-- **Separation of concerns.** The LLM narrates in the Claude Code terminal; the engine
-  state is visible in Lux. Players don't have to scroll back through narration to check HP.
-- **Already installed.** Lux is a Punt Labs building block. Players using the Punt Labs
-  ecosystem likely have it; it ships as a dependency via `install.sh`.
-
-### CLIRenderer as Fallback
-
-`CLIRenderer` (ANSI terminal) is implemented for `headless` mode and as a fallback when
-Lux is not available. The `LuxRenderer` checks liveness with `ping()` on startup and falls
-back to `CLIRenderer` automatically.
+The `LuxRenderer` called Lux MCP tools (`show`, `update`, `recv`) to maintain a persistent
+native ImGui window alongside the Claude Code terminal: a map canvas (grid rooms, fog of
+war, player position), a stats panel (HP/MP/XP), directional navigation buttons, a scrolling
+narration log, and a combat panel. `show()` ran on scene transitions and `update()` on
+incremental changes; navigation and combat buttons fed the engine via `recv()` with no LLM
+round-trip. `CLIRenderer` was the `headless`-mode and liveness-check fallback.
 
 ---
 
@@ -982,9 +962,10 @@ back to `CLIRenderer` automatically.
 
 Two input paths, selected by action type:
 
-- **Structured actions (navigation, combat):** Lux buttons. Player clicks `[↑ North]` or
-  `[⚔ Attack]`. The engine receives the action directly via `recv()` on the `LuxRenderer`.
-  No LLM involvement. Latency: ~50ms (Lux round-trip).
+- **Structured actions (navigation, combat):** the `crypt` TUI. The player uses the
+  compass grid for movement and single-key combat shortcuts (A/D/F/U); the client
+  serializes the action straight to the engine as a `game.*` call. No LLM involvement.
+  Latency: one local round-trip.
 
 - **Free text (exploration, interaction, conversation):** Player types in the Claude Code
   terminal. The `CommandInterpreter` parses intent and calls the corresponding engine tool.
@@ -1004,8 +985,8 @@ In `solo` mode, free text goes to `SLMInterpreter`. In `headless`, to `RulesInte
 
 ### Performance Implication
 
-Navigation button → engine → Lux update: ~50ms total. The LLM is not in this path.
-This is the critical performance boundary: a game that requires LLM confirmation for
+Navigation key → engine → client render: one local round-trip. The LLM is not in this
+path. This is the critical performance boundary: a game that requires LLM confirmation for
 every step is not playable at human pace.
 
 ---
@@ -1112,7 +1093,7 @@ The game takes mechanical inspiration from two 1981 classics:
 ### What We Don't Take From Either
 
 - **Wizardry's party of six:** Deferred to Biff multi-player.
-- **Wizardry's wireframe 3D view:** The Lux map canvas uses a top-down grid view instead.
+- **Wizardry's wireframe 3D view:** the game uses a top-down grid map instead.
 - **Zork's maze of twisty passages:** Grid-based map makes this unnecessary and frustrating.
 - **Zork's verb-noun parser:** The LLM/SLM handles natural language; no magic verbs.
 
@@ -1444,7 +1425,7 @@ bridge between the game loop and the network.
 - **Typed data end-to-end.** Both sides use `model.GameState`, `model.Character`, etc.
   No `map[string]any` anywhere. The wire format is just serialization boilerplate.
 - **Interface is the contract.** The `Renderer` interface is identical on both sides.
-  Adding a new renderer (web client, Lux) means implementing the same interface.
+  Adding a new renderer (e.g. a future web client) means implementing the same interface.
 - **Display logic lives in the client.** `formatBar`, `formatHUD`, room headers, enemy
   status — all in the client renderer where the player sees them.
 - **Server renderer is pure I/O.** Serialize state out, deserialize events in. No display
@@ -1577,3 +1558,49 @@ After: 65% survival, 27.7 mean XP, 66% level-up rate, 3pp class spread
 - `cmd/cryptd/serve.go`: interactive character creation prompt, SLM in `-t` mode
 - `cmd/eval-balance/main.go` + `internal/monkeytest/`: balance testing harness
 - `docs/gameplay.tex`: full mechanics specification
+
+---
+
+## DES-029: Lux Renderer Abandoned
+
+**Date:** 2026-11-08
+**Status:** SETTLED
+**Topic:** Removing Lux as a display surface
+**Supersedes:** DES-018
+
+### Decision
+
+The Lux (ImGui) renderer is abandoned. All Lux code is deleted: the `internal/lux`
+wire-protocol client, the `renderer.Lux` renderer and its element/transport translation
+layer, the `FakeLuxServer`/`LuxElementDisplay` test doubles, the Lux integration tests,
+and the `cryptd serve -t --lux` flag. The engine keeps exactly three `Renderer`
+implementations: `CLIRenderer` (terminal), `Autoplay` (scripted `-t` mode), and the
+twin-renderer wire path (DES-026) that carries typed state to the `crypt` client's Bubble
+Tea TUI.
+
+### Why
+
+- **The player-facing surface is already the `crypt` TUI.** Since DES-025 (two binaries)
+  and DES-026 (twin renderer), the rich display a player sees is the `crypt` client's
+  Bubble Tea UI — HP/XP bars, compass grid, combat overlay — fed typed `GameState` over
+  the wire. The Lux renderer was a parallel, second display path for the same data.
+- **Lux drifted out of sync and stayed unused.** The Go client spoke Lux wire protocol
+  `0.1`; Lux is now at 0.33.1. The only test that exercised a live Lux server failed on
+  the current protocol. No play mode shipped on Lux; the HUD milestones (M4/M5/M12) never
+  reached a player.
+- **One display path, not two.** Carrying a second renderer with its own protocol,
+  translation layer, and fakes cost ~3,300 lines and a standing integration failure for a
+  surface the twin renderer already covers.
+
+### Consequences
+
+- DES-018 (Lux as primary display surface) is superseded; its `LuxRenderer` fallback
+  design no longer applies. DES-019's structured-action input now flows through the `crypt`
+  TUI rather than Lux buttons. The `Renderer` interface itself is unchanged.
+- Backlog: the M5 Lux HUD beads and the M12 Lux HUD Release Pass epic are closed as
+  abandoned. The twin-renderer client (M8b) is the display direction going forward.
+
+### Operator ruling
+
+Jim, 2026-11-08: remove the Lux integration and kill the associated beads. Bead:
+cryptd-oal.
