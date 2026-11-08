@@ -461,3 +461,4 @@ When this file conflicts with punt-kit standards, this file wins (project-specif
 - **`.tmp/`** — scratch files, diffs, throwaway data. Gitignored. Use instead of `/tmp`.
 - **`../.bin/`** — cross-repo scripts for repeated operations.
 - **Quarry** — semantic search via MCP tools, connected to the `punt-labs` database. This repo is indexed as the `cryptd` collection.
+@.punt-labs/ethos/CLAUDE.md
