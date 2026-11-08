@@ -19,8 +19,7 @@ type EngineEvent struct {
 	Details map[string]any // additional context for narrators and renderers
 }
 
-// InputEvent is an event received from the renderer (e.g. a keypress or
-// button click in Lux).
+// InputEvent is an event received from the renderer (e.g. a keypress).
 type InputEvent struct {
 	Type    string
 	Payload string

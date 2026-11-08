@@ -142,7 +142,7 @@ named triple of interface implementations.  The engine always runs as
   & \texttt{SLMNarrator}
   & \texttt{TemplateNarrator} \\
 \iface{Renderer}
-  & \texttt{RPCRenderer} or \texttt{LuxRenderer}
+  & \texttt{RPCRenderer}
   & \texttt{RPCRenderer} or \texttt{CLIRenderer}
   & \texttt{CLIRenderer} \\
 \textbf{Engine deployment}
@@ -201,7 +201,7 @@ Encounter lore        & LLM             & Pre-made only   & Pre-made only \\
 State transitions     & Engine          & Engine          & Engine \\
 Combat resolution     & Engine          & Engine          & Engine \\
 Fog-of-war, save/load & Engine          & Engine          & Engine \\
-Rendering             & Lux or RPC      & RPC or CLI      & CLI \\
+Rendering             & RPC             & RPC or CLI      & CLI \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -229,7 +229,8 @@ Game engine
   & Generates human-readable prose from engine event results. \\
 \iface{Renderer}
   & Go interface
-  & Presents game state to the player (Lux HUD or ANSI CLI). \\
+  & Presents game state to the player (ANSI CLI, or typed element
+    trees over the wire to the \cmd{crypt} client). \\
 \cmd{cryptd} server
   & Go binary
   & JSON-RPC 2.0 daemon; exposes direct named methods
@@ -272,10 +273,6 @@ SKILL.md
   & Prompt (L4)
   & DM role instructions for Claude; narration, scenario generation,
     lore, examination responses. \\
-Lux
-  & Python / ImGui
-  & Native display surface; receives element trees from
-    \texttt{LuxRenderer} via MCP tools. \\
 ollama
   & External service
   & Serves SLM for \texttt{SLMInterpreter} and \texttt{SLMNarrator}.
@@ -571,10 +568,6 @@ type Renderer interface {
     \texttt{Render()} serializes a \texttt{Play\-Response} as NDJSON.
     \texttt{Events()} reads \texttt{play} requests from the client's
     scanner.  Runs inside the game goroutine. \\
-\texttt{LuxRenderer}
-  & \cmd{-t --lux} mode
-  & Calls Lux MCP tools (\tool{show}, \tool{update}, \tool{recv})
-    to drive the full HUD.  Currently used in \cmd{-t} testing mode. \\
 \texttt{CLIRenderer}
   & \cmd{-t} mode, \mode{headless}
   & ANSI terminal; ASCII map, text HP bar, stdin input loop. \\
@@ -643,8 +636,8 @@ type DungeonState struct {
     \cmd{/crypt:create} skill command.  Procedural generation is
     explicitly not used --- it produces maps that are inconsistent on
     backtracking.
-  \item \textbf{Fog of war}: unvisited rooms are opaque on the Lux
-    map canvas.  Room content is not revealed until the player enters.
+  \item \textbf{Fog of war}: unvisited rooms are hidden on the rendered
+    map.  Room content is not revealed until the player enters.
   \item \textbf{Room types}: corridor, chamber, stairway (up/down),
     treasure vault, boss chamber.
   \item \textbf{Door kinds}: open, locked (requires key item),
@@ -891,81 +884,6 @@ standard JSON-RPC error).
 \end{center}
 
 % ===================================================================
-\section{Lux Display Integration}
-% ===================================================================
-
-\textbf{Status}: partially implemented.  The \texttt{LuxRenderer}
-and Lux element tree builder exist and work in \cmd{cryptd serve -t
---lux} mode.  The full four-panel HUD described below is future work.
-
-\subsection{HUD Layout}
-
-The \texttt{LuxRenderer} drives a four-panel HUD.  Navigation and
-combat buttons deliver input events directly to the engine --- no
-LLM round-trip is required for button-driven actions.
-
-\begin{lstlisting}[title={Lux HUD layout (schematic)}]
-+--------------------------------------------------+
-| Menu: [Game] [Character] [Map]                   |
-+----------------------------+---------------------+
-|                            | HP  [========--] 45 |
-|   DUNGEON MAP              | MP  [----------]  0 |
-|   (draw canvas,            | Fighter Lv3  XP 1k  |
-|    grid rooms,             +---------------------+
-|    fog of war,             | EXITS               |
-|    visited/unvisited,      |       [N]            |
-|    player dot,             |  [W]       [E]      |
-|    locked doors)           |       [S]            |
-|                            |       [D stairs]     |
-+----------------------------+---------------------+
-| NARRATION LOG              | COMBAT (when active) |
-| (markdown, scrolling)      | Goblin [=====--] 8hp |
-|                            | [Attack] [Use Item]  |
-|                            | [Defend] [Flee]      |
-|                            | Round 2 - Your turn  |
-+----------------------------+---------------------+
-\end{lstlisting}
-
-\subsection{Update Strategy}
-
-\begin{center}
-\begin{tabular}{lp{8cm}}
-\toprule
-\textbf{Event} & \textbf{Lux operation} \\
-\midrule
-Room transition (new room entered)
-  & \tool{lux.show()} --- replace full narration panel, update map fog \\
-HP/MP change during combat
-  & \tool{lux.update()} --- patch progress bar elements in-place \\
-Narration text appended
-  & \tool{lux.update()} --- append to narration log list \\
-Combat begins/ends
-  & \tool{lux.show()} --- activate or deactivate combat panel \\
-Map fog reveal (new room)
-  & \tool{lux.update()} --- patch map canvas element \\
-Nav button press (player)
-  & \tool{lux.recv()} event \textrightarrow{} engine directly \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-\subsection{Lux Tools Used}
-
-The \texttt{LuxRenderer} uses the following Lux MCP tools:
-
-\begin{itemize}
-  \item \tool{show(scene\_id, elements, title?)} --- initial HUD render
-    and full scene transitions.
-  \item \tool{update(scene\_id, patches)} --- incremental HP, MP, fog,
-    and log updates within a scene.
-  \item \tool{recv(timeout?)} --- poll for button interaction events
-    (navigation presses, combat actions).
-\end{itemize}
-
-The engine does not use \tool{show\_table}, \tool{show\_dashboard},
-or \tool{show\_diagram}; those are data-analysis surfaces.
-
-% ===================================================================
 \section{mcp-proxy Integration}
 % ===================================================================
 
@@ -1190,9 +1108,8 @@ When Biff is added:
     graceful shutdown.
   & Complete \\
 \midrule
-\textbf{Future — DM Mode + Lux HUD}
-  & Full Lux HUD (map canvas, HP/MP bars, nav buttons);
-    SKILL.md rewritten for DM role;
+\textbf{Future — DM Mode}
+  & SKILL.md rewritten for DM role;
     \cmd{/crypt:create} --- interactive scenario generation.
   & Planned \\
 \midrule
@@ -1261,7 +1178,7 @@ Three principles follow from this:
     \iface{CommandInterpreter}, \iface{Narrator}, and
     \iface{Renderer} (Section~\ref{sec:interfaces}) are the only
     coupling points to external systems.  All tests above unit level
-    use test doubles at these seams.  No real LLM, SLM, or Lux
+    use test doubles at these seams.  No real LLM or SLM
     instance is ever required to run CI.
   \item \textbf{Headless mode is the CI workhorse.}
     \mode{headless} uses \texttt{RulesInterpreter} +
@@ -1279,7 +1196,7 @@ Three principles follow from this:
 \textbf{Layer} & \textbf{Trigger} & \textbf{Target} & \textbf{Coverage} \\
 \midrule
 Unit           & Every commit & $<$5~s   & Pure engine functions, parsers, \texttt{RulesInterpreter}, \texttt{TemplateNarrator} \\
-Integration    & Every commit & $<$30~s  & Interface compositions, fake SLM, fake Lux, daemon routing, session resume \\
+Integration    & Every commit & $<$30~s  & Interface compositions, fake SLM, daemon routing, session resume \\
 End-to-End     & Every PR     & $<$2~min & Real \cmd{cryptd} subprocess; MCP wire smoke; save round-trips \\
 Acceptance     & Release      & $<$10~min & YAML game scripts through \cmd{cryptd serve -t}; full adventures \\
 \bottomrule

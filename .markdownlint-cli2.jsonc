@@ -1,6 +1,7 @@
 {
   // Markdownlint rules defined in .markdownlint.jsonc at repo root
-  // .punt-labs/quarry/captures/** and .punt-labs/ethos/agents/** are gitignored
-  // runtime state (session transcripts, generated agents), not authored docs.
-  "ignores": ["node_modules/**", ".tmp/**", "**/copilot-session-*.md", ".claude/agents/**", ".punt-labs/ethos/agents/**", ".punt-labs/quarry/captures/**"]
+  // .punt-labs/quarry/captures/**, .punt-labs/ethos/agents/**, and
+  // .punt-labs/local/** are gitignored runtime state (session transcripts,
+  // generated agents, mission traces), not authored docs.
+  "ignores": ["node_modules/**", ".tmp/**", "**/copilot-session-*.md", ".claude/agents/**", ".punt-labs/ethos/agents/**", ".punt-labs/quarry/captures/**", ".punt-labs/local/**"]
 }

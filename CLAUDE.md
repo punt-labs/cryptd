@@ -40,7 +40,7 @@ Core principle (DES-009): the LLM is the Dungeon Master (narrator, semantic pars
 L4 — Claude (SKILL.md)      Narrates, interprets free text, generates scenario YAML
          │ MCP tools
 L1 — Go engine              State transitions, combat, inventory, fog-of-war, save/load
-L1 — Lux (ImGui)            Display surface (receives element trees via MCP)
+Display                     CLIRenderer (terminal) + twin-renderer wire to the crypt client
 ```
 
 ### Daemon Modes (DES-025)
@@ -108,7 +108,7 @@ The engine knows nothing about interpreters. Interpreters know nothing about nar
 | `internal/scenariodir` | Scenario ID resolution with path-traversal protection |
 | `internal/save` | JSON save/load with `schema_version` and forward compat |
 | `internal/dice` | Dice notation parser: `NdS`, `NdS+M`, `NdS-M` |
-| `internal/testutil` | Test doubles: `FakeLLMInterpreter`, `FakeLLMNarrator`, `FakeSLMServer`, `FakeLuxServer`, `ScriptRunner` |
+| `internal/testutil` | Test doubles: `FakeLLMInterpreter`, `FakeLLMNarrator`, `FakeSLMServer`, `ScriptRunner` |
 | `e2e` | End-to-end tests (build tag `e2e`); compiles binary and runs scripted sessions |
 
 ### Data Formats
@@ -187,7 +187,7 @@ Full specification: [docs/testing.md](docs/testing.md). The key enforcement rule
 | E2E | `e2e` | < 2min | Compiled binary, black-box stdin/stdout |
 | Acceptance | `acceptance` | < 10min | YAML game scripts via `cryptd headless` |
 
-**No real LLM, SLM, or Lux instance is ever required for CI.** Every external dependency has a fake in `internal/testutil/`.
+**No real LLM or SLM instance is ever required for CI.** Every external dependency has a fake in `internal/testutil/`.
 
 ### Coverage Targets
 
@@ -204,7 +204,6 @@ Coverage regressions are gate failures. When you touch a file, its coverage must
 |----------------|------|----------|
 | Claude (LLM) | `FakeLLMInterpreter`, `FakeLLMNarrator` | `internal/testutil/` |
 | ollama (SLM) | `FakeSLMServer` (`httptest.NewServer`) | `internal/testutil/` |
-| Lux MCP | `FakeLuxServer` (records calls, injects events) | `internal/testutil/` |
 
 All fakes implement the same Go interfaces as real implementations and are importable by any test package.
 

@@ -12,8 +12,8 @@
    is never in a state where a full slice cannot be exercised.
 
 3. **Headless first, display last.** The `headless` play mode (zero
-   dependencies) is the CI workhorse and the first integration target. Lux
-   and LLM integrations are layered on top of a proven engine core.
+   dependencies) is the CI workhorse and the first integration target. LLM
+   integration is layered on top of a proven engine core.
 
 4. **Each milestone ends in green CI.** No milestone is done until tests pass,
    lint is clean, and the binary is runnable end-to-end. Partial work stays
@@ -40,7 +40,7 @@
              │               │                 │
    ┌─────────▼──────┐  ┌─────▼───────┐  ┌─────▼───────────┐
    │  Interpreters  │  │  Narrators  │  │   Renderers     │
-   │  Rules / SLM   │  │  Template   │  │  CLI / Lux      │
+   │  Rules / SLM   │  │  Template   │  │  CLI            │
    │  LLM           │  │  SLM / LLM  │  │                 │
    └─────────┬──────┘  └─────┬───────┘  └─────────────────┘
              │               │
@@ -79,7 +79,6 @@ exists yet. Every subsequent milestone builds on this foundation.
   - `FakeLLMNarrator` — returns fixture string
   - `FakeSLMServer` — `httptest.Server` serving canned ollama `/api/generate`
     responses (will switch to OpenAI-compatible endpoints in M6)
-  - `FakeLuxServer` — records `show()`/`update()` calls; injects events
   - `ScriptRunner` — skeleton for running game scripts (no engine yet)
 - `testdata/` layout: `scenarios/`, `saves/`, `scripts/`, `fixtures/`
 - `testdata/scenarios/minimal.yaml` — two rooms, one enemy, one item
@@ -207,58 +206,23 @@ A real human can play a complete game via `cryptd headless`.
 
 ---
 
-## Milestone 4 — Lux Thin Slice
+## Milestone 4 — Lux Thin Slice (ABANDONED)
 
-**Goal:** `cryptd solo` starts, connects to Lux, and shows a minimal HUD.
-A player can move rooms and see the narration log update in Lux. No SLM yet —
-`solo` still uses `RulesInterpreter` as the interpreter in this milestone.
-
-**What gets built:**
-
-- `internal/renderer/lux.go` — `LuxRenderer` (thin):
-  - `show()` on `new_game` and room transitions: displays room name and
-    narration in a single Lux text panel
-  - `update()` for log appends
-  - `recv()` event loop for Lux button presses → `InputEvent`
-- `cmd/crypt/solo.go` — `cryptd solo` subcommand:
-  - Wires `RulesInterpreter` + `TemplateNarrator` + `LuxRenderer`
-  - Falls back to `CLIRenderer` if Lux is not running
-
-**Tests written:**
-
-- Unit: `LuxRenderer.Render()` calls `show()` on scene transition, not
-  `update()` — verified against `FakeLuxServer` call log
-- Unit: `LuxRenderer.Render()` calls `update()` for log appends —
-  not a full `show()` (regression guard)
-- Integration: `FakeLuxServer` receives correct element structure for
-  a two-room navigation sequence
-- Integration: `FakeLuxServer` injects a synthetic button press event;
-  assert engine receives correct `InputEvent`
-
-**Done when:** `cryptd solo --scenario minimal` connects to a running Lux
-instance and displays room transitions. `FakeLuxServer` tests pass in CI
-without Lux installed.
+**Abandoned** per operator ruling 2026-11-08 (bead cryptd-oal). The Lux
+(ImGui display) renderer is no longer a display surface for cryptd. This
+milestone's `LuxRenderer` thin slice and `cryptd solo` Lux wiring were
+removed; the engine keeps CLIRenderer, Autoplay, and the twin-renderer
+wire path to the `crypt` client. The milestone number is retained for
+historical continuity; later milestones are not renumbered.
 
 ---
 
-## Milestone 5 — Full Lux HUD
+## Milestone 5 — Full Lux HUD (ABANDONED)
 
-**Goal:** Deepen `LuxRenderer` to the full four-panel HUD. Navigation buttons,
-HP/MP bars, fog-of-war map canvas, combat panel.
-
-**Sub-order:**
-
-1. Stats panel: HP/MP progress bars, class/level, XP
-2. Map canvas: `draw` element, grid rooms, fog of war, player dot
-3. Navigation buttons: N/S/E/W/Up/Down as Lux buttons wired to engine
-4. Narration log: scrolling markdown panel
-5. Combat panel: enemy HP bars, action buttons (Attack/Defend/Use/Flee)
-
-**Tests written:** Each panel addition tested against `FakeLuxServer`. Button
-press events from `FakeLuxServer` drive combat actions without any LLM.
-
-**Done when:** Full HUD renders for a complete game session including combat.
-`FakeLuxServer` integration tests cover all HUD update paths.
+**Abandoned** per operator ruling 2026-11-08 (bead cryptd-oal). The
+four-panel Lux HUD (stats panel, map canvas, navigation buttons, combat
+panel) is not built. See Milestone 4 above. The milestone number is
+retained for historical continuity; later milestones are not renumbered.
 
 ---
 
@@ -510,8 +474,8 @@ M1  Data Contracts  Structs, YAML parser, save/load, testdata                   
 M2  Thin E2E Slice  Move pipeline: interpreter → engine → narrator → renderer   ✓ DONE
                     ← FIRST FULL ARCHITECTURE VALIDATION →
 M3  Full Engine     All engine mechanics; acceptance tests                       ✓ DONE
-M4  Lux Thin Slice  LuxRenderer; element tree builder; Lux wire protocol client ✓ DONE
-M5  Full Lux HUD    Four-panel HUD; nav buttons; combat panel
+M4  Lux Thin Slice  ABANDONED (operator ruling 2026-11-08, bead cryptd-oal)
+M5  Full Lux HUD    ABANDONED (operator ruling 2026-11-08, bead cryptd-oal)
 M6  SLM Thin Slice  SLMInterpreter + SLMNarrator; ollama auto-detection         ✓ DONE
 M7  Full SLM        All verbs; ollama medium tier; --model flag                 ✓ DONE
 M8  Server Slice    cryptd serve; single-session; TCP + Unix socket             ✓ DONE
@@ -547,7 +511,6 @@ Some work can proceed in parallel once its dependencies are met:
 
 | Can run in parallel | After |
 |---|---|
-| `FakeLuxServer` + `LuxRenderer` | M2 (interfaces defined) |
 | `FakeSLMServer` + SLM interpreters (OpenAI-compat switch in M6) | M2 (interfaces defined) |
 | Additional scenario YAML files | M1 (parser exists) |
 | Additional acceptance scripts | M3 (engine complete) |
@@ -567,7 +530,7 @@ These constraints must hold throughout development:
   be. The LLM prompt grows only with narrative and creative guidance.
 - **No network in unit tests.** Any test that dials a real socket is an
   integration test and must be tagged accordingly.
-- **No real ollama, llama.cpp, or Lux in CI.** Every external dependency has
+- **No real ollama or llama.cpp in CI.** Every external dependency has
   a fake. If a test requires the real thing, it is a manual playtest, not CI.
 - **Save files are always loadable by the current binary.** Migration tests
   run on every format change. Old saves never silently corrupt.
