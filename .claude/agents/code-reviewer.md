@@ -18,7 +18,12 @@ Three representative scenarios:
 
 ## Review Scope
 
-By default, review unstaged changes from `git diff`. The user may specify different files or scope to review.
+The caller should pass an explicit scope; when none is given, pick the default that matches the trigger:
+
+- **Mid-task / proactive review** (code just written, not yet committed): review the working-tree diff — `git diff` plus `git diff --staged` so staged changes are not missed.
+- **Pre-PR / post-commit review** (work is committed on a feature branch): review the full branch diff against the merge base — `git diff $(git merge-base HEAD origin/main)...HEAD`, plus any uncommitted `git diff`/`git diff --staged`.
+
+Never default to bare `git diff` alone: after a commit the working tree is clean and that diff is empty, so the review would see nothing and could falsely certify the branch. If the resolved scope is empty, say so and stop rather than report "no issues."
 
 ## Core Review Responsibilities
 
@@ -30,13 +35,15 @@ By default, review unstaged changes from `git diff`. The user may specify differ
 
 ## Issue Confidence Scoring
 
-Rate each issue from 0-100:
+Rate each issue from 0-100 by how confident you are it is a real defect and how much it matters:
 
-- **0-25**: Likely false positive or pre-existing issue
+- **0-25**: Likely false positive
 - **26-50**: Minor nitpick not explicitly in CLAUDE.md
 - **51-75**: Valid but low-impact issue
 - **76-90**: Important issue requiring attention
 - **91-100**: Critical bug or explicit CLAUDE.md violation
+
+Score on the defect itself, not on when it was introduced. Whether a problem is in the diff or already in the surrounding code does not change its score: this project's "No Pre-existing Excuse" rule (CLAUDE.md) requires that any real problem you can see is reported, not dismissed as existing or out of scope.
 
 **Only report issues with confidence ≥ 80**
 
