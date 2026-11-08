@@ -234,7 +234,7 @@ If any target is breached, investigate before adding more tests.
 
 All code delegation uses ethos missions (`/mission` skill). Missions are typed contracts between a leader (claude) and a worker that enforce write-set admission, frozen evaluators, bounded rounds, and append-only event logs.
 
-The cryptd repo has a mix of pools: the org engineering specialists for the Go engine, security review, infra, etc., plus repo-local game-team identities (`cht`, `gax`, `archivist`, `cryptkeeper`) defined under `.punt-labs/ethos/identities/` for TUI/scenario/world-design work. Use the org pool for engine/CLI/security/infra; use the game-team for narrative content, balance, and Charm-TUI surface.
+The crypt team pools two kinds of specialist, all vendored repo-local under `.punt-labs/ethos/identities/`: engineering specialists for the Go engine, security review, infra, ML, formal methods, product, and QA; and game identities (`cht`, `gax`, `archivist`, `cryptkeeper`) for TUI/scenario/world-design work. Use the engineering pool for engine/CLI/security/infra/QA; use the game pool for narrative content, balance, and Charm-TUI surface.
 
 ### When to use missions
 
@@ -256,7 +256,7 @@ Do NOT use missions for: exploratory research, work you do yourself, epics that 
 
 ```yaml
 leader: claude
-worker: bwk                    # org pool: bwk|rsc|mdm|rop|adb|kth|djb|bcs|kpz|ylc|jms|jra|mcg|tdt — game pool: cht|gax|archivist|cryptkeeper
+worker: bwk                    # eng pool: bwk|rsc|mdm|rop|adb|kth|djb|bcs|kpz|ylc|jms|jra|mcg|tdt — qa: gstack-qa — game pool: cht|gax|archivist|cryptkeeper
 evaluator:
   handle: mdm                  # must differ from worker, no shared role
 inputs:
@@ -305,8 +305,9 @@ Two specialists per domain. Within each row, the worker and evaluator must be di
 | ML inference (ollama tier, SLM accuracy) | `kpz` (Karpathy) | `ylc` (LeCun) |
 | Z-spec / formal model of game state | `jms` (Spivey) | `jra` (Abrial) |
 | Product / new-mode validation | `claude` (leader) | `mcg` (Cagan) or `tdt` (Torres) |
+| QA / user-flow testing / bug reproduction | `gstack-qa` (Lake) | `bwk` — engine-correctness on reproductions |
 
-The full org roster is available via `ethos identity list`. Game-team identities (cht, gax, archivist, cryptkeeper) are repo-local — they live in `.punt-labs/ethos/identities/` rather than the team submodule.
+Every handle in this table is vendored repo-local under `.punt-labs/ethos/identities/`. cryptd runs `resolution: repo-only` (`.punt-labs/ethos.yaml`), so there is no global-store fallback: the crypt team's full closure — the game identities (cht, gax, archivist, cryptkeeper), the engineering specialists and their evaluators (bwk/rsc, mdm/rop, djb/bcs, adb/kth, kpz/ylc, jms/jra, mcg/tdt), and gstack-qa — is snapshotted in-repo via `ethos vendor --team crypt --prune`. Re-run that after editing the team or any member source, then restart Claude Code to regenerate `.claude/agents/`.
 
 ### Task tracking and parallelism
 
@@ -333,10 +334,10 @@ Start every session with `/tty cryptd` to register the session, `/plan` to decla
 
 Identity is managed by ethos. The SessionStart hook resolves identity from `.punt-labs/ethos.yaml` (agent field), loads personality and writing style, and injects them into context. PreCompact re-injects the persona before context compression.
 
-- **Identity registry**: `.punt-labs/ethos/` — repo-local in this repo, holding both crypt-specific game-team identities and references to the org engineering roster. Other Punt Labs repos mount this path as a git submodule of `punt-labs/team`; cryptd does not, because it overlays repo-local game identities (`cht`, `gax`, `archivist`, `cryptkeeper`) under `.punt-labs/ethos/identities/`.
-- **Repo config**: `.punt-labs/ethos.yaml` — `agent: claude`, `team: engineering`
-- **Crypt team**: `.punt-labs/ethos/teams/crypt.yaml` — game-specific roles (dungeon-master, game-designer, tui-specialist)
-- **Sub-agent matching**: `subagent_type` in Agent() calls matches ethos identity handles. Engine/CLI/security/infra pool from the engineering team submodule: `bwk`/`rsc` (Go), `mdm`/`rop` (CLI), `djb`/`bcs` (security), `adb`/`kth` (infra), `kpz`/`ylc` (ML for SLM tier), `jms`/`jra` (formal methods), `mcg`/`tdt` (product). Game-team pool from repo-local `.punt-labs/ethos/identities/`: `cht` (Charm TUI), `gax` (game design / balance), `archivist` (lore/voice), `cryptkeeper` (DM). Each loads its agent definition with full personality, writing style, and tool restrictions.
+- **Identity registry**: `.punt-labs/ethos/` — fully repo-local and self-contained. cryptd sets `resolution: repo-only`, so the entire crypt-team closure (game identities, engineering specialists, evaluators, and QA) is vendored in-repo via `ethos vendor --team crypt --prune`; there is no `punt-labs/team` submodule and no global-store fallback.
+- **Repo config**: `.punt-labs/ethos.yaml` — `agent: claude`, `team: crypt`, `resolution: repo-only`
+- **Crypt team**: `.punt-labs/ethos/teams/crypt.yaml` — the single team for this repo, holding game roles (dungeon-master, game-designer, tui-specialist), engineering roles (go-specialist/go-toolchain, cli-specialist/cli-minimalist, security-engineer/security-architect, infra-engineer/cloud-native-engineer, ml-specialist/ml-foundations, z-specialist/b-specialist, product-strategy/product-discovery), and qa-engineer.
+- **Sub-agent matching**: `subagent_type` in Agent() calls matches ethos identity handles, all vendored repo-local under `.punt-labs/ethos/identities/`: `bwk`/`rsc` (Go), `mdm`/`rop` (CLI), `djb`/`bcs` (security), `adb`/`kth` (infra), `kpz`/`ylc` (ML for SLM tier), `jms`/`jra` (formal methods), `mcg`/`tdt` (product), `gstack-qa` (QA), and the game pool `cht` (Charm TUI), `gax` (game design / balance), `archivist` (lore/voice), `cryptkeeper` (DM). Each loads its agent definition with full personality, writing style, and tool restrictions.
 
 ## Development Workflow
 

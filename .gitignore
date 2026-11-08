@@ -10,6 +10,7 @@
 .env*.local
 !.env.example
 .envrc.local
+.direnv
 .biff.local
 .claude/settings.local.json
 .claude/settings.local.*
