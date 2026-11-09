@@ -66,6 +66,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **`.gitignore` now ignores live ethos mission runtime state.** `.punt-labs/ethos/missions/` (the live mission tree) and `.punt-labs/ethos/missions.jsonl` (the index) are per-run runtime churn and were untracked-but-not-ignored, so a `git add -A` would commit them. Added both to `.gitignore`; `.punt-labs/ethos/missions-closed/` (redacted, exported closed missions) stays tracked. The stale comment block inherited from vox's opposite policy (missions/ tracked) was corrected to cryptd's policy.
 - `make check` no longer fails on quarry session-transcript captures. `.markdownlint-cli2.jsonc` now ignores `.punt-labs/quarry/captures/**`, which is gitignored runtime state (auto-captured transcripts), not authored docs — the same treatment as `.claude/agents/**` and `.punt-labs/ethos/agents/**`.
 - `crypt` REPL now uses `ergochat/readline` for proper terminal line editing, history, and Ctrl-C handling (was broken with bare `bufio.Scanner`).
 - `TestSLMLoop_HappyPath` integration test no longer hangs — test inputs changed to phrases the Rules interpreter can't parse, so the SLM is actually invoked.
