@@ -125,3 +125,247 @@ type SessionInfo struct {
 type ListSessionsResult struct {
 	Sessions []SessionInfo `json:"sessions"`
 }
+
+// Tool response bodies. These are the JSON results returned by the
+// passthrough dispatcher for each game.* method, shared so the crypt
+// client can decode them. Field presence mirrors the former
+// map[string]any construction: a plain field is always emitted; a
+// pointer or omitempty field appears only when the dispatcher set it.
+// An embedded pointer struct is a group of keys that appear together.
+
+// HeroSummary is the hero snapshot embedded in most tool results.
+type HeroSummary struct {
+	Name  string `json:"name"`
+	Class string `json:"class"`
+	Level int    `json:"level"`
+	HP    int    `json:"hp"`
+	MaxHP int    `json:"max_hp"`
+	MP    int    `json:"mp"`
+	MaxMP int    `json:"max_mp"`
+	XP    int    `json:"xp"`
+}
+
+// HeroContext is the hero snapshot in a context result: the base summary
+// plus the current inventory (item IDs) and equipped slots, which the
+// context tool always emits even when empty.
+type HeroContext struct {
+	HeroSummary
+	Inventory []string        `json:"inventory"`
+	Equipped  model.Equipment `json:"equipped"`
+}
+
+// CombatEnemy is one enemy entry in a combat summary.
+type CombatEnemy struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	HP    int    `json:"hp"`
+	MaxHP int    `json:"max_hp"`
+}
+
+// CombatSummary describes combat as it begins (move result).
+type CombatSummary struct {
+	Enemies   []CombatEnemy `json:"enemies"`
+	TurnOrder []string      `json:"turn_order"`
+	HeroTurn  bool          `json:"hero_turn"`
+}
+
+// CombatView describes ongoing combat (look result).
+type CombatView struct {
+	Enemies  []CombatEnemy `json:"enemies"`
+	Round    int           `json:"round"`
+	HeroTurn bool          `json:"hero_turn"`
+}
+
+// EnemyTurn is one enemy's action during the enemy phase. Damage and
+// HeroHP are set only for an attack action.
+type EnemyTurn struct {
+	Enemy    string `json:"enemy"`
+	Action   string `json:"action"`
+	Damage   *int   `json:"damage,omitempty"`
+	HeroHP   *int   `json:"hero_hp,omitempty"`
+	HeroDead bool   `json:"hero_dead,omitempty"`
+}
+
+// LevelUpSummary reports a level-up after combat.
+type LevelUpSummary struct {
+	NewLevel int `json:"new_level"`
+	HPGain   int `json:"hp_gain"`
+	MPGain   int `json:"mp_gain"`
+}
+
+// CombatOutcome is the combat_over/level_up pair, emitted together when
+// combat ends. LevelUp is null when no level was gained.
+type CombatOutcome struct {
+	CombatOver bool            `json:"combat_over"`
+	LevelUp    *LevelUpSummary `json:"level_up"`
+}
+
+// NewGameResult is the game.new result.
+type NewGameResult struct {
+	Room        string      `json:"room"`
+	Name        string      `json:"name"`
+	Description string      `json:"description"`
+	Exits       []string    `json:"exits"`
+	Items       []string    `json:"items"`
+	Hero        HeroSummary `json:"hero"`
+}
+
+// MoveResult is the game.move result.
+type MoveResult struct {
+	Room        string         `json:"room"`
+	Name        string         `json:"name"`
+	Description string         `json:"description"`
+	Exits       []string       `json:"exits"`
+	Items       []string       `json:"items"`
+	Combat      *CombatSummary `json:"combat,omitempty"`
+	EnemyTurns  *[]EnemyTurn   `json:"enemy_turns,omitempty"`
+	Warning     string         `json:"warning,omitempty"`
+}
+
+// LookResult is the game.look result.
+type LookResult struct {
+	Room        string      `json:"room"`
+	Name        string      `json:"name"`
+	Description string      `json:"description"`
+	Exits       []string    `json:"exits"`
+	Items       []string    `json:"items"`
+	Combat      *CombatView `json:"combat,omitempty"`
+}
+
+// PickUpResult is the game.pick_up and game.drop result.
+type PickUpResult struct {
+	Item model.Item  `json:"item"`
+	Hero HeroSummary `json:"hero"`
+}
+
+// EquipResult is the game.equip and game.unequip result.
+type EquipResult struct {
+	Item model.Item  `json:"item"`
+	Slot string      `json:"slot"`
+	Hero HeroSummary `json:"hero"`
+}
+
+// ExamineResult is the game.examine result.
+type ExamineResult struct {
+	Item model.Item `json:"item"`
+}
+
+// InventoryResult is the game.inventory result.
+type InventoryResult struct {
+	Items    []model.Item    `json:"items"`
+	Equipped model.Equipment `json:"equipped"`
+	Weight   float64         `json:"weight"`
+	Capacity float64         `json:"capacity"`
+}
+
+// AttackResult is the game.attack result.
+type AttackResult struct {
+	Target    string      `json:"target"`
+	Damage    int         `json:"damage"`
+	Killed    bool        `json:"killed"`
+	Hero      HeroSummary `json:"hero"`
+	XPAwarded *int        `json:"xp_awarded,omitempty"`
+	*CombatOutcome
+	EnemyTurns *[]EnemyTurn `json:"enemy_turns,omitempty"`
+}
+
+// DefendResult is the game.defend result.
+type DefendResult struct {
+	Defending  bool         `json:"defending"`
+	Hero       HeroSummary  `json:"hero"`
+	EnemyTurns *[]EnemyTurn `json:"enemy_turns,omitempty"`
+}
+
+// FleeResult is the game.flee result.
+type FleeResult struct {
+	Success    bool         `json:"success"`
+	Hero       HeroSummary  `json:"hero"`
+	EnemyTurns *[]EnemyTurn `json:"enemy_turns,omitempty"`
+}
+
+// CastSpellResult is the game.cast_spell result. Target is set only for a
+// damage spell.
+type CastSpellResult struct {
+	Spell  string      `json:"spell"`
+	Effect string      `json:"effect"`
+	Power  int         `json:"power"`
+	MPCost int         `json:"mp_cost"`
+	Hero   HeroSummary `json:"hero"`
+	Target *string     `json:"target,omitempty"`
+	*CombatOutcome
+	EnemyTurns *[]EnemyTurn `json:"enemy_turns,omitempty"`
+}
+
+// UseItemResult is the game.use_item result. Item is the item's display name.
+type UseItemResult struct {
+	Item   string `json:"item"`
+	Effect string `json:"effect"`
+	Power  int    `json:"power"`
+	HeroHP int    `json:"hero_hp"`
+}
+
+// SaveResult is the game.save_game result.
+type SaveResult struct {
+	Slot string `json:"slot"`
+	Path string `json:"path"`
+}
+
+// LoadResult is the game.load_game result.
+type LoadResult struct {
+	Slot        string      `json:"slot"`
+	Room        string      `json:"room"`
+	Name        string      `json:"name"`
+	Description string      `json:"description"`
+	Exits       []string    `json:"exits"`
+	Items       []string    `json:"items"`
+	Hero        HeroSummary `json:"hero"`
+}
+
+// ScenarioContext is the scenario-level info in a context result.
+type ScenarioContext struct {
+	Title        string `json:"title"`
+	StartingRoom string `json:"starting_room"`
+	DeathMode    string `json:"death_mode"`
+}
+
+// RoomContextDetail holds the current-room fields present when the room is
+// found in the scenario; absent for the id-only fallback.
+type RoomContextDetail struct {
+	Name            string   `json:"name"`
+	DescriptionSeed string   `json:"description_seed"`
+	Exits           []string `json:"exits"`
+	Items           []string `json:"items"`
+	Enemies         []string `json:"enemies"`
+}
+
+// CurrentRoomContext is the current_room field of a context result.
+type CurrentRoomContext struct {
+	ID string `json:"id"`
+	*RoomContextDetail
+}
+
+// AdjacentRoomDetail holds the adjacent-room fields present when that room
+// is found in the scenario.
+type AdjacentRoomDetail struct {
+	Name            string `json:"name"`
+	DescriptionSeed string `json:"description_seed"`
+}
+
+// AdjacentRoom is one entry in a context result's adjacent_rooms list.
+type AdjacentRoom struct {
+	ID        string `json:"id"`
+	Direction string `json:"direction"`
+	Visited   bool   `json:"visited"`
+	*AdjacentRoomDetail
+}
+
+// ContextResult is the game.context result.
+type ContextResult struct {
+	Scenario      ScenarioContext    `json:"scenario"`
+	CurrentRoom   CurrentRoomContext `json:"current_room"`
+	AdjacentRooms []AdjacentRoom     `json:"adjacent_rooms"`
+	Hero          HeroContext        `json:"hero"`
+	VisitedRooms  []string           `json:"visited_rooms"`
+	RoomsTotal    int                `json:"rooms_total"`
+	CombatActive  bool               `json:"combat_active"`
+}

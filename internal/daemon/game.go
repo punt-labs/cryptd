@@ -13,6 +13,7 @@ import (
 	"github.com/punt-labs/cryptd/internal/engine"
 	"github.com/punt-labs/cryptd/internal/game"
 	"github.com/punt-labs/cryptd/internal/model"
+	"github.com/punt-labs/cryptd/internal/protocol"
 	"github.com/punt-labs/cryptd/internal/scenariodir"
 )
 
@@ -324,15 +325,14 @@ func dispatchNewGame(raw json.RawMessage, scenarioDir, defaultScenario string) (
 
 	state := &gs
 	look := eng.Look(state)
-	hs := heroSummary(state)
 
-	result := map[string]any{
-		"room":        look.Room,
-		"name":        look.Name,
-		"description": look.Description,
-		"exits":       look.Exits,
-		"items":       look.Items,
-		"hero":        hs,
+	result := protocol.NewGameResult{
+		Room:        look.Room,
+		Name:        look.Name,
+		Description: look.Description,
+		Exits:       look.Exits,
+		Items:       look.Items,
+		Hero:        heroSummary(state),
 	}
 
 	return eng, state, result, nil
@@ -364,27 +364,28 @@ func dispatchMove(eng *engine.Engine, state *model.GameState, raw json.RawMessag
 
 	look := eng.Look(state)
 
-	response := map[string]any{
-		"room":        result.NewRoom,
-		"name":        look.Name,
-		"description": look.Description,
-		"exits":       look.Exits,
-		"items":       look.Items,
+	response := protocol.MoveResult{
+		Room:        result.NewRoom,
+		Name:        look.Name,
+		Description: look.Description,
+		Exits:       look.Exits,
+		Items:       look.Items,
 	}
 
 	combatResult, combatErr := eng.StartCombat(state)
 	switch {
 	case combatErr == nil:
-		response["combat"] = combatSummary(combatResult, state)
+		response.Combat = combatSummary(combatResult, state)
 		if state.Dungeon.Combat.Active && !isHeroTurn(state) {
-			response["enemy_turns"] = processEnemyTurns(eng, state)
+			turns := processEnemyTurns(eng, state)
+			response.EnemyTurns = &turns
 		}
 	case errors.As(combatErr, new(*engine.NoEnemiesError)),
 		errors.As(combatErr, new(*engine.AlreadyInCombatError)):
 		// Expected — room has no enemies or combat already active.
 	default:
 		log.Printf("daemon: dispatchMove: StartCombat error: %v", combatErr)
-		response["warning"] = "combat failed to start due to an internal error"
+		response.Warning = "combat failed to start due to an internal error"
 	}
 
 	return response, nil
@@ -394,15 +395,15 @@ func dispatchMove(eng *engine.Engine, state *model.GameState, raw json.RawMessag
 
 func dispatchLook(eng *engine.Engine, state *model.GameState) (any, *RPCError) {
 	look := eng.Look(state)
-	result := map[string]any{
-		"room":        look.Room,
-		"name":        look.Name,
-		"description": look.Description,
-		"exits":       look.Exits,
-		"items":       look.Items,
+	result := protocol.LookResult{
+		Room:        look.Room,
+		Name:        look.Name,
+		Description: look.Description,
+		Exits:       look.Exits,
+		Items:       look.Items,
 	}
 	if state.Dungeon.Combat.Active {
-		result["combat"] = currentCombatState(state)
+		result.Combat = currentCombatState(state)
 	}
 	return result, nil
 }
@@ -432,9 +433,9 @@ func dispatchPickUp(eng *engine.Engine, state *model.GameState, raw json.RawMess
 	if err != nil {
 		return nil, engineError(err)
 	}
-	return map[string]any{
-		"item": result.Item,
-		"hero": heroSummary(state),
+	return protocol.PickUpResult{
+		Item: result.Item,
+		Hero: heroSummary(state),
 	}, nil
 }
 
@@ -453,9 +454,9 @@ func dispatchDrop(eng *engine.Engine, state *model.GameState, raw json.RawMessag
 	if err != nil {
 		return nil, engineError(err)
 	}
-	return map[string]any{
-		"item": result.Item,
-		"hero": heroSummary(state),
+	return protocol.PickUpResult{
+		Item: result.Item,
+		Hero: heroSummary(state),
 	}, nil
 }
 
@@ -474,10 +475,10 @@ func dispatchEquip(eng *engine.Engine, state *model.GameState, raw json.RawMessa
 	if err != nil {
 		return nil, engineError(err)
 	}
-	return map[string]any{
-		"item": result.Item,
-		"slot": result.Slot,
-		"hero": heroSummary(state),
+	return protocol.EquipResult{
+		Item: result.Item,
+		Slot: result.Slot,
+		Hero: heroSummary(state),
 	}, nil
 }
 
@@ -496,10 +497,10 @@ func dispatchUnequip(eng *engine.Engine, state *model.GameState, raw json.RawMes
 	if err != nil {
 		return nil, engineError(err)
 	}
-	return map[string]any{
-		"item": result.Item,
-		"slot": result.Slot,
-		"hero": heroSummary(state),
+	return protocol.EquipResult{
+		Item: result.Item,
+		Slot: result.Slot,
+		Hero: heroSummary(state),
 	}, nil
 }
 
@@ -518,16 +519,16 @@ func dispatchExamine(eng *engine.Engine, state *model.GameState, raw json.RawMes
 	if err != nil {
 		return nil, engineError(err)
 	}
-	return map[string]any{"item": result.Item}, nil
+	return protocol.ExamineResult{Item: result.Item}, nil
 }
 
 func dispatchInventory(eng *engine.Engine, state *model.GameState) (any, *RPCError) {
 	result := eng.Inventory(state)
-	return map[string]any{
-		"items":    result.Items,
-		"equipped": result.Equipped,
-		"weight":   result.Weight,
-		"capacity": result.Capacity,
+	return protocol.InventoryResult{
+		Items:    result.Items,
+		Equipped: result.Equipped,
+		Weight:   result.Weight,
+		Capacity: result.Capacity,
 	}, nil
 }
 
@@ -561,22 +562,26 @@ func dispatchAttack(eng *engine.Engine, state *model.GameState, raw json.RawMess
 		return nil, engineError(err)
 	}
 
-	response := map[string]any{
-		"target": result.Target,
-		"damage": result.Damage,
-		"killed": result.Killed,
-		"hero":   heroSummary(state),
+	response := protocol.AttackResult{
+		Target: result.Target,
+		Damage: result.Damage,
+		Killed: result.Killed,
+		Hero:   heroSummary(state),
 	}
 
 	if result.Killed {
-		response["xp_awarded"] = result.XPAwarded
+		xp := result.XPAwarded
+		response.XPAwarded = &xp
 	}
 
 	if result.CombatOver {
-		response["combat_over"] = true
-		response["level_up"] = checkLevelUp(eng, state)
+		response.CombatOutcome = &protocol.CombatOutcome{
+			CombatOver: true,
+			LevelUp:    checkLevelUp(eng, state),
+		}
 	} else if state.Dungeon.Combat.Active && !isHeroTurn(state) {
-		response["enemy_turns"] = processEnemyTurns(eng, state)
+		turns := processEnemyTurns(eng, state)
+		response.EnemyTurns = &turns
 	}
 
 	return response, nil
@@ -592,13 +597,14 @@ func dispatchDefend(eng *engine.Engine, state *model.GameState) (any, *RPCError)
 		return nil, engineError(err)
 	}
 
-	response := map[string]any{
-		"defending": true,
-		"hero":      heroSummary(state),
+	response := protocol.DefendResult{
+		Defending: true,
+		Hero:      heroSummary(state),
 	}
 
 	if state.Dungeon.Combat.Active && !isHeroTurn(state) {
-		response["enemy_turns"] = processEnemyTurns(eng, state)
+		turns := processEnemyTurns(eng, state)
+		response.EnemyTurns = &turns
 	}
 
 	return response, nil
@@ -614,13 +620,14 @@ func dispatchFlee(eng *engine.Engine, state *model.GameState) (any, *RPCError) {
 		return nil, engineError(err)
 	}
 
-	response := map[string]any{
-		"success": result.Success,
-		"hero":    heroSummary(state),
+	response := protocol.FleeResult{
+		Success: result.Success,
+		Hero:    heroSummary(state),
 	}
 
 	if !result.Success && state.Dungeon.Combat.Active && !isHeroTurn(state) {
-		response["enemy_turns"] = processEnemyTurns(eng, state)
+		turns := processEnemyTurns(eng, state)
+		response.EnemyTurns = &turns
 	}
 
 	return response, nil
@@ -650,23 +657,27 @@ func dispatchCastSpell(eng *engine.Engine, state *model.GameState, raw json.RawM
 		return nil, engineError(err)
 	}
 
-	response := map[string]any{
-		"spell":   result.SpellName,
-		"effect":  result.Effect,
-		"power":   result.Power,
-		"mp_cost": result.MPCost,
-		"hero":    heroSummary(state),
+	response := protocol.CastSpellResult{
+		Spell:  result.SpellName,
+		Effect: result.Effect,
+		Power:  result.Power,
+		MPCost: result.MPCost,
+		Hero:   heroSummary(state),
 	}
 
 	if result.Effect == "damage" {
-		response["target"] = result.TargetID
+		target := result.TargetID
+		response.Target = &target
 	}
 
 	if state.Dungeon.Combat.Active && !isHeroTurn(state) {
-		response["enemy_turns"] = processEnemyTurns(eng, state)
+		turns := processEnemyTurns(eng, state)
+		response.EnemyTurns = &turns
 	} else if result.Effect == "damage" && !state.Dungeon.Combat.Active {
-		response["combat_over"] = true
-		response["level_up"] = checkLevelUp(eng, state)
+		response.CombatOutcome = &protocol.CombatOutcome{
+			CombatOver: true,
+			LevelUp:    checkLevelUp(eng, state),
+		}
 	}
 
 	return response, nil
@@ -686,11 +697,11 @@ func dispatchUseItem(eng *engine.Engine, state *model.GameState, raw json.RawMes
 	if err != nil {
 		return nil, engineError(err)
 	}
-	return map[string]any{
-		"item":    result.Item.Name,
-		"effect":  result.Effect,
-		"power":   result.Power,
-		"hero_hp": result.HeroHP,
+	return protocol.UseItemResult{
+		Item:   result.Item.Name,
+		Effect: result.Effect,
+		Power:  result.Power,
+		HeroHP: result.HeroHP,
 	}, nil
 }
 
@@ -699,19 +710,14 @@ func dispatchUseItem(eng *engine.Engine, state *model.GameState, raw json.RawMes
 func dispatchContext(eng *engine.Engine, state *model.GameState) (any, *RPCError) {
 	sc := eng.Scenario()
 
-	// Scenario-level info.
-	scenarioInfo := map[string]any{
-		"title":         sc.Title,
-		"starting_room": sc.StartingRoom,
-		"death_mode":    sc.Death,
-	}
-
 	// Current room info.
 	currentRoomID := state.Dungeon.CurrentRoom
-	currentRoom := map[string]any{"id": currentRoomID}
+	currentRoom := protocol.CurrentRoomContext{ID: currentRoomID}
 	if room, ok := sc.Rooms[currentRoomID]; ok {
-		currentRoom["name"] = room.Name
-		currentRoom["description_seed"] = room.DescriptionSeed
+		detail := &protocol.RoomContextDetail{
+			Name:            room.Name,
+			DescriptionSeed: room.DescriptionSeed,
+		}
 
 		exits := make([]string, 0, len(room.Connections))
 		for dir, conn := range room.Connections {
@@ -720,10 +726,10 @@ func dispatchContext(eng *engine.Engine, state *model.GameState) (any, *RPCError
 			}
 		}
 		sort.Strings(exits)
-		currentRoom["exits"] = exits
+		detail.Exits = exits
 
 		rs := eng.EnsureRoomState(state, currentRoomID)
-		currentRoom["items"] = rs.Items
+		detail.Items = rs.Items
 
 		// Active enemies in combat, or scenario enemies for the room.
 		if state.Dungeon.Combat.Active {
@@ -733,64 +739,65 @@ func dispatchContext(eng *engine.Engine, state *model.GameState) (any, *RPCError
 					enemies = append(enemies, e.ID)
 				}
 			}
-			currentRoom["enemies"] = enemies
+			detail.Enemies = enemies
 		} else if rs.Cleared {
-			currentRoom["enemies"] = []string{}
+			detail.Enemies = []string{}
 		} else {
-			currentRoom["enemies"] = room.Enemies
+			detail.Enemies = room.Enemies
 		}
+		currentRoom.RoomContextDetail = detail
 	}
 
 	// Adjacent rooms.
-	var adjacentRooms []map[string]any
+	var adjacentRooms []protocol.AdjacentRoom
 	if room, ok := sc.Rooms[currentRoomID]; ok {
 		for dir, conn := range room.Connections {
 			if conn.Type == "hidden" {
 				continue
 			}
-			adj := map[string]any{
-				"id":        conn.Room,
-				"direction": dir,
-				"visited":   containsString(state.Dungeon.VisitedRooms, conn.Room),
+			adj := protocol.AdjacentRoom{
+				ID:        conn.Room,
+				Direction: dir,
+				Visited:   containsString(state.Dungeon.VisitedRooms, conn.Room),
 			}
 			if adjRoom, ok := sc.Rooms[conn.Room]; ok {
-				adj["name"] = adjRoom.Name
-				adj["description_seed"] = adjRoom.DescriptionSeed
+				adj.AdjacentRoomDetail = &protocol.AdjacentRoomDetail{
+					Name:            adjRoom.Name,
+					DescriptionSeed: adjRoom.DescriptionSeed,
+				}
 			}
 			adjacentRooms = append(adjacentRooms, adj)
 		}
 		// Sort by direction for deterministic output.
 		sort.Slice(adjacentRooms, func(i, j int) bool {
-			return adjacentRooms[i]["direction"].(string) < adjacentRooms[j]["direction"].(string)
+			return adjacentRooms[i].Direction < adjacentRooms[j].Direction
 		})
 	}
 
-	// Hero summary.
-	hs := heroSummary(state)
-	// Add inventory and equipped details for context.
+	// Hero summary with context-only inventory and equipped details.
+	hero := protocol.HeroContext{HeroSummary: heroSummary(state)}
 	if len(state.Party) > 0 {
 		h := &state.Party[0]
 		var invNames []string
 		for _, item := range h.Inventory {
 			invNames = append(invNames, item.ID)
 		}
-		hs["inventory"] = invNames
-		hs["equipped"] = map[string]any{
-			"weapon": h.Equipped.Weapon,
-			"armor":  h.Equipped.Armor,
-			"ring":   h.Equipped.Ring,
-			"amulet": h.Equipped.Amulet,
-		}
+		hero.Inventory = invNames
+		hero.Equipped = h.Equipped
 	}
 
-	return map[string]any{
-		"scenario":       scenarioInfo,
-		"current_room":   currentRoom,
-		"adjacent_rooms": adjacentRooms,
-		"hero":           hs,
-		"visited_rooms":  state.Dungeon.VisitedRooms,
-		"rooms_total":    len(sc.Rooms),
-		"combat_active":  state.Dungeon.Combat.Active,
+	return protocol.ContextResult{
+		Scenario: protocol.ScenarioContext{
+			Title:        sc.Title,
+			StartingRoom: sc.StartingRoom,
+			DeathMode:    sc.Death,
+		},
+		CurrentRoom:   currentRoom,
+		AdjacentRooms: adjacentRooms,
+		Hero:          hero,
+		VisitedRooms:  state.Dungeon.VisitedRooms,
+		RoomsTotal:    len(sc.Rooms),
+		CombatActive:  state.Dungeon.Combat.Active,
 	}, nil
 }
 
@@ -821,7 +828,7 @@ func dispatchSaveGame(eng *engine.Engine, state *model.GameState, raw json.RawMe
 	if err != nil {
 		return nil, engineError(err)
 	}
-	return map[string]any{"slot": result.Slot, "path": result.Path}, nil
+	return protocol.SaveResult{Slot: result.Slot, Path: result.Path}, nil
 }
 
 func dispatchLoadGame(eng *engine.Engine, state *model.GameState, raw json.RawMessage) (any, *RPCError) {
@@ -837,22 +844,22 @@ func dispatchLoadGame(eng *engine.Engine, state *model.GameState, raw json.RawMe
 	}
 	*state = loaded
 	look := eng.Look(state)
-	return map[string]any{
-		"slot":        result.Slot,
-		"room":        look.Room,
-		"name":        look.Name,
-		"description": look.Description,
-		"exits":       look.Exits,
-		"items":       look.Items,
-		"hero":        heroSummary(state),
+	return protocol.LoadResult{
+		Slot:        result.Slot,
+		Room:        look.Room,
+		Name:        look.Name,
+		Description: look.Description,
+		Exits:       look.Exits,
+		Items:       look.Items,
+		Hero:        heroSummary(state),
 	}, nil
 }
 
 // --- helpers ---
 
 // processEnemyTurns runs all enemy turns until it's the hero's turn (or combat ends).
-func processEnemyTurns(eng *engine.Engine, state *model.GameState) []map[string]any {
-	var turns []map[string]any
+func processEnemyTurns(eng *engine.Engine, state *model.GameState) []protocol.EnemyTurn {
+	var turns []protocol.EnemyTurn
 	maxIter := len(state.Dungeon.Combat.TurnOrder) * 2
 	if maxIter < 1 {
 		maxIter = 1
@@ -866,82 +873,77 @@ func processEnemyTurns(eng *engine.Engine, state *model.GameState) []map[string]
 		if result.Action == "skip" {
 			continue
 		}
-		turn := map[string]any{
-			"enemy":  result.EnemyName,
-			"action": result.Action,
+		turn := protocol.EnemyTurn{
+			Enemy:  result.EnemyName,
+			Action: result.Action,
 		}
 		if result.Action == "attack" {
-			turn["damage"] = result.Damage
-			turn["hero_hp"] = result.HeroHP
-			if result.HeroDead {
-				turn["hero_dead"] = true
-			}
+			dmg, hp := result.Damage, result.HeroHP
+			turn.Damage = &dmg
+			turn.HeroHP = &hp
+			turn.HeroDead = result.HeroDead
 		}
 		turns = append(turns, turn)
 	}
 	return turns
 }
 
-// checkLevelUp checks and applies a level-up, returning the result or nil.
-func checkLevelUp(eng *engine.Engine, state *model.GameState) any {
+// checkLevelUp checks and applies a level-up, returning the summary or nil.
+func checkLevelUp(eng *engine.Engine, state *model.GameState) *protocol.LevelUpSummary {
 	result := eng.CheckLevelUp(state)
 	if !result.Leveled {
 		return nil
 	}
-	return map[string]any{
-		"new_level": result.NewLevel,
-		"hp_gain":   result.HPGain,
-		"mp_gain":   result.MPGain,
+	return &protocol.LevelUpSummary{
+		NewLevel: result.NewLevel,
+		HPGain:   result.HPGain,
+		MPGain:   result.MPGain,
 	}
 }
 
 // heroSummary returns a snapshot of the hero for inclusion in tool results.
-func heroSummary(state *model.GameState) map[string]any {
+func heroSummary(state *model.GameState) protocol.HeroSummary {
 	if len(state.Party) == 0 {
-		return map[string]any{}
+		return protocol.HeroSummary{}
 	}
 	h := &state.Party[0]
-	return map[string]any{
-		"name":   h.Name,
-		"class":  h.Class,
-		"level":  h.Level,
-		"hp":     h.HP,
-		"max_hp": h.MaxHP,
-		"mp":     h.MP,
-		"max_mp": h.MaxMP,
-		"xp":     h.XP,
+	return protocol.HeroSummary{
+		Name:  h.Name,
+		Class: h.Class,
+		Level: h.Level,
+		HP:    h.HP,
+		MaxHP: h.MaxHP,
+		MP:    h.MP,
+		MaxMP: h.MaxMP,
+		XP:    h.XP,
 	}
 }
 
 // combatSummary builds a combat summary from a StartCombat result.
-func combatSummary(result engine.CombatStartResult, state *model.GameState) map[string]any {
-	var enemies []map[string]any
+func combatSummary(result engine.CombatStartResult, state *model.GameState) *protocol.CombatSummary {
+	var enemies []protocol.CombatEnemy
 	for _, e := range result.Enemies {
-		enemies = append(enemies, map[string]any{
-			"id": e.ID, "name": e.Name, "hp": e.HP, "max_hp": e.MaxHP,
-		})
+		enemies = append(enemies, protocol.CombatEnemy{ID: e.ID, Name: e.Name, HP: e.HP, MaxHP: e.MaxHP})
 	}
-	return map[string]any{
-		"enemies":    enemies,
-		"turn_order": result.TurnOrder,
-		"hero_turn":  isHeroTurn(state),
+	return &protocol.CombatSummary{
+		Enemies:   enemies,
+		TurnOrder: result.TurnOrder,
+		HeroTurn:  isHeroTurn(state),
 	}
 }
 
 // currentCombatState returns the current combat state for look results.
-func currentCombatState(state *model.GameState) map[string]any {
-	var enemies []map[string]any
+func currentCombatState(state *model.GameState) *protocol.CombatView {
+	var enemies []protocol.CombatEnemy
 	for _, e := range state.Dungeon.Combat.Enemies {
 		if e.HP > 0 {
-			enemies = append(enemies, map[string]any{
-				"id": e.ID, "name": e.Name, "hp": e.HP, "max_hp": e.MaxHP,
-			})
+			enemies = append(enemies, protocol.CombatEnemy{ID: e.ID, Name: e.Name, HP: e.HP, MaxHP: e.MaxHP})
 		}
 	}
-	return map[string]any{
-		"enemies":   enemies,
-		"round":     state.Dungeon.Combat.Round,
-		"hero_turn": isHeroTurn(state),
+	return &protocol.CombatView{
+		Enemies:  enemies,
+		Round:    state.Dungeon.Combat.Round,
+		HeroTurn: isHeroTurn(state),
 	}
 }
 
