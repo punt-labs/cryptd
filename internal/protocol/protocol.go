@@ -26,27 +26,31 @@ type Response struct {
 	Error   *RPCError       `json:"error,omitempty"`
 }
 
+// RPCErrorCode is a JSON-RPC 2.0 error code. Standard codes are negative
+// integers in the -32768..-32000 range; application codes use -32001..-32099.
+type RPCErrorCode int
+
 // RPCError is a JSON-RPC 2.0 error object.
 type RPCError struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-	Data    any    `json:"data,omitempty"`
+	Code    RPCErrorCode `json:"code"`
+	Message string       `json:"message"`
+	Data    any          `json:"data,omitempty"`
 }
 
 // Standard JSON-RPC error codes.
 const (
-	CodeParseError     = -32700
-	CodeInvalidRequest = -32600
-	CodeMethodNotFound = -32601
-	CodeInvalidParams  = -32602
-	CodeInternalError  = -32603
+	CodeParseError     RPCErrorCode = -32700
+	CodeInvalidRequest RPCErrorCode = -32600
+	CodeMethodNotFound RPCErrorCode = -32601
+	CodeInvalidParams  RPCErrorCode = -32602
+	CodeInternalError  RPCErrorCode = -32603
 )
 
 // Application-specific error codes.
 const (
-	CodeStateBlocked = -32001 // combat/turn/lock constraints
-	CodeGameOver     = -32002 // hero is dead
-	CodeNoActiveGame = -32003 // tool called before new_game
+	CodeStateBlocked RPCErrorCode = -32001 // combat/turn/lock constraints
+	CodeGameOver     RPCErrorCode = -32002 // hero is dead
+	CodeNoActiveGame RPCErrorCode = -32003 // tool called before new_game
 )
 
 // PlayRequest is the JSON-RPC params for the "play" method.
