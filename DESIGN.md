@@ -2,6 +2,11 @@
 
 This file is the authoritative record of design decisions, prior approaches, and their outcomes. **Every design change must be logged here before implementation.**
 
+> For *how the system is structured today* (as-built, read from source) rather
+> than the decision history, see
+> [`docs/architecture-as-built.md`](docs/architecture-as-built.md). When an older
+> ADR here and the running code disagree, that document and the code win.
+
 ## Rules
 
 1. Before proposing ANY design change, consult this log for prior decisions on the same topic.

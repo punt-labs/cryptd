@@ -109,7 +109,9 @@ func (s *Server) hasNormalMode() bool {
 }
 
 // ListenAndServe starts listening and blocks until interrupted by
-// SIGINT/SIGTERM. It accepts one connection at a time (single-session for M8).
+// SIGINT/SIGTERM. It accepts connections concurrently — one goroutine per
+// connection (see Serve) — and games run concurrently, each owned by its own
+// goroutine.
 func (s *Server) ListenAndServe() error {
 	if s.network == "unix" {
 		return s.listenUnix()
