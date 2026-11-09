@@ -440,7 +440,7 @@ for the full specification.
 | File | Contents |
 |------|---------|
 | `docs/architecture-as-built.md` | **Read first.** The structural map of how cryptd actually works, from source: engine-is-the-DM, the normal/passthrough request paths, layers, inference tiers, concurrency, state model, and where the docs drifted from the code. |
-| `DESIGN.md` | Authoritative decision log (DES-001-032) |
+| `DESIGN.md` | Authoritative decision log (DES-001-034) |
 | `docs/build-plan.md` | 13-milestone roadmap with guiding principles and red lines |
 | `docs/testing.md` | Full test architecture: pyramid, fixture layout, fakes reference, CI config |
 | `docs/distribution.md` | Binary distribution: GitHub Releases, GoReleaser, Homebrew tap, trust tiers |

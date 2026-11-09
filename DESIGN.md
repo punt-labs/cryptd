@@ -1769,12 +1769,73 @@ and does all display formatting client-side.
 
 ---
 
-## DES-033: Multiplayer Is a Standalone Capability
+## DES-033: Multiplayer Is Decoupled From Biff
+
+**Date:** 2026-11-09
+**Status:** SUPERSEDED by DES-034 (2026-11-09)
+**Topic:** What multiplayer depends on
+**Corrects:** DES-021 ("Party as Biff Extension")
+
+### Decision
+
+Multiplayer does not imply Biff. The multiplayer capability — a real party of
+several human players in one game — is a property of the engine and the daemon,
+defined independently of how players connect or coordinate. Biff is at most one
+optional coordination/presence transport layered on top; it is never the
+definition of the feature.
+
+### Why this correction is needed
+
+DES-021 titled the work "Party as Biff Extension" and defined the whole feature
+in Biff terms: "each Biff participant controls one character," "turn tokens
+passed via Biff `/write`," "`PostToolUse` hook notifies party members," session
+identity "from mcp-proxy." That couples a capability to one specific delivery
+mechanism. Two facts already pull the other way:
+
+- The daemon (DES-013, DES-025) is a general-purpose game server that accepts
+  concurrent connections over Unix socket or TCP. Multiple players can connect
+  to one `cryptd serve` directly. DES-025 itself notes "Biff may not be needed
+  as the multiplayer transport ... players connect to the same `cryptd serve`
+  instance directly," with Biff's value being optional coordination
+  (presence, `/wall`, `/talk`) on top.
+- The game is the DM (DES-030). Multiplayer is about multiple *human players*
+  sharing the one game — a question of party state, per-player action routing,
+  and turn ownership — none of which is inherently a Biff concern.
+
+### What this means
+
+- **The multiplayer capability** (engine + daemon) is: a real `Party []Character`
+  (not length-1); `character_id` routing on `move`/`attack`/`flee`/`defend` (the
+  DES-021 seam, already wired); per-player session→character binding; turn
+  ownership; and the DM narrating for the full party. All transport-agnostic.
+- **Transport is a separate, later decision.** Direct daemon connections are the
+  obvious default (the server already supports them). Biff coordination
+  (presence, turn signalling via `/write`, broadcast) is optional and additive,
+  chosen on its own merits, not assumed.
+- The per-player capability/turn *design* question is tracked on the M10 bead
+  cryptd-90e.2 ("Multiplayer: per-player capability and turn rules").
+
+### Consequences
+
+- DES-021's engine party-readiness (the `GameState.Party` array, the
+  `character_id` parameters, N-actor turn order, the save `party` array) still
+  holds exactly — only its "Party as Biff Extension" framing and Biff-specific
+  mechanism are superseded.
+- The M14 epic (cryptd-1qj) is retitled "Multiplayer (party play)" and its tasks
+  rewritten to be transport-agnostic; "turn tokens via Biff `/write`" becomes
+  "turn ownership: whose turn it is and how it passes," with the mechanism left
+  open.
+- mcp-proxy is not a prerequisite for multiplayer (consistent with DES-014's
+  2026-03-29 revision, which moved session routing into the protocol natively).
+
+---
+
+## DES-034: Multiplayer Is a Standalone Capability
 
 **Date:** 2026-11-09
 **Status:** SETTLED
 **Topic:** What multiplayer is
-**Supersedes:** DES-021 (which tied multiplayer to one transport)
+**Supersedes:** DES-033
 
 ### Decision
 
@@ -1797,12 +1858,15 @@ transports are evaluated then; none is part of this capability's definition.
 
 The game defines the capability. The engine holds the party, the rules, and the
 turn order; the daemon routes actions by `character_id`. These do not depend on
-how players reach the daemon, so the transport is factored out.
+how players reach the daemon, so the transport is factored out. DES-033 still
+named one transport (Biff) as an optional layer; naming any specific transport
+privileges it before the implementation decision is made, so none is named.
 
 ### Consequences
 
-- DES-021's engine party-readiness (the `GameState.Party` slice, the
-  `character_id` parameters, N-actor turn order, the save `party` array) stands.
+- DES-021's and DES-033's engine party-readiness (the `GameState.Party` slice,
+  the `character_id` parameters, N-actor turn order, the save `party` array)
+  stands.
 - The per-player capability and turn-ownership design is tracked on bead
   cryptd-90e.2.
 - The M14 epic (cryptd-1qj) covers this capability, with transport left open.
