@@ -464,9 +464,14 @@ DES-001 says "no code, only prompts." This MCP server is ~90 lines of JavaScript
 ## DES-009: Architecture Evolution — LLM as DM, Go Engine as L1
 
 **Date:** 2026-03-10
-**Status:** SETTLED
+**Status:** SETTLED; "LLM as DM" framing CORRECTED by DES-030 (2026-11-08)
 **Topic:** Replacing the pure-prompt engine with a proper separation of concerns
 **Supersedes:** DES-001, DES-008
+
+> The separation of concerns below holds exactly as written. Its naming is
+> corrected by **DES-030**: the deterministic Go engine is the Dungeon Master,
+> and the LLM is an enhancement layer, not "the DM." The original wording is
+> retained below for the record.
 
 ### Design
 
@@ -712,7 +717,7 @@ The beads lesson is taken seriously.
 ## DES-014: mcp-proxy for DM Mode Session Multiplexing
 
 **Date:** 2026-03-10
-**Status:** REVISED (2026-03-29) — session routing implemented natively in protocol; mcp-proxy no longer a prerequisite
+**Status:** REVISED (2026-03-29) — session routing implemented natively in protocol; mcp-proxy no longer a prerequisite. The "DM session" language is retired by DES-030 (2026-11-08).
 **Topic:** How Claude Code sessions connect to the shared game engine daemon
 
 ### Design
@@ -1247,7 +1252,7 @@ translate between raw text and their domain types.
 ## DES-025: Two Binaries — cryptd (Server) and crypt (Client)
 
 **Date:** 2026-03-12
-**Status:** SETTLED (revised 2026-03-12: removed embedded engine, established two daemon modes)
+**Status:** SETTLED (revised 2026-03-12: removed embedded engine, established two daemon modes); protocol framing and `--passthrough` flag SUPERSEDED by DES-031 (2026-11-08)
 **Topic:** Binary architecture, client-server separation, and the daemon's role
 
 ### Context
@@ -1646,7 +1651,8 @@ mis-scoping cryptd-90e.2 twice). Two facts in the existing record already contra
   rules/template tiers fill the same two roles. The DM does not disappear.
 - **No client is the DM.** DES-014's "DM session sees DM-privileged tools" language is
   retired. There is no DM session. There are only clients connecting to the engine, and the
-  open question (DES-014 was already revised to design-stage on 2026-03-29) is which
+  open question (DES-014 was already revised on 2026-03-29, when session routing moved into
+  the protocol natively and mcp-proxy was dropped as a prerequisite) is which
   connecting clients may call privileged/authoring engine methods versus play-only methods —
   a client-privilege question, not a "who is the DM" question. See the M10 session-routing
   beads (cryptd-90e and children), which this ADR re-scopes accordingly.
@@ -1682,9 +1688,11 @@ standard JSON-RPC error objects with typed codes. This replaces the earlier MCP 
 (`initialize`, `tools/list`, `tools/call` with `ToolResult{content:[...]}` wrappers).
 
 Session mode (normal vs passthrough) is selected **per session** at `session.init` via a
-`mode` field in `InitializeParams`. There is no server-level `--passthrough` flag. A
-session that requests `"passthrough"` keeps it for its lifetime; a session with no mode
-gets normal mode when the server has an interpreter and narrator, passthrough otherwise.
+`mode` field in `InitializeParams`. There is no server-level `--passthrough` flag. Each
+`session.init` sets the mode from scratch — last-init-wins: a call with `mode: "passthrough"`
+puts the session in passthrough, and a later call for the same session with no mode resets it
+to normal when the server has an interpreter and narrator (passthrough otherwise). Mode is not
+pinned for the session's lifetime; it is whatever the most recent `session.init` computed.
 Both modes coexist on the same socket (`internal/daemon/handler.go`).
 
 ### Why
