@@ -464,9 +464,14 @@ DES-001 says "no code, only prompts." This MCP server is ~90 lines of JavaScript
 ## DES-009: Architecture Evolution — LLM as DM, Go Engine as L1
 
 **Date:** 2026-03-10
-**Status:** SETTLED
+**Status:** SETTLED; "LLM as DM" framing CORRECTED by DES-030 (2026-11-08)
 **Topic:** Replacing the pure-prompt engine with a proper separation of concerns
 **Supersedes:** DES-001, DES-008
+
+> The separation of concerns below holds exactly as written. Its naming is
+> corrected by **DES-030**: the deterministic Go engine is the Dungeon Master,
+> and the LLM is an enhancement layer, not "the DM." The original wording is
+> retained below for the record.
 
 ### Design
 
@@ -712,7 +717,7 @@ The beads lesson is taken seriously.
 ## DES-014: mcp-proxy for DM Mode Session Multiplexing
 
 **Date:** 2026-03-10
-**Status:** REVISED (2026-03-29) — session routing implemented natively in protocol; mcp-proxy no longer a prerequisite
+**Status:** REVISED (2026-03-29) — session routing implemented natively in protocol; mcp-proxy no longer a prerequisite. The "DM session" language is retired by DES-030 (2026-11-08).
 **Topic:** How Claude Code sessions connect to the shared game engine daemon
 
 ### Design
@@ -1247,7 +1252,7 @@ translate between raw text and their domain types.
 ## DES-025: Two Binaries — cryptd (Server) and crypt (Client)
 
 **Date:** 2026-03-12
-**Status:** SETTLED (revised 2026-03-12: removed embedded engine, established two daemon modes)
+**Status:** SETTLED (revised 2026-03-12: removed embedded engine, established two daemon modes); protocol framing and `--passthrough` flag SUPERSEDED by DES-031 (2026-11-08)
 **Topic:** Binary architecture, client-server separation, and the daemon's role
 
 ### Context
@@ -1604,3 +1609,155 @@ Tea TUI.
 
 Jim, 2026-11-08: remove the Lux integration and kill the associated beads. Bead:
 cryptd-oal.
+
+---
+
+## DES-030: The Engine Is the DM; the LLM Enhances It
+
+**Date:** 2026-11-08
+**Status:** SETTLED
+**Topic:** What "the Dungeon Master" is, and what role the LLM plays
+**Corrects:** DES-009 (the "LLM as DM" framing), DES-014 (the "DM session" language)
+
+### Decision
+
+The game engine is the Dungeon Master. The deterministic Go engine — world state,
+rooms, combat, inventory, the rules — is the DM. When a large language model is present
+it **enhances** the DM: it interprets free-text input into engine actions and narrates
+engine events in richer prose. The LLM is not the DM, and neither is any client that
+connects to the engine. The DM is always present because the engine is always present;
+the LLM is an optional top tier layered on top of it.
+
+### Why this correction is needed
+
+DES-009 is titled "LLM as DM, Go Engine as L1" and calls the LLM "the Dungeon Master."
+That framing is wrong, and it caused repeated design confusion (including a leader
+mis-scoping cryptd-90e.2 twice). Two facts in the existing record already contradict it:
+
+- **DES-023 (four-tier inference)** makes the game fully playable at the bottom tier with
+  regex interpretation and template narration — no LLM at all. If the DM were the LLM, the
+  game would have no DM in headless mode. It does: the engine is the DM, running rooms,
+  combat, and narration from templates. The LLM, when present, only makes interpretation
+  and narration richer.
+- **DES-025 / DES-013** make the engine the always-running server (`cryptd serve`). The
+  engine is the thing clients connect **to**, not a participant that connects. So the DM is
+  not a session, a connection, or a seat at the table.
+
+### What this means concretely
+
+- **The DM = `cryptd` (the engine/server).** It holds and advances all game state.
+- **The LLM (Claude, in `dm` mode) = an enhancement layer**, playing the `CommandInterpreter`
+  and `Narrator` roles (DES-011) at the "Large" tier (DES-023). Remove it and the SLM or the
+  rules/template tiers fill the same two roles. The DM does not disappear.
+- **No client is the DM.** DES-014's "DM session sees DM-privileged tools" language is
+  retired. There is no DM session. There are only clients connecting to the engine, and the
+  open question (DES-014 was already revised on 2026-03-29, when session routing moved into
+  the protocol natively and mcp-proxy was dropped as a prerequisite) is which
+  connecting clients may call privileged/authoring engine methods versus play-only methods —
+  a client-privilege question, not a "who is the DM" question. See the M10 session-routing
+  beads (cryptd-90e and children), which this ADR re-scopes accordingly.
+
+### Consequences
+
+- DES-009's separation of concerns (deterministic rules in Go, narrative/parsing in the
+  LLM) still holds exactly as written — only its naming is corrected: what it calls "the DM"
+  (the LLM) is the enhancement layer, and what it calls "L1" (the engine) is the DM.
+- DES-014's privilege-routing intent survives, restated: scope privileged engine methods by
+  the kind of connecting client, not by assigning a DM role to a session.
+- cryptd-90e.2 ("DM vs player tool privilege gating") is re-read as: a privileged/authoring
+  client may call authoring methods; a player client may call only play methods; a play
+  client calling a privileged method gets a typed error. How a connecting client is
+  classified (and whether that boundary is security-enforced or convenience-only) remains an
+  open operator decision, tracked on that bead.
+
+---
+
+## DES-031: Direct JSON-RPC Methods Replace MCP `tools/call` Framing
+
+**Date:** 2026-11-08
+**Status:** SETTLED (logging a shipped decision)
+**Topic:** The daemon wire protocol and how a session selects its mode
+**Supersedes:** the protocol and `--passthrough` portions of DES-025
+
+### Decision
+
+The daemon speaks direct, named JSON-RPC 2.0 methods — `session.init`, `game.new`,
+`game.move`, `game.look`, `game.play`, `session.quit`, and the rest of the `game.*`
+surface — over NDJSON (Unix socket or TCP). Results are direct JSON objects; errors are
+standard JSON-RPC error objects with typed codes. This replaces the earlier MCP framing
+(`initialize`, `tools/list`, `tools/call` with `ToolResult{content:[...]}` wrappers).
+
+Session mode (normal vs passthrough) is selected **per session** at `session.init` via a
+`mode` field in `InitializeParams`. There is no server-level `--passthrough` flag. Each
+`session.init` sets the mode from scratch — last-init-wins: a call with `mode: "passthrough"`
+puts the session in passthrough, and a later call for the same session with no mode resets it
+to normal when the server has an interpreter and narrator (passthrough otherwise). Mode is not
+pinned for the session's lifetime; it is whatever the most recent `session.init` computed.
+Both modes coexist on the same socket (`internal/daemon/handler.go`).
+
+### Why
+
+- DES-025 described the protocol as "JSON-RPC 2.0 over NDJSON ... using MCP method names
+  (`initialize`, `tools/list`, `tools/call`) for compatibility with the MCP ecosystem," and
+  a server-level `--passthrough` flag. In practice the daemon is a game server, not an MCP
+  server: wrapping every result in `ToolResult{content:[{text:...}]}` added a layer with no
+  consumer, and a server-level mode flag is wrong because normal and passthrough clients
+  (the `crypt` TUI and the Claude Code `crypt mcp` bridge) connect to the same running
+  daemon at the same time.
+- Direct named methods with typed JSON results are simpler to produce, test (one
+  `protocol_contract_test.go` pins the wire shape), and consume. Claude Code reaches the
+  daemon through the `crypt mcp` stdio bridge, which does the MCP translation at the edge
+  rather than in the daemon.
+
+### Consequences
+
+- `cmd/dump-mcp-schema`, `testdata/mcp-schema.json`, and the `mcp-schema` CI job were
+  removed — the daemon has no MCP tool schema to pin.
+- The `crypt` client sends `session.init` / `game.*`, not `initialize` / `tools/call`.
+- DES-025's two-binary split, auto-start, transport choice, and "brain is server config"
+  decisions are unchanged; only its protocol framing and `--passthrough` flag are superseded.
+- The dispatcher response/error types were later hardened (named structs, `RPCErrorCode`,
+  `RPCError` implementing `error`) in PR #106 (cryptd-7z8/dbe/8c0/64x); that is an
+  implementation of this protocol, not a separate decision.
+
+---
+
+## DES-032: Bubble Tea TUI as the `crypt` Client Display
+
+**Date:** 2026-11-08
+**Status:** SETTLED (logging a shipped decision)
+**Topic:** How the `crypt` client renders the game to the player
+**Extends:** DES-026 (twin renderer), DES-029 (Lux abandoned)
+
+### Decision
+
+The `crypt` client's display is a Bubble Tea (Charm) terminal UI, launched by default on a
+TTY: a scrolling narration viewport, HP/XP bars, a 3x3 compass grid with styled exits,
+equipped-item and inventory panels, a stat block, and a combat overlay with single-key
+shortcuts (A/D/F/U). A `--plain` flag falls back to the readline REPL for non-TTY or
+scripted use. The client receives typed `GameState` over the twin-renderer wire (DES-026)
+and does all display formatting client-side.
+
+### Why
+
+- DES-026 established that display logic lives in the client, fed typed state over the wire,
+  with the client renderer owning the "fancy ASCII display." DES-029 then removed Lux,
+  leaving the `crypt` client as the single rich player-facing surface. Neither ADR recorded
+  *what* that client UI actually is. It is a Bubble Tea TUI — the Charm libraries are the
+  terminal-UI choice, matching the structured-input half of DES-019 (compass grid, combat
+  shortcuts) with a real widget layer instead of ad-hoc print formatting.
+- Bubble Tea gives a proper event loop, viewport scrolling, and styled layout that the
+  earlier readline REPL could not. The REPL survives behind `--plain` because scripted tests
+  and non-TTY environments need a line-oriented interface, and because it is the liveness
+  fallback DES-026 implied.
+
+### Consequences
+
+- The structured-action input path of DES-019 (navigation, combat without an LLM
+  round-trip) is realized through the TUI's compass grid and A/D/F/U combat keys, which
+  serialize straight to `game.*` calls.
+- The wire carries the fields the sidebar needs — `PlayResponse` includes `exits` and
+  `next_level_xp` for rendering — consistent with DES-026's typed-data-end-to-end property.
+- A lobby and 4-step character-creation wizard (scenario pick, name, class, point-buy)
+  front the TUI, backed by the `game.list_scenarios` and `game.list_sessions` methods
+  (DES-031 protocol). These are UI over existing engine data, not new game rules.
