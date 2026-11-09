@@ -4,6 +4,7 @@ package protocol
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/punt-labs/cryptd/internal/model"
 )
@@ -35,6 +36,15 @@ type RPCError struct {
 	Code    RPCErrorCode `json:"code"`
 	Message string       `json:"message"`
 	Data    any          `json:"data,omitempty"`
+}
+
+// Error reports the code and message, so *RPCError satisfies the error
+// interface. A nil receiver reads as "<nil>" rather than panicking.
+func (e *RPCError) Error() string {
+	if e == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("rpc error %d: %s", e.Code, e.Message)
 }
 
 // Standard JSON-RPC error codes.
