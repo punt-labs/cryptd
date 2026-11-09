@@ -899,6 +899,12 @@ func dispatchLoadGame(eng *engine.Engine, state *model.GameState, raw json.RawMe
 	if err != nil {
 		return nil, engineError(err)
 	}
+	// A valid game always has exactly one hero. A save with an empty party
+	// is corrupt; reject it loudly rather than install a heroless state that
+	// would panic on the first gameplay command.
+	if len(loaded.Party) == 0 {
+		return nil, &RPCError{Code: CodeInternalError, Message: "loaded save has no hero"}
+	}
 	*state = loaded
 	look := eng.Look(state)
 	return protocol.LoadResult{
@@ -959,9 +965,12 @@ func checkLevelUp(eng *engine.Engine, state *model.GameState) *protocol.LevelUpS
 }
 
 // heroSummary returns a snapshot of the hero for inclusion in tool results.
+// Every active game has exactly one hero (engine.NewGame seeds it; load
+// rejects a heroless save), so an empty party is a programmer bug, not a
+// runtime condition.
 func heroSummary(state *model.GameState) protocol.HeroSummary {
 	if len(state.Party) == 0 {
-		return protocol.HeroSummary{}
+		panic("daemon: heroSummary called with empty party")
 	}
 	h := &state.Party[0]
 	return protocol.HeroSummary{

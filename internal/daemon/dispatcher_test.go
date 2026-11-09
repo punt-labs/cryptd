@@ -11,6 +11,8 @@ import (
 
 	"github.com/punt-labs/cryptd/internal/engine"
 	"github.com/punt-labs/cryptd/internal/model"
+	"github.com/punt-labs/cryptd/internal/protocol"
+	"github.com/punt-labs/cryptd/internal/save"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -438,6 +440,50 @@ func TestSaveAndLoad(t *testing.T) {
 	loadResult := extractResult(t, loadResps[1])
 	assert.Equal(t, "test", loadResult["slot"])
 	assert.Equal(t, "entrance", loadResult["room"])
+}
+
+// TestLoadRejectsHerolessSave verifies the load boundary refuses a save file
+// with an empty party rather than installing a heroless state that would panic
+// on the first gameplay command.
+func TestLoadRejectsHerolessSave(t *testing.T) {
+	srv := testServer(t)
+	saveDir := t.TempDir()
+
+	reqs := []Request{
+		initRequest(0),
+		newGameCall(1, map[string]any{
+			"scenario_id": "minimal", "character_name": "Tester", "character_class": "fighter",
+		}),
+	}
+	resps := multiRoundTrip(t, srv, reqs)
+	require.Len(t, resps, 2)
+	sid := extractSessionID(t, resps[0])
+
+	// Point the engine at our save dir and learn its scenario ID.
+	g := activeGame(t, srv)
+	ctx := context.Background()
+	var scenarioID string
+	require.NoError(t, g.Inspect(ctx, func(eng *engine.Engine, _ *model.GameState) {
+		eng.SaveDir = saveDir
+		scenarioID = eng.Scenario().ID
+	}))
+
+	// Write a schema-valid save with no hero.
+	heroless := model.GameState{
+		Scenario: scenarioID,
+		Dungeon:  model.DungeonState{CurrentRoom: "entrance"},
+		Party:    nil,
+	}
+	require.NoError(t, save.Save(heroless, filepath.Join(saveDir, "corrupt.json")))
+
+	loadResps := multiRoundTrip(t, srv, []Request{
+		initRequestWithSession(0, sid),
+		gameCall(2, "load_game", map[string]any{"slot": "corrupt"}),
+	})
+	require.Len(t, loadResps, 2)
+	require.NotNil(t, loadResps[1].Error, "load of heroless save should fail")
+	assert.Equal(t, protocol.CodeInternalError, loadResps[1].Error.Code)
+	assert.Contains(t, loadResps[1].Error.Message, "no hero")
 }
 
 func TestCombatBlockedActions(t *testing.T) {
