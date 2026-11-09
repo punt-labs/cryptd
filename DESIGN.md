@@ -1769,49 +1769,47 @@ and does all display formatting client-side.
 
 ---
 
-## DES-033: Multiplayer Is Decoupled From Biff
+## DES-033: Multiplayer Is a Standalone Capability
 
 **Date:** 2026-11-09
 **Status:** SETTLED
-**Topic:** What multiplayer depends on
+**Topic:** What multiplayer is
 **Corrects:** DES-021 ("Party as Biff Extension")
 
 ### Decision
 
-Multiplayer does not imply Biff. The multiplayer capability — a real party of
-several human players in one game — is a property of the engine and the daemon,
-defined independently of how players connect or coordinate. Biff is at most one
-optional coordination/presence transport layered on top; it is never the
-definition of the feature.
+Multiplayer — a real party of several human players in one game — is a
+capability of the engine and the daemon. It is defined entirely in terms of game
+state and the daemon's own protocol, and is not tied to any particular transport
+or coordination technology. The transport by which players connect is a separate
+implementation choice, made later on its own merits.
 
 ### Why this correction is needed
 
 DES-021 titled the work "Party as Biff Extension" and defined the whole feature
-in Biff terms: "each Biff participant controls one character," "turn tokens
-passed via Biff `/write`," "`PostToolUse` hook notifies party members," session
-identity "from mcp-proxy." That couples a capability to one specific delivery
-mechanism. Two facts already pull the other way:
+in terms of one specific technology: "each Biff participant controls one
+character," "turn tokens passed via Biff `/write`," "`PostToolUse` hook notifies
+party members," session identity "from mcp-proxy." That makes an implementation
+technology part of the feature's definition, which is backwards. The capability
+is defined by the game, not by the pipe:
 
-- The daemon (DES-013, DES-025) is a general-purpose game server that accepts
-  concurrent connections over Unix socket or TCP. Multiple players can connect
-  to one `cryptd serve` directly. DES-025 itself notes "Biff may not be needed
-  as the multiplayer transport ... players connect to the same `cryptd serve`
-  instance directly," with Biff's value being optional coordination
-  (presence, `/wall`, `/talk`) on top.
+- The daemon (DES-013, DES-025) is a general-purpose game server that already
+  accepts concurrent connections over Unix socket or TCP. Multiple players
+  connect to one `cryptd serve` directly.
 - The game is the DM (DES-030). Multiplayer is about multiple *human players*
-  sharing the one game — a question of party state, per-player action routing,
-  and turn ownership — none of which is inherently a Biff concern.
+  sharing the one game — party state, per-player action routing, and turn
+  ownership — all of which live in the engine and the daemon protocol.
 
 ### What this means
 
 - **The multiplayer capability** (engine + daemon) is: a real `Party []Character`
   (not length-1); `character_id` routing on `move`/`attack`/`flee`/`defend` (the
   DES-021 seam, already wired); per-player session→character binding; turn
-  ownership; and the DM narrating for the full party. All transport-agnostic.
-- **Transport is a separate, later decision.** Direct daemon connections are the
-  obvious default (the server already supports them). Biff coordination
-  (presence, turn signalling via `/write`, broadcast) is optional and additive,
-  chosen on its own merits, not assumed.
+  ownership; and the DM narrating for the full party.
+- **Transport is a separate, later implementation decision.** Players connect to
+  the daemon; how a given deployment wires that connection and any
+  cross-player coordination is chosen when it is built, on its own merits, and is
+  out of scope for the multiplayer capability itself.
 - The per-player capability/turn *design* question is tracked on the M10 bead
   cryptd-90e.2 ("Multiplayer: per-player capability and turn rules").
 
@@ -1819,11 +1817,11 @@ mechanism. Two facts already pull the other way:
 
 - DES-021's engine party-readiness (the `GameState.Party` array, the
   `character_id` parameters, N-actor turn order, the save `party` array) still
-  holds exactly — only its "Party as Biff Extension" framing and Biff-specific
-  mechanism are superseded.
+  holds exactly — only its "Party as Biff Extension" framing and
+  technology-specific mechanism are superseded.
 - The M14 epic (cryptd-1qj) is retitled "Multiplayer (party play)" and its tasks
-  rewritten to be transport-agnostic; "turn tokens via Biff `/write`" becomes
-  "turn ownership: whose turn it is and how it passes," with the mechanism left
-  open.
+  rewritten to describe game behavior, not a transport; "turn tokens via Biff
+  `/write`" becomes "turn ownership: whose turn it is and how it passes," with
+  the mechanism left open.
 - mcp-proxy is not a prerequisite for multiplayer (consistent with DES-014's
   2026-03-29 revision, which moved session routing into the protocol natively).
