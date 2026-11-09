@@ -454,13 +454,14 @@ DM-generated scenario creation.
 
 ---
 
-## Milestone 13 — Biff Multi-player
+## Milestone 13 — Multi-player
 
-**Goal:** Party play. Each Biff participant controls one character.
+**Goal:** Party play. Multiple human players share one game; the game is the DM.
 
 - `GameState.Party` promoted from single-element to real party
 - `move`/`attack`/`flee`/`defend` `character_id` routing active
-- Turn tokens via Biff `/write`
+- Per-player session-to-character binding
+- Turn ownership: whose turn it is and how it passes
 - Shared save state across sessions
 - DM narrates for the full party
 
@@ -486,7 +487,7 @@ M10 Session Routing Concurrent sessions; game-as-goroutine; session resume;     
                     per-session mode; crypt mcp bridge; direct JSON-RPC protocol
 M11 Full DM Mode    DM SKILL.md for MCP; rich narration; scenario creation
 M12 Rich World      Shops, traps, multiple scenarios
-M13 Biff            Multi-player party
+M13 Multi-player    Party play; shared game, multiple players
 ```
 
 Both critical integration gates — **M2** (architecture validated end-to-end)
