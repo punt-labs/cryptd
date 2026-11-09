@@ -45,11 +45,11 @@ type Command struct {
 // RunLoopRequest carries the dependencies for running the game loop inside the
 // game goroutine (normal mode).
 type RunLoopRequest struct {
-	Scanner            *bufio.Scanner
-	Writer             io.Writer
-	Interp             model.CommandInterpreter
-	Narr               model.Narrator
-	SkipInitialRender  bool // true when caller already sent the initial room (new_game path)
+	Scanner           *bufio.Scanner
+	Writer            io.Writer
+	Interp            model.CommandInterpreter
+	Narr              model.Narrator
+	SkipInitialRender bool // true when caller already sent the initial room (new_game path)
 }
 
 // Game represents a running game instance. Each Game is a goroutine that
@@ -394,8 +394,11 @@ func dispatchMove(eng *engine.Engine, state *model.GameState, raw json.RawMessag
 	case combatErr == nil:
 		response.Combat = combatSummary(combatResult, state)
 		if state.Dungeon.Combat.Active && !isHeroTurn(state) {
-			turns := processEnemyTurns(eng, state)
+			turns, truncated := processEnemyTurns(eng, state)
 			response.EnemyTurns = &turns
+			if truncated {
+				response.Warning = enemyPhaseWarning
+			}
 		}
 	case errors.As(combatErr, new(*engine.NoEnemiesError)),
 		errors.As(combatErr, new(*engine.AlreadyInCombatError)):
@@ -619,8 +622,11 @@ func dispatchAttack(eng *engine.Engine, state *model.GameState, raw json.RawMess
 			LevelUp:    checkLevelUp(eng, state),
 		}
 	} else if state.Dungeon.Combat.Active && !isHeroTurn(state) {
-		turns := processEnemyTurns(eng, state)
+		turns, truncated := processEnemyTurns(eng, state)
 		response.EnemyTurns = &turns
+		if truncated {
+			response.Warning = enemyPhaseWarning
+		}
 	}
 
 	return response, nil
@@ -642,8 +648,11 @@ func dispatchDefend(eng *engine.Engine, state *model.GameState) (any, *RPCError)
 	}
 
 	if state.Dungeon.Combat.Active && !isHeroTurn(state) {
-		turns := processEnemyTurns(eng, state)
+		turns, truncated := processEnemyTurns(eng, state)
 		response.EnemyTurns = &turns
+		if truncated {
+			response.Warning = enemyPhaseWarning
+		}
 	}
 
 	return response, nil
@@ -665,8 +674,11 @@ func dispatchFlee(eng *engine.Engine, state *model.GameState) (any, *RPCError) {
 	}
 
 	if !result.Success && state.Dungeon.Combat.Active && !isHeroTurn(state) {
-		turns := processEnemyTurns(eng, state)
+		turns, truncated := processEnemyTurns(eng, state)
 		response.EnemyTurns = &turns
+		if truncated {
+			response.Warning = enemyPhaseWarning
+		}
 	}
 
 	return response, nil
@@ -717,8 +729,11 @@ func dispatchCastSpell(eng *engine.Engine, state *model.GameState, raw json.RawM
 	}
 
 	if state.Dungeon.Combat.Active && !isHeroTurn(state) {
-		turns := processEnemyTurns(eng, state)
+		turns, truncated := processEnemyTurns(eng, state)
 		response.EnemyTurns = &turns
+		if truncated {
+			response.Warning = enemyPhaseWarning
+		}
 	} else if result.Effect == "damage" && !state.Dungeon.Combat.Active {
 		response.CombatOutcome = &protocol.CombatOutcome{
 			CombatOver: true,
@@ -914,8 +929,14 @@ func dispatchLoadGame(eng *engine.Engine, state *model.GameState, raw json.RawMe
 
 // --- helpers ---
 
-// processEnemyTurns runs all enemy turns until it's the hero's turn (or combat ends).
-func processEnemyTurns(eng *engine.Engine, state *model.GameState) []protocol.EnemyTurn {
+// enemyPhaseWarning is the client-visible signal that the enemy phase ended
+// before the hero's turn because of an internal error.
+const enemyPhaseWarning = "enemy turn phase ended early due to an internal error"
+
+// processEnemyTurns runs all enemy turns until it's the hero's turn (or combat
+// ends). The returned bool is true when an unexpected engine error cut the
+// phase short, leaving combat mid-enemy-turn; callers surface it to the client.
+func processEnemyTurns(eng *engine.Engine, state *model.GameState) ([]protocol.EnemyTurn, bool) {
 	var turns []protocol.EnemyTurn
 	maxIter := len(state.Dungeon.Combat.TurnOrder) * 2
 	if maxIter < 1 {
@@ -925,7 +946,7 @@ func processEnemyTurns(eng *engine.Engine, state *model.GameState) []protocol.En
 		result, err := eng.ProcessEnemyTurn(state)
 		if err != nil {
 			log.Printf("daemon: processEnemyTurns: unexpected error: %v", err)
-			break
+			return turns, true
 		}
 		if result.Action == "skip" {
 			continue
@@ -942,7 +963,7 @@ func processEnemyTurns(eng *engine.Engine, state *model.GameState) []protocol.En
 		}
 		turns = append(turns, turn)
 	}
-	return turns
+	return turns, false
 }
 
 // checkLevelUp checks and applies a level-up, returning the summary or nil.

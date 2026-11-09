@@ -74,7 +74,7 @@ type PlayResponse struct {
 	State       *model.GameState `json:"state,omitempty"`
 	Dead        bool             `json:"dead,omitempty"`
 	Quit        bool             `json:"quit,omitempty"`
-	Exits       []string         `json:"exits,omitempty"`        // transient: available exits from current room
+	Exits       []string         `json:"exits,omitempty"`         // transient: available exits from current room
 	NextLevelXP int              `json:"next_level_xp,omitempty"` // transient: XP needed for next level
 }
 
@@ -267,6 +267,7 @@ type AttackResult struct {
 	XPAwarded *int        `json:"xp_awarded,omitempty"`
 	*CombatOutcome
 	EnemyTurns *[]EnemyTurn `json:"enemy_turns,omitempty"`
+	Warning    string       `json:"warning,omitempty"`
 }
 
 // DefendResult is the game.defend result.
@@ -274,6 +275,7 @@ type DefendResult struct {
 	Defending  bool         `json:"defending"`
 	Hero       HeroSummary  `json:"hero"`
 	EnemyTurns *[]EnemyTurn `json:"enemy_turns,omitempty"`
+	Warning    string       `json:"warning,omitempty"`
 }
 
 // FleeResult is the game.flee result.
@@ -281,6 +283,7 @@ type FleeResult struct {
 	Success    bool         `json:"success"`
 	Hero       HeroSummary  `json:"hero"`
 	EnemyTurns *[]EnemyTurn `json:"enemy_turns,omitempty"`
+	Warning    string       `json:"warning,omitempty"`
 }
 
 // CastSpellResult is the game.cast_spell result. Target is set only for a
@@ -294,6 +297,7 @@ type CastSpellResult struct {
 	Target *string     `json:"target,omitempty"`
 	*CombatOutcome
 	EnemyTurns *[]EnemyTurn `json:"enemy_turns,omitempty"`
+	Warning    string       `json:"warning,omitempty"`
 }
 
 // UseItemResult is the game.use_item result. Item is the item's display name.

@@ -275,6 +275,47 @@ func TestWireContract_CastSpellResult_TargetPresent(t *testing.T) {
 	assertKey(t, got, "target", keyPresent)
 }
 
+func TestWireContract_EnemyPhaseWarning(t *testing.T) {
+	// The warning key is additive: absent when the enemy phase completed, present
+	// when an internal error cut it short. Pin both states on every result that
+	// carries an enemy phase.
+	const msg = "enemy turn phase ended early due to an internal error"
+	tests := []struct {
+		name   string
+		clean  any
+		warned any
+	}{
+		{
+			name:   "attack",
+			clean:  AttackResult{Target: "goblin"},
+			warned: AttackResult{Target: "goblin", Warning: msg},
+		},
+		{
+			name:   "defend",
+			clean:  DefendResult{Defending: true},
+			warned: DefendResult{Defending: true, Warning: msg},
+		},
+		{
+			name:   "flee",
+			clean:  FleeResult{Success: false},
+			warned: FleeResult{Success: false, Warning: msg},
+		},
+		{
+			name:   "cast_spell",
+			clean:  CastSpellResult{Spell: "firebolt", Effect: "damage"},
+			warned: CastSpellResult{Spell: "firebolt", Effect: "damage", Warning: msg},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clean := marshalKeys(t, tt.clean, "warning")
+			assertKey(t, clean, "warning", keyAbsent)
+			warned := marshalKeys(t, tt.warned, "warning")
+			assertKey(t, warned, "warning", keyPresent)
+		})
+	}
+}
+
 func TestWireContract_CurrentRoomContext_DetailOmitted(t *testing.T) {
 	// Id-only fallback: the embedded *RoomContextDetail is nil, so its keys
 	// (name, description_seed, exits, items, enemies) are all absent.
