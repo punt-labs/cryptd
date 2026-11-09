@@ -25,6 +25,14 @@ ambiguous free text and writes richer prose. Remove it and the rules + templates
 do the same two jobs. The DM never disappears, because the engine is always
 there. This corrects the "LLM as DM" framing of DES-009 (see DES-030).
 
+The trap to avoid: **do not confuse the game engine with the narration layer.**
+Interpreting input and narrating events is one role (the enhancement layer); it
+is distinct from the DM (the engine), which decides outcomes. The enhancement
+layer can be a template, a small local model, or a full LLM, and it can run on
+the server or on the client — but wherever it runs and however smart it is, it
+never becomes the DM. It turns intent into a `game.*` call and an event into
+prose; the engine decides what actually happens.
+
 ### There is no "DM" and no "player" in the code
 
 Nothing connects *as* the DM — the engine *is* the DM, and it is the thing you
@@ -74,6 +82,31 @@ flowchart TB
 In passthrough, Claude Code *is* the interpreter and narrator; in normal mode
 the server fills those roles itself. Both paths resolve against the same engine
 and game state.
+
+### Why two modes
+
+The two modes exist because of **where an LLM is already available to pay for
+the enhancement layer** (interpretation + narration):
+
+- **Inside Claude Code (passthrough):** the player already has an LLM — Claude,
+  in the session they are running. So the enhancement layer runs client-side and
+  reuses that LLM. The server needs no API key and no model of its own; it just
+  runs the engine and returns structured JSON for Claude Code to interpret and
+  narrate.
+- **Other clients (normal):** the `crypt` TUI and `--plain` client are plain
+  terminals with no LLM of their own. So if LLM-grade narration or parsing is
+  wanted, the **server** must supply the brain — a Claude API key, a local SLM,
+  or the rules + template floor. The brain has to live somewhere, and here the
+  only place is the server.
+
+Same engine, same DM, same enhancement *role* — the difference is just who
+already has an LLM to spend on that role. Passthrough reuses the one the player
+brought; normal mode has to bring its own.
+
+Like the rest of the game's design, it is unproven that this split is the best
+architecture. It is here because it makes sense to enable gameplay with the LLM
+people already have access to, rather than requiring every player to supply the
+server with a key.
 
 **Which methods each path uses:**
 
