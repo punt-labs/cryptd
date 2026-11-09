@@ -26,23 +26,17 @@
 .punt-labs/**/local/**
 .punt-labs/**/*.local.*
 .punt-labs/quarry/captures/
-# Ethos vendored registry: sessions/ and mission lock files are per-run
-# runtime churn (0700 dirs / flocks), never committed. missions/ is NOT
-# blanket-ignored here -- vox's own .gitignore tracks durable mission
-# records (contract.yaml, results.yaml, reflections.yaml, log.jsonl)
-# under .punt-labs/ethos/missions/ by design; only its lock files are
-# runtime noise (the mission-wide .create.lock is already covered by the
-# global **/.create.lock below; missions/**/.lock catches a per-mission
-# lock at any nesting depth, not just one level down).
-#
-# The rollout script's dedup exempts .punt-labs/ethos/ specifically
-# (unlike vox/quarry/lux, this policy is genuinely per-repo, not
-# universal -- see gitignore-canonical-rollout.sh) so a repo's own
-# broader or narrower .punt-labs/ethos/* rule survives rollout untouched.
-# This entry is only the minimal shared baseline for repos with no
-# custom policy of their own.
+# Ethos vendored registry runtime state, never committed. cryptd's policy
+# (see CLAUDE.md "Ethos Integration" / mission lifecycle): the live
+# missions/ tree and the missions.jsonl index are per-run runtime churn;
+# only closed missions, exported to missions-closed/ and redacted, are
+# tracked. sessions/ is per-run too. (This differs from vox, whose own
+# .gitignore tracks durable records under missions/ -- the rollout script's
+# dedup exempts .punt-labs/ethos/ so this per-repo policy survives rollout,
+# see gitignore-canonical-rollout.sh.)
 .punt-labs/ethos/sessions/
-.punt-labs/ethos/missions/**/.lock
+.punt-labs/ethos/missions/
+.punt-labs/ethos/missions.jsonl
 .punt-labs/vox/ephemeral/
 .punt-labs/vox/vox.local.md
 .punt-labs/lux.md
