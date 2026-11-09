@@ -115,7 +115,7 @@ determinism wins: rules are authoritative, the engine adjudicates.
   \item \textbf{Party is designed in, not bolted on.}
     \texttt{GameState.Party} is always a slice (length~1 for single
     player).  Combat, movement, and save tooling accept an optional
-    \field{character\_id}.  Multi-player (Biff Phase~5) requires no
+    \field{character\_id}.  Multi-player requires no
     engine redesign.
 \end{enumerate}
 
@@ -1033,11 +1033,11 @@ confirmations) use the \texttt{TemplateNarrator} fallback for
 precision and speed.
 
 % ===================================================================
-\section{Biff Extension Points}
+\section{Multi-player Extension Points}
 % ===================================================================
 
-The engine is party-ready from day one.  No redesign is required
-when Biff multi-player (Phase~5) is added.
+The engine is party-ready from day one.  Multi-player requires no
+engine redesign.
 
 \begin{itemize}
   \item \texttt{GameState.Party} is always a \texttt{[]Character}
@@ -1046,17 +1046,18 @@ when Biff multi-player (Phase~5) is added.
     \texttt{game.defend} all accept an optional \field{character\_id};
     omitting it targets the primary character.
   \item Combat turn order already handles multiple actors.
-  \item Save files carry a \field{party} array (empty until Biff).
+  \item Save files carry a \field{party} array.
 \end{itemize}
 
-When Biff is added:
+Multi-player is a capability of the engine and daemon: multiple human
+players share one game, and the game is the DM.  The transport by which
+players connect is a separate implementation choice.  The remaining work:
 
 \begin{itemize}
-  \item Each Biff participant controls one character in the party.
-  \item \texttt{PostToolUse} hooks notify party members of
-    state-change events.
+  \item \texttt{GameState.Party} grows beyond a single character.
+  \item Each player's session binds to one character in the party.
+  \item Turn ownership: whose turn it is and how it passes.
   \item The DM narrates for the full party.
-  \item Turn tokens are passed via Biff \cmd{/write} messages.
 \end{itemize}
 
 % ===================================================================
@@ -1118,10 +1119,10 @@ When Biff is added:
     DM-generated encounters with backstory and puzzles.
   & Planned \\
 \midrule
-\textbf{Future — Biff Multi-player}
-  & Party management (one character per Biff participant);
+\textbf{Future — Multi-player}
+  & Party management (one character per player);
     N:1 session-to-game mapping;
-    turn tokens via Biff \cmd{/write}.
+    turn ownership and passing.
   & Planned \\
 \bottomrule
 \end{tabular}
