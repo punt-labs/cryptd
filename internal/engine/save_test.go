@@ -1,10 +1,12 @@
 package engine_test
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/punt-labs/cryptd/internal/engine"
 	"github.com/punt-labs/cryptd/internal/model"
+	"github.com/punt-labs/cryptd/internal/save"
 	"github.com/punt-labs/cryptd/internal/scenario"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -137,6 +139,23 @@ func TestLoadGame_ScenarioMismatch(t *testing.T) {
 	require.Error(t, err)
 	var mismatchErr *engine.ScenarioMismatchError
 	assert.ErrorAs(t, err, &mismatchErr)
+}
+
+func TestLoadGame_HerolessSave(t *testing.T) {
+	e := saveEngine(t)
+	// Write a schema-valid save for this scenario but with no hero. LoadGame
+	// is the single chokepoint both load paths pass through, so it must reject
+	// the corrupt save rather than return a heroless state that panics later.
+	heroless := model.GameState{
+		Scenario: e.Scenario().ID,
+		Dungeon:  model.DungeonState{CurrentRoom: "entrance"},
+		Party:    nil,
+	}
+	require.NoError(t, save.Save(heroless, filepath.Join(e.SaveDir, "corrupt.json")))
+
+	_, _, err := e.LoadGame("corrupt")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, engine.ErrHerolessSave)
 }
 
 func TestSaveGame_ValidSlotNames(t *testing.T) {

@@ -1,0 +1,47 @@
+mission_id: m-2026-11-09-001
+status: escalated
+type: implement
+created_at: "2026-11-09T01:33:06Z"
+updated_at: "2026-11-09T03:26:56Z"
+closed_at: "2026-11-09T03:26:56Z"
+leader: claude
+worker: bwk
+evaluator:
+    handle: rsc
+    pinned_at: "2026-11-09T01:33:06Z"
+    hash: 2547729fefe4fb969c9a2bf6501fd4e685424b77b13fa4fee4e1e6ca92b7a787
+inputs:
+    ticket: cryptd-7z8
+write_set:
+    - internal/protocol/protocol.go
+    - internal/daemon/game.go
+    - internal/daemon/protocol.go
+    - internal/daemon/dispatcher_test.go
+    - internal/daemon/game_test.go
+    - internal/protocol/protocol_test.go
+    - internal/daemon/protocol_contract_test.go
+success_criteria:
+    - 'cryptd-7z8: define `type RPCErrorCode int` in internal/protocol/protocol.go; the RPCError.Code field and all Code* constants (CodeParseError..CodeNoActiveGame) use that type, not bare int'
+    - 'cryptd-dbe: RPCError implements the error interface via `func (e *RPCError) Error() string` in internal/protocol/protocol.go; a nil-receiver guard is present'
+    - 'cryptd-8c0: every map[string]any response body in internal/daemon/game.go (29 occurrences, e.g. the new_game result ~game.go:329) is replaced by a named struct; the structs live in internal/protocol so the crypt client can share them; JSON field names and the on-the-wire shape are byte-for-byte unchanged'
+    - 'cryptd-64x: each dispatcher argument struct (newGameArgs, moveArgs, and the rest) has a `validate() *RPCError` method; each dispatch* function calls it immediately after json.Unmarshal, replacing the inline `if a.X == ""` checks; the CodeInvalidParams messages are preserved'
+    - make check is green (go vet, go test -race, integration, engine coverage >=90%, e2e, staticcheck, markdownlint) with no suppressions
+    - 'wire compatibility proven: existing protocol_contract_test.go and integration_test.go pass unchanged; if a response struct would change any JSON key, that is a defect to fix, not to accept'
+    - CHANGELOG.md [Unreleased] gets a Changed entry for the dispatcher typing hardening
+budget:
+    rounds: 3
+    reflection_after_each: true
+current_round: 3
+round_decisions:
+    version: 1
+    entries:
+        - id: 7db17a65076c2db4f6a6b2485f1a9fa3
+          round: 1
+          created_at: "2026-11-09T02:25:27Z"
+          author: claude
+          recommendation: continue
+        - id: c86831da0982637a2e069aa1315239c6
+          round: 2
+          created_at: "2026-11-09T02:48:30Z"
+          author: claude
+          recommendation: continue

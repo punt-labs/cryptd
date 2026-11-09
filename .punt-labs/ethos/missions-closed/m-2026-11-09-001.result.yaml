@@ -1,0 +1,20 @@
+mission: m-2026-11-09-001
+round: 3
+created_at: "2026-11-09T03:26:52Z"
+author: bwk
+verdict: escalate
+confidence: 1
+files_changed: []
+evidence:
+    - name: 'make check green per round-3 commit (leader independently re-ran full gate: all packages ok, staticcheck clean, markdownlint 0 issues)'
+      status: pass
+    - name: engine.LoadGame rejects heroless save with typed ErrHerolessSave at save.go:102-104 — single chokepoint for both load paths
+      status: pass
+    - name: regression tests TestLoadGame_HerolessSave (engine), TestLoop_LoadRejectsHerolessSave (game loop path), TestLoadRejectsHerolessSave (daemon) all pass
+      status: pass
+    - name: 'escalate: round-3 fix required engine/game paths outside the sealed write_set; leader scoping error, not a work defect'
+      status: fail
+open_questions:
+    - 'Write-set was under-scoped at create time: the engine/game paths needed to fix the sibling load path (internal/game/loop.go) flagged by rsc in round 2 were not admitted. Future dispatcher-wire missions should scope internal/engine + internal/game load paths alongside internal/daemon + internal/protocol.'
+prose: |
+    Round-3 code work is complete and committed on refactor/dispatcher-typing. The result is submitted as escalate because the fix the evaluator required in round 2 — moving the heroless-save guard to the engine chokepoint that BOTH load paths route through — necessarily touches internal/engine/save.go, internal/engine/save_test.go, and internal/game/loop_test.go, which are outside this contract's sealed write_set (original seven daemon+protocol paths). The leader authorized the write-set expansion in the round-3 dispatch but ethos has no contract-amend command, so the stored contract could not be updated. This is a leader contract-scoping error at create time, not a worker boundary violation. files_changed is empty per the escalate convention. The leader closes the mission escalated and accepts the code on independent verification; the branch is correct, make check is green, and it proceeds to local review and PR.
