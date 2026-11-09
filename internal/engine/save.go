@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"regexp"
@@ -9,6 +10,12 @@ import (
 	"github.com/punt-labs/cryptd/internal/model"
 	"github.com/punt-labs/cryptd/internal/save"
 )
+
+// ErrHerolessSave is returned when a loaded save has an empty party. A valid
+// game always has exactly one hero (DES-021); a heroless save is corrupt and
+// would panic on the first gameplay command, so LoadGame rejects it here, the
+// single chokepoint both load paths pass through.
+var ErrHerolessSave = errors.New("save has no hero")
 
 // validSlot matches slot names containing only alphanumeric characters,
 // underscores, and hyphens. This prevents path traversal attacks.
@@ -91,6 +98,9 @@ func (e *Engine) LoadGame(slot string) (model.GameState, LoadResult, error) {
 			SaveScenario:   state.Scenario,
 			EngineScenario: e.s.ID,
 		}
+	}
+	if len(state.Party) == 0 {
+		return model.GameState{}, LoadResult{}, ErrHerolessSave
 	}
 	return state, LoadResult{Slot: slot, Path: path}, nil
 }

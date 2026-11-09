@@ -899,12 +899,6 @@ func dispatchLoadGame(eng *engine.Engine, state *model.GameState, raw json.RawMe
 	if err != nil {
 		return nil, engineError(err)
 	}
-	// A valid game always has exactly one hero. A save with an empty party
-	// is corrupt; reject it loudly rather than install a heroless state that
-	// would panic on the first gameplay command.
-	if len(loaded.Party) == 0 {
-		return nil, &RPCError{Code: CodeInternalError, Message: "loaded save has no hero"}
-	}
 	*state = loaded
 	look := eng.Look(state)
 	return protocol.LoadResult{
@@ -1093,6 +1087,8 @@ func engineError(err error) *RPCError {
 		return &RPCError{Code: CodeGameOver, Message: err.Error()}
 
 	default:
+		// Includes engine.ErrHerolessSave: a corrupt save with no party is
+		// an internal condition, not a client-input error.
 		return &RPCError{Code: CodeInternalError, Message: err.Error()}
 	}
 }
