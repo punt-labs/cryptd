@@ -128,6 +128,88 @@ func TestWireContract_AttackResult_OutcomeWithLevelUp(t *testing.T) {
 	assertKey(t, got, "level_up", keyPresent)
 }
 
+func TestWireContract_MoveResult_NoCombat(t *testing.T) {
+	// A move into an empty room: no combat, no enemy phase, no warning. All
+	// three conditional keys are absent.
+	r := MoveResult{Room: "hall", Name: "Hall"}
+	got := marshalKeys(t, r, "combat", "enemy_turns", "warning")
+	assertKey(t, got, "combat", keyAbsent)
+	assertKey(t, got, "enemy_turns", keyAbsent)
+	assertKey(t, got, "warning", keyAbsent)
+}
+
+func TestWireContract_MoveResult_CombatStarted(t *testing.T) {
+	// A move that triggers combat sets the *CombatSummary: the combat key is a
+	// present object. A warning string also emits once non-empty.
+	r := MoveResult{
+		Room:    "lair",
+		Combat:  &CombatSummary{Enemies: []CombatEnemy{{ID: "g1", Name: "Goblin"}}, HeroTurn: true},
+		Warning: "a goblin blocks your path",
+	}
+	got := marshalKeys(t, r, "combat", "warning")
+	assertKey(t, got, "combat", keyPresent)
+	assertKey(t, got, "warning", keyPresent)
+}
+
+func TestWireContract_LookResult_NoCombat(t *testing.T) {
+	// Looking outside combat leaves the *CombatView nil: combat key absent.
+	r := LookResult{Room: "hall", Name: "Hall"}
+	got := marshalKeys(t, r, "combat")
+	assertKey(t, got, "combat", keyAbsent)
+}
+
+func TestWireContract_LookResult_InCombat(t *testing.T) {
+	// Looking during combat sets the *CombatView: combat key is a present object.
+	r := LookResult{
+		Room:   "lair",
+		Combat: &CombatView{Enemies: []CombatEnemy{{ID: "g1", Name: "Goblin"}}, Round: 1, HeroTurn: true},
+	}
+	got := marshalKeys(t, r, "combat")
+	assertKey(t, got, "combat", keyPresent)
+}
+
+func TestWireContract_AttackResult_XPAwardedPresent(t *testing.T) {
+	// A kill that awards XP sets *XPAwarded; a real zero award still emits
+	// "xp_awarded":0 rather than being dropped.
+	zero := 0
+	r := AttackResult{Target: "goblin", Killed: true, XPAwarded: &zero}
+	got := marshalKeys(t, r, "xp_awarded")
+	assertKey(t, got, "xp_awarded", keyPresent)
+
+	data, err := json.Marshal(r)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var decoded map[string]json.RawMessage
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if string(decoded["xp_awarded"]) != "0" {
+		t.Errorf("xp_awarded = %s, want 0", decoded["xp_awarded"])
+	}
+}
+
+func TestWireContract_EnemyTurn_HeroDead(t *testing.T) {
+	// A killing blow sets HeroDead true, so the omitempty key emits "hero_dead":true.
+	dmg := 5
+	hp := 0
+	turn := EnemyTurn{Enemy: "goblin", Action: "attack", Damage: &dmg, HeroHP: &hp, HeroDead: true}
+	got := marshalKeys(t, turn, "hero_dead")
+	assertKey(t, got, "hero_dead", keyPresent)
+
+	data, err := json.Marshal(turn)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var decoded map[string]json.RawMessage
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if string(decoded["hero_dead"]) != "true" {
+		t.Errorf("hero_dead = %s, want true", decoded["hero_dead"])
+	}
+}
+
 func TestWireContract_EnemyTurns_NilPointer(t *testing.T) {
 	// No enemy phase: the *[]EnemyTurn is nil, key absent.
 	r := DefendResult{Defending: true}
