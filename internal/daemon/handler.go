@@ -128,10 +128,10 @@ func (s *Server) handleRequest(req Request, sess **Session) Response {
 
 		*sess = s.getOrCreateSession(sid)
 
-		// Set session mode from params. A session that requests passthrough
-		// stays in passthrough for its lifetime. Sessions without a mode
-		// default to normal when the server has an interpreter+narrator,
-		// or passthrough otherwise.
+		// Set session mode from params on every session.init (last-init-wins):
+		// a request for passthrough sets passthrough; a later init with no mode
+		// resets the session to normal when the server has an interpreter+narrator,
+		// or passthrough otherwise. Mode is not pinned for the session's lifetime.
 		s.mu.Lock()
 		(*sess).passthrough = params.Mode == "passthrough" || !s.hasNormalMode()
 		s.mu.Unlock()
