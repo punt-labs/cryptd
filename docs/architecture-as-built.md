@@ -46,9 +46,13 @@ not have. (See [Documented vs. built](#documented-vs-built).)
 ## Two request paths, one engine
 
 This is the distinction that matters and the one the old docs blurred. A session
-is **normal** or **passthrough**, decided by the `mode` field in `session.init`.
-Same engine underneath; the difference is who parses the text and who writes the
-prose.
+is **normal** or **passthrough**. The client requests a mode via the `mode`
+field in `session.init`, but the server has the final say: if it was built
+without an interpreter and narrator, every session is passthrough regardless of
+what the client asked for (`passthrough = mode == "passthrough" || !hasNormalMode()`,
+`internal/daemon/handler.go`). The mode is recomputed on each `session.init`
+(last-init-wins), not pinned for the session's lifetime. Same engine underneath;
+the difference is who parses the text and who writes the prose.
 
 ```mermaid
 flowchart TB
@@ -73,15 +77,19 @@ and game state.
 
 **Which methods each path uses:**
 
-- The interactive `crypt` client (TUI and `--plain`) only ever calls
-  `session.init`, `game.new`, and `game.play`. Combat hotkeys in the TUI
-  (`a`/`d`/`f`/`u`) synthesize free text like `"attack"` and send it through
-  `game.play` — they do not call granular methods.
-- The granular methods — `game.move`, `game.attack`, `game.look`,
+- The interactive `crypt` client drives *gameplay* entirely through
+  `game.play` (free text). Combat hotkeys in the TUI (`a`/`d`/`f`/`u`)
+  synthesize free text like `"attack"` and send it through `game.play` — they
+  do not call granular methods. The `--plain` client calls only `session.init`,
+  `game.new`, and `game.play`; the TUI also calls `game.list_scenarios` and
+  `game.list_sessions` to populate its lobby and resume screens.
+- The granular gameplay methods — `game.move`, `game.attack`, `game.look`,
   `game.pick_up`, and the rest — exist **only** for passthrough (`crypt mcp`).
-- The server enforces the split: it rejects `game.*` granular calls in normal
-  mode, and rejects `game.play` in passthrough mode
-  (`internal/daemon/handler.go`).
+- The server enforces the split: it rejects the granular `game.*` gameplay
+  calls in normal mode, and rejects `game.play` in passthrough mode
+  (`internal/daemon/handler.go`). (`game.list_scenarios` and
+  `game.list_sessions` are mode-independent and answered directly by the
+  server in either mode.)
 
 ## Layers and dependency direction
 
