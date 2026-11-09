@@ -442,10 +442,10 @@ func TestSaveAndLoad(t *testing.T) {
 	assert.Equal(t, "entrance", loadResult["room"])
 }
 
-// TestLoadRejectsHerolessSave verifies the load boundary refuses a save file
-// with an empty party rather than installing a heroless state that would panic
-// on the first gameplay command.
-func TestLoadRejectsHerolessSave(t *testing.T) {
+// TestDispatcher_RejectsHerolessLoad verifies the load boundary refuses a save
+// file with an empty party rather than installing a heroless state that would
+// panic on the first gameplay command.
+func TestDispatcher_RejectsHerolessLoad(t *testing.T) {
 	srv := testServer(t)
 	saveDir := t.TempDir()
 

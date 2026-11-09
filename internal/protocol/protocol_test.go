@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/punt-labs/cryptd/internal/model"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRPCError_Error(t *testing.T) {
@@ -27,9 +29,7 @@ func TestRPCError_Error(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.err.Error(); got != tt.want {
-				t.Errorf("Error() = %q, want %q", got, tt.want)
-			}
+			assert.Equal(t, tt.want, tt.err.Error())
 		})
 	}
 }
@@ -37,9 +37,7 @@ func TestRPCError_Error(t *testing.T) {
 // TestRPCError_SatisfiesError verifies *RPCError is assignable to error.
 func TestRPCError_SatisfiesError(t *testing.T) {
 	var err error = &RPCError{Code: CodeInternalError, Message: "boom"}
-	if err.Error() == "" {
-		t.Fatal("expected non-empty error string")
-	}
+	require.NotEmpty(t, err.Error())
 }
 
 // Wire-contract tests. These pin the omit-vs-null-vs-present choice of every
@@ -85,10 +83,7 @@ func marshalKeys(t *testing.T, v any, keys ...string) map[string]keyState {
 
 func assertKey(t *testing.T, got map[string]keyState, key string, want keyState) {
 	t.Helper()
-	names := map[keyState]string{keyAbsent: "absent", keyNull: "null", keyPresent: "present"}
-	if got[key] != want {
-		t.Errorf("key %q = %s, want %s", key, names[got[key]], names[want])
-	}
+	assert.Equal(t, want, got[key], "key %q", key)
 }
 
 func TestWireContract_AttackResult_NilOutcome(t *testing.T) {
@@ -177,16 +172,10 @@ func TestWireContract_AttackResult_XPAwardedPresent(t *testing.T) {
 	assertKey(t, got, "xp_awarded", keyPresent)
 
 	data, err := json.Marshal(r)
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
+	require.NoError(t, err)
 	var decoded map[string]json.RawMessage
-	if err := json.Unmarshal(data, &decoded); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-	if string(decoded["xp_awarded"]) != "0" {
-		t.Errorf("xp_awarded = %s, want 0", decoded["xp_awarded"])
-	}
+	require.NoError(t, json.Unmarshal(data, &decoded))
+	assert.Equal(t, "0", string(decoded["xp_awarded"]))
 }
 
 func TestWireContract_EnemyTurn_HeroDead(t *testing.T) {
@@ -198,16 +187,10 @@ func TestWireContract_EnemyTurn_HeroDead(t *testing.T) {
 	assertKey(t, got, "hero_dead", keyPresent)
 
 	data, err := json.Marshal(turn)
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
+	require.NoError(t, err)
 	var decoded map[string]json.RawMessage
-	if err := json.Unmarshal(data, &decoded); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-	if string(decoded["hero_dead"]) != "true" {
-		t.Errorf("hero_dead = %s, want true", decoded["hero_dead"])
-	}
+	require.NoError(t, json.Unmarshal(data, &decoded))
+	assert.Equal(t, "true", string(decoded["hero_dead"]))
 }
 
 func TestWireContract_EnemyTurns_NilPointer(t *testing.T) {
@@ -238,16 +221,10 @@ func TestWireContract_EnemyTurn_ZeroDamage(t *testing.T) {
 	assertKey(t, got, "hero_dead", keyAbsent)
 
 	data, err := json.Marshal(turn)
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
+	require.NoError(t, err)
 	var decoded map[string]json.RawMessage
-	if err := json.Unmarshal(data, &decoded); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-	if string(decoded["damage"]) != "0" {
-		t.Errorf("damage = %s, want 0", decoded["damage"])
-	}
+	require.NoError(t, json.Unmarshal(data, &decoded))
+	assert.Equal(t, "0", string(decoded["damage"]))
 }
 
 func TestWireContract_EnemyTurn_NonAttack(t *testing.T) {
