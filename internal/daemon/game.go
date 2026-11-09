@@ -293,6 +293,16 @@ type newGameArgs struct {
 	Stats          *model.Stats `json:"stats,omitempty"`
 }
 
+// validate checks the required new-game fields. The caller applies the
+// default scenario before calling this, so an empty ScenarioID here means
+// no default was configured either.
+func (a newGameArgs) validate() *RPCError {
+	if a.ScenarioID == "" || a.CharacterName == "" || a.CharacterClass == "" {
+		return &RPCError{Code: CodeInvalidParams, Message: "scenario_id, character_name, and character_class are required"}
+	}
+	return nil
+}
+
 // dispatchNewGame creates a new engine and state. Returns them alongside the
 // result so the game goroutine can replace its locals.
 func dispatchNewGame(raw json.RawMessage, scenarioDir, defaultScenario string) (*engine.Engine, *model.GameState, any, *RPCError) {
@@ -303,8 +313,8 @@ func dispatchNewGame(raw json.RawMessage, scenarioDir, defaultScenario string) (
 	if a.ScenarioID == "" {
 		a.ScenarioID = defaultScenario
 	}
-	if a.ScenarioID == "" || a.CharacterName == "" || a.CharacterClass == "" {
-		return nil, nil, nil, &RPCError{Code: CodeInvalidParams, Message: "scenario_id, character_name, and character_class are required"}
+	if rpcErr := a.validate(); rpcErr != nil {
+		return nil, nil, nil, rpcErr
 	}
 
 	sc, err := scenariodir.Load(scenarioDir, a.ScenarioID)
@@ -344,6 +354,13 @@ type moveArgs struct {
 	Direction string `json:"direction"`
 }
 
+func (a moveArgs) validate() *RPCError {
+	if a.Direction == "" {
+		return &RPCError{Code: CodeInvalidParams, Message: "direction is required"}
+	}
+	return nil
+}
+
 func dispatchMove(eng *engine.Engine, state *model.GameState, raw json.RawMessage) (any, *RPCError) {
 	if state.Dungeon.Combat.Active {
 		return nil, &RPCError{Code: CodeStateBlocked, Message: "cannot move during combat"}
@@ -353,8 +370,8 @@ func dispatchMove(eng *engine.Engine, state *model.GameState, raw json.RawMessag
 	if err := json.Unmarshal(raw, &a); err != nil {
 		return nil, &RPCError{Code: CodeInvalidParams, Message: "invalid arguments: " + err.Error()}
 	}
-	if a.Direction == "" {
-		return nil, &RPCError{Code: CodeInvalidParams, Message: "direction is required"}
+	if rpcErr := a.validate(); rpcErr != nil {
+		return nil, rpcErr
 	}
 
 	result, err := eng.Move(state, a.Direction)
@@ -414,8 +431,22 @@ type itemArgs struct {
 	ItemID string `json:"item_id"`
 }
 
+func (a itemArgs) validate() *RPCError {
+	if a.ItemID == "" {
+		return &RPCError{Code: CodeInvalidParams, Message: "item_id is required"}
+	}
+	return nil
+}
+
 type slotArgs struct {
 	Slot string `json:"slot"`
+}
+
+func (a slotArgs) validate() *RPCError {
+	if a.Slot == "" {
+		return &RPCError{Code: CodeInvalidParams, Message: "slot is required"}
+	}
+	return nil
 }
 
 func dispatchPickUp(eng *engine.Engine, state *model.GameState, raw json.RawMessage) (any, *RPCError) {
@@ -426,8 +457,8 @@ func dispatchPickUp(eng *engine.Engine, state *model.GameState, raw json.RawMess
 	if err := json.Unmarshal(raw, &a); err != nil {
 		return nil, &RPCError{Code: CodeInvalidParams, Message: "invalid arguments: " + err.Error()}
 	}
-	if a.ItemID == "" {
-		return nil, &RPCError{Code: CodeInvalidParams, Message: "item_id is required"}
+	if rpcErr := a.validate(); rpcErr != nil {
+		return nil, rpcErr
 	}
 	result, err := eng.PickUp(state, a.ItemID)
 	if err != nil {
@@ -447,8 +478,8 @@ func dispatchDrop(eng *engine.Engine, state *model.GameState, raw json.RawMessag
 	if err := json.Unmarshal(raw, &a); err != nil {
 		return nil, &RPCError{Code: CodeInvalidParams, Message: "invalid arguments: " + err.Error()}
 	}
-	if a.ItemID == "" {
-		return nil, &RPCError{Code: CodeInvalidParams, Message: "item_id is required"}
+	if rpcErr := a.validate(); rpcErr != nil {
+		return nil, rpcErr
 	}
 	result, err := eng.Drop(state, a.ItemID)
 	if err != nil {
@@ -468,8 +499,8 @@ func dispatchEquip(eng *engine.Engine, state *model.GameState, raw json.RawMessa
 	if err := json.Unmarshal(raw, &a); err != nil {
 		return nil, &RPCError{Code: CodeInvalidParams, Message: "invalid arguments: " + err.Error()}
 	}
-	if a.ItemID == "" {
-		return nil, &RPCError{Code: CodeInvalidParams, Message: "item_id is required"}
+	if rpcErr := a.validate(); rpcErr != nil {
+		return nil, rpcErr
 	}
 	result, err := eng.Equip(state, a.ItemID)
 	if err != nil {
@@ -490,8 +521,8 @@ func dispatchUnequip(eng *engine.Engine, state *model.GameState, raw json.RawMes
 	if err := json.Unmarshal(raw, &a); err != nil {
 		return nil, &RPCError{Code: CodeInvalidParams, Message: "invalid arguments: " + err.Error()}
 	}
-	if a.Slot == "" {
-		return nil, &RPCError{Code: CodeInvalidParams, Message: "slot is required"}
+	if rpcErr := a.validate(); rpcErr != nil {
+		return nil, rpcErr
 	}
 	result, err := eng.Unequip(state, a.Slot)
 	if err != nil {
@@ -512,8 +543,8 @@ func dispatchExamine(eng *engine.Engine, state *model.GameState, raw json.RawMes
 	if err := json.Unmarshal(raw, &a); err != nil {
 		return nil, &RPCError{Code: CodeInvalidParams, Message: "invalid arguments: " + err.Error()}
 	}
-	if a.ItemID == "" {
-		return nil, &RPCError{Code: CodeInvalidParams, Message: "item_id is required"}
+	if rpcErr := a.validate(); rpcErr != nil {
+		return nil, rpcErr
 	}
 	result, err := eng.Examine(state, a.ItemID)
 	if err != nil {
@@ -538,6 +569,11 @@ type attackArgs struct {
 	TargetID string `json:"target_id"`
 }
 
+// validate has no required fields: target_id is optional and defaults to the
+// first alive enemy. It exists so every dispatcher arg struct validates the
+// same way.
+func (a attackArgs) validate() *RPCError { return nil }
+
 func dispatchAttack(eng *engine.Engine, state *model.GameState, raw json.RawMessage) (any, *RPCError) {
 	if !state.Dungeon.Combat.Active {
 		return nil, &RPCError{Code: CodeStateBlocked, Message: "not in combat"}
@@ -548,6 +584,9 @@ func dispatchAttack(eng *engine.Engine, state *model.GameState, raw json.RawMess
 		if err := json.Unmarshal(raw, &a); err != nil {
 			return nil, &RPCError{Code: CodeInvalidParams, Message: "invalid arguments: " + err.Error()}
 		}
+	}
+	if rpcErr := a.validate(); rpcErr != nil {
+		return nil, rpcErr
 	}
 	targetID := a.TargetID
 	if targetID == "" {
@@ -638,13 +677,20 @@ type castSpellArgs struct {
 	TargetID string `json:"target_id"`
 }
 
+func (a castSpellArgs) validate() *RPCError {
+	if a.SpellID == "" {
+		return &RPCError{Code: CodeInvalidParams, Message: "spell_id is required"}
+	}
+	return nil
+}
+
 func dispatchCastSpell(eng *engine.Engine, state *model.GameState, raw json.RawMessage) (any, *RPCError) {
 	var a castSpellArgs
 	if err := json.Unmarshal(raw, &a); err != nil {
 		return nil, &RPCError{Code: CodeInvalidParams, Message: "invalid arguments: " + err.Error()}
 	}
-	if a.SpellID == "" {
-		return nil, &RPCError{Code: CodeInvalidParams, Message: "spell_id is required"}
+	if rpcErr := a.validate(); rpcErr != nil {
+		return nil, rpcErr
 	}
 
 	targetID := a.TargetID
@@ -690,8 +736,8 @@ func dispatchUseItem(eng *engine.Engine, state *model.GameState, raw json.RawMes
 	if err := json.Unmarshal(raw, &a); err != nil {
 		return nil, &RPCError{Code: CodeInvalidParams, Message: "invalid arguments: " + err.Error()}
 	}
-	if a.ItemID == "" {
-		return nil, &RPCError{Code: CodeInvalidParams, Message: "item_id is required"}
+	if rpcErr := a.validate(); rpcErr != nil {
+		return nil, rpcErr
 	}
 	result, err := eng.UseItem(state, a.ItemID)
 	if err != nil {
@@ -817,12 +863,20 @@ type saveLoadArgs struct {
 	Slot string `json:"slot"`
 }
 
+// validate has no required fields: an empty slot is normalised to the
+// quicksave slot by the engine. It exists so every dispatcher arg struct
+// validates the same way.
+func (a saveLoadArgs) validate() *RPCError { return nil }
+
 func dispatchSaveGame(eng *engine.Engine, state *model.GameState, raw json.RawMessage) (any, *RPCError) {
 	var a saveLoadArgs
 	if raw != nil {
 		if err := json.Unmarshal(raw, &a); err != nil {
 			return nil, &RPCError{Code: CodeInvalidParams, Message: "invalid arguments: " + err.Error()}
 		}
+	}
+	if rpcErr := a.validate(); rpcErr != nil {
+		return nil, rpcErr
 	}
 	result, err := eng.SaveGame(state, a.Slot)
 	if err != nil {
@@ -837,6 +891,9 @@ func dispatchLoadGame(eng *engine.Engine, state *model.GameState, raw json.RawMe
 		if err := json.Unmarshal(raw, &a); err != nil {
 			return nil, &RPCError{Code: CodeInvalidParams, Message: "invalid arguments: " + err.Error()}
 		}
+	}
+	if rpcErr := a.validate(); rpcErr != nil {
+		return nil, rpcErr
 	}
 	loaded, result, err := eng.LoadGame(a.Slot)
 	if err != nil {
