@@ -4,9 +4,14 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/punt-labs/cryptd/test.yml?label=CI)](https://github.com/punt-labs/cryptd/actions/workflows/test.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/punt-labs/cryptd)](https://goreportcard.com/report/github.com/punt-labs/cryptd)
 [![Go Reference](https://pkg.go.dev/badge/github.com/punt-labs/cryptd.svg)](https://pkg.go.dev/github.com/punt-labs/cryptd)
+[![Working Backwards](https://img.shields.io/badge/Working_Backwards-hypothesis-lightgrey)](./prfaq.pdf)
 
-Game engine and server for [crypt](https://github.com/punt-labs/crypt) — a text
-adventure game playable via Claude Code, CLI, or (future) web client.
+Game engine and server for [crypt](https://github.com/punt-labs/crypt), a text
+adventure game playable via Claude Code, CLI, or (future) web client. The
+product direction is in the [PR/FAQ](./prfaq.pdf): Wizardry's party of six,
+filled by any mix of friends and AI companions who remember earlier sessions
+and can die for good, over an engine that owns every rule. Rebuild the PDF
+with `make prfaq`.
 
 ## Three Binaries
 

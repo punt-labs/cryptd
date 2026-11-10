@@ -5,7 +5,8 @@
        generate-dungeon validate-dungeon \
        eval-balance eval-balance-quick eval-balance-generated eval-balance-unix \
        demo demo-solo demo-exploration demo-inventory \
-       demo-combat demo-save-load demo-unix-catacombs
+       demo-combat demo-save-load demo-unix-catacombs \
+       prfaq clean-tex
 
 SCENARIO_DIR = testdata/scenarios
 DEMO_DIR     = testdata/demos
@@ -171,6 +172,78 @@ eval-balance-generated:                    ## Balance eval on generated scenario
 
 eval-balance-unix:                         ## Balance eval on unix-catacombs (500 sessions)
 	CRYPT_SCENARIO_DIR=scenarios go run ./cmd/eval-balance --scenario unix-catacombs --class all --players 500 --max-moves 200
+
+##@ Docs
+# Only the PR/FAQ at the repo root. docs/architecture.tex and docs/gameplay.tex
+# have their own build path and are not compiled here.
+TEX_FILES = prfaq.tex
+
+# LaTeX intermediate extensions. Every removal is by explicit name
+# ($dir/<job>.<ext>), never by a root glob, so an unrelated *.log or *.out at
+# the repo root (a daemon log, a test capture) is never touched.
+LATEX_EXTS = aux log out bbl bcf blg run.xml fls fdb_latexmk synctex.gz toc
+
+# Build under the jobname <base>.build so the tracked <base>.pdf is replaced
+# only after every check passes; a failed build never leaves a half-resolved
+# PDF at the tracked path, and the job's .log and .blg survive for diagnosis.
+# pdflatex exits 0 on unresolved citations and references, and biber exits 0
+# on a missing database entry, so the recipe reads <job>.log and <job>.blg
+# instead of trusting exit codes. Tool output is discarded; the log is the
+# diagnostic, and every error names it.
+PDFLATEX = pdflatex -interaction=nonstopmode -halt-on-error
+BIBER_PROBLEM = (WARN|ERROR) -
+# Anchored to LaTeX's own warning forms so body text echoed under an
+# overfull-box warning (e.g. "undefined behaviour") cannot trip it.
+TEX_UNRESOLVED = (Citation|Reference) .* undefined|There were undefined|Rerun to get|Please \(re\)run Biber
+
+prfaq:                                     ## Compile prfaq.tex to prfaq.pdf; fails on unresolved citations or references
+	@command -v pdflatex > /dev/null 2>&1 \
+	  || { echo "Error: pdflatex is not installed; install a TeX distribution (TeX Live or MacTeX)" >&2; exit 1; }
+	@for f in $(TEX_FILES); do \
+	  echo "Compiling $$f ..."; \
+	  dir=$$(dirname "$$f"); base=$$(basename "$$f" .tex); job="$$base.build"; \
+	  for ext in pdf $(LATEX_EXTS); do rm -f "$$dir/$$job.$$ext"; done; \
+	  $(PDFLATEX) -output-directory="$$dir" -jobname="$$job" "$$f" > /dev/null 2>&1 \
+	    || { grep -A3 '^!' "$$dir/$$job.log" >&2; \
+	         echo "Error: $$f failed to compile (pdflatex pass 1); see $$dir/$$job.log" >&2; exit 1; }; \
+	  if [ -f "$$dir/$$job.bcf" ]; then \
+	    command -v biber > /dev/null 2>&1 \
+	      || { echo "Error: $$f uses biblatex but biber is not installed" >&2; exit 1; }; \
+	    (cd "$$dir" && biber "$$job") > /dev/null 2>&1 \
+	      || { grep -E "$(BIBER_PROBLEM)" "$$dir/$$job.blg" >&2; \
+	           echo "Error: $$f failed to process the bibliography (biber); see $$dir/$$job.blg" >&2; exit 1; }; \
+	    if grep -qE "$(BIBER_PROBLEM)" "$$dir/$$job.blg"; then \
+	      grep -E "$(BIBER_PROBLEM)" "$$dir/$$job.blg" >&2; \
+	      echo "Error: $$f has unresolved citations (biber); see $$dir/$$job.blg" >&2; exit 1; \
+	    fi; \
+	    $(PDFLATEX) -output-directory="$$dir" -jobname="$$job" "$$f" > /dev/null 2>&1 \
+	      || { grep -A3 '^!' "$$dir/$$job.log" >&2; \
+	           echo "Error: $$f failed to compile (pdflatex pass 2, post-biber); see $$dir/$$job.log" >&2; exit 1; }; \
+	  fi; \
+	  $(PDFLATEX) -output-directory="$$dir" -jobname="$$job" "$$f" > /dev/null 2>&1 \
+	    || { grep -A3 '^!' "$$dir/$$job.log" >&2; \
+	         echo "Error: $$f failed to compile (pdflatex final pass); see $$dir/$$job.log" >&2; exit 1; }; \
+	  if grep -qE "$(TEX_UNRESOLVED)" "$$dir/$$job.log"; then \
+	    grep -E "$(TEX_UNRESOLVED)" "$$dir/$$job.log" >&2; \
+	    echo "Error: $$f has unresolved references; see $$dir/$$job.log" >&2; exit 1; \
+	  fi; \
+	  overfull=$$(grep -c "Overfull \\\\hbox" "$$dir/$$job.log" 2>/dev/null || true); \
+	  if [ "$${overfull:-0}" -gt 0 ]; then \
+	    echo "Warning: $$overfull overfull hbox warning(s) in $$f; content extends beyond margins:" >&2; \
+	    grep "Overfull \\\\hbox" "$$dir/$$job.log" >&2; \
+	  fi; \
+	  mv "$$dir/$$job.pdf" "$$dir/$$base.pdf" \
+	    || { echo "Error: could not replace $$dir/$$base.pdf; built PDF left at $$dir/$$job.pdf" >&2; exit 1; }; \
+	  echo "  $$dir/$$base.pdf"; \
+	  for ext in $(LATEX_EXTS); do rm -f "$$dir/$$job.$$ext"; done; \
+	done
+
+clean-tex:                                 ## Remove LaTeX intermediates for TEX_FILES by name (never the tracked PDF)
+	@for f in $(TEX_FILES); do \
+	  dir=$$(dirname "$$f"); base=$$(basename "$$f" .tex); \
+	  for ext in $(LATEX_EXTS); do rm -f "$$dir/$$base.$$ext" "$$dir/$$base.build.$$ext"; done; \
+	  rm -f "$$dir/$$base.build.pdf"; \
+	done
 
 ##@ Help
 help:                                      ## Show this help

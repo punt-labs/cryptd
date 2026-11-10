@@ -1,0 +1,938 @@
+\documentclass[11pt,letterpaper]{article}
+
+% ── Geometry ──────────────────────────────────────────────────────────────────
+\usepackage[margin=1in]{geometry}
+
+% ── Pagination ────────────────────────────────────────────────────────────────
+\usepackage[all]{nowidow}
+\brokenpenalty=10000
+\raggedbottom
+
+% ── Fonts ─────────────────────────────────────────────────────────────────────
+\usepackage[T1]{fontenc}
+\usepackage{newpxtext}
+\usepackage{newpxmath}
+
+% ── Colors ────────────────────────────────────────────────────────────────────
+\usepackage[dvipsnames]{xcolor}
+\definecolor{SectionBlue}{HTML}{1B3A5C}
+\definecolor{AccentGray}{HTML}{4A4A4A}
+\definecolor{QuoteBorder}{HTML}{8B9DAF}
+\definecolor{RiskRed}{HTML}{C0392B}
+\definecolor{RiskAmber}{HTML}{E67E22}
+\definecolor{RiskGreen}{HTML}{27AE60}
+\definecolor{BoxBg}{HTML}{F7F8FA}
+
+% ── Tables ────────────────────────────────────────────────────────────────────
+\usepackage{booktabs}
+\usepackage{tabularx}
+
+% ── Boxes ─────────────────────────────────────────────────────────────────────
+\usepackage[framemethod=tikz]{mdframed}
+
+% ── Lists ─────────────────────────────────────────────────────────────────────
+\usepackage{enumitem}
+\usepackage{needspace}
+
+% ── Hyperlinks ────────────────────────────────────────────────────────────────
+\usepackage{hyperref}
+\usepackage{xurl}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=SectionBlue,
+  urlcolor=SectionBlue,
+  citecolor=SectionBlue,
+  pdfauthor={Jim Freeman},
+  pdftitle={crypt PR/FAQ},
+  pdfsubject={Working Backwards: Product Discovery},
+}
+
+% ── Bibliography ─────────────────────────────────────────────────────────────
+\usepackage[style=numeric,backend=biber,sorting=none]{biblatex}
+\addbibresource{prfaq.bib}
+
+% ── Section styling ───────────────────────────────────────────────────────────
+\usepackage{titlesec}
+\titleformat{\section}
+  {\needspace{6\baselineskip}\Large\bfseries\color{SectionBlue}}{}{0pt}{}
+\titleformat{\subsection}
+  {\needspace{5\baselineskip}\large\bfseries\color{AccentGray}}{}{0pt}{}
+\titleformat{\subsubsection}
+  {\normalsize\bfseries\color{AccentGray}}{}{0pt}{}
+\titlespacing*{\subsubsection}{0pt}{1em}{0.5em}[0pt]
+
+% ── Document stage ───────────────────────────────────────────────────────────
+\newcommand{\prfaqstage}[1]{\def\theprfaqstage{#1}}
+\prfaqstage{hypothesis}
+
+% ── Document version ─────────────────────────────────────────────────────────
+\newcommand{\prfaqversion}[2]{\def\theprfaqmajor{#1}\def\theprfaqminor{#2}}
+\prfaqversion{2}{3}
+
+% ── Header/footer ────────────────────────────────────────────────────────────
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\footnotesize\textcolor{AccentGray}{Stage: \theprfaqstage{} \enspace\textbar\enspace v\theprfaqmajor.\theprfaqminor}}
+\fancyhead[R]{\footnotesize\textcolor{AccentGray}{\thepage}}
+\renewcommand{\headrulewidth}{0pt}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\newcommand{\prsection}[1]{%
+  \vspace{1em}{\large\bfseries\color{SectionBlue}#1}\vspace{0.3em}\par}
+
+\newmdenv[topline=false,bottomline=false,rightline=false,linewidth=3pt,
+  linecolor=QuoteBorder,backgroundcolor=BoxBg,innerleftmargin=12pt,
+  innerrightmargin=12pt,innertopmargin=8pt,innerbottommargin=8pt,
+  skipabove=\baselineskip,skipbelow=\baselineskip]{customerquote}
+
+\newmdenv[topline=false,bottomline=false,rightline=false,linewidth=3pt,
+  linecolor=SectionBlue,backgroundcolor=BoxBg,innerleftmargin=12pt,
+  innerrightmargin=12pt,innertopmargin=8pt,innerbottommargin=8pt,
+  skipabove=\baselineskip,skipbelow=\baselineskip]{spokespersonquote}
+
+\newcounter{faqnum}
+\newenvironment{faqpair}[1]{%
+  \needspace{4\baselineskip}\vspace{0.5em}\refstepcounter{faqnum}%
+  \noindent\textbf{\color{SectionBlue}Q\thefaqnum: #1}\par\nopagebreak[4]%
+  \vspace{0.2em}\begin{adjustwidth}{1em}{0pt}\setlength{\parindent}{0pt}%
+}{\end{adjustwidth}\vspace{0.5em}}
+\newcommand{\faqref}[1]{\hyperref[#1]{FAQ~\ref*{#1}}}
+
+\newcounter{featurenum}
+\newcommand{\featureitem}[2]{%
+  \refstepcounter{featurenum}%
+  \item[\textbf{\color{SectionBlue}F\thefeaturenum.}]\textbf{#1}: #2}
+\newcommand{\featureref}[1]{\hyperref[#1]{Feature~\ref*{#1}}}
+
+\usepackage{changepage}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\begin{document}
+
+% ── Headline block ───────────────────────────────────────────────────────────
+\begin{center}
+  {\LARGE\bfseries\color{SectionBlue} Wizardry's Party of Six Returns, With Friends and AI Companions Who Remember You and Can Die} \\[0.8em]
+  {\large\color{AccentGray} crypt fills every seat in the party with any mix of human players and companions, and with a model connected gives Zork and Wizardry fans a dungeon that never runs out} \\[0.3em]
+  {\large\color{AccentGray} Built to work through Chip Huyen's AI-engineering curriculum end to end, with a game people enjoy as the proof}
+\end{center}
+
+\vspace{0.5em}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section*{Press Release}
+
+SAN FRANCISCO: Today the crypt project released crypt, a text-adventure
+dungeon crawler for players who grew up on Zork, Wizardry, and the old
+MUDs. A party descends together, with up to six seats, filled in any mix
+of friends and AI companions. Each companion has its own personality
+and voice, remembers what happened in earlier sessions, and can die. A
+deterministic engine enforces every rule for humans and companions
+alike, the way a board game does. Reloading a save never brings a dead
+companion back. Where the dungeon offers resurrection, a companion pays
+the same price a human does. Under the party, with a model connected, a
+language model writes a new dungeon for every descent, so the dungeon never
+runs out (see \faqref{faq:party}).
+
+\prsection{Problem}
+
+The dungeon crawls that defined a genre ran out of content. Zork had to fit
+a 32K microcomputer, so its authors cut it from 191 rooms to 110 and its
+vocabulary from 911 words to 617 \cite{maher2012zilzmachine}. Wizardry
+shipped ten fixed levels under one castle \cite{wikipedia2026wizardry1}.
+Once a player solves them, the mystery is gone. The MUDs answered with crowd
+authorship: LPMud wizards and LambdaMOO builders added rooms, monsters, and
+objects from inside the running game
+\cite{wikipedia2026lpmud,wikipedia2026lambdamoo}. Crowd authorship needs a
+crowd, and a world grows only while its builders keep logging in. The party
+had its own limit. Wizardry gave one player six characters to run alone
+\cite{wikipedia2026wizardry1}. A MUD offered other people, but a party
+still needed five of them free on the same evening. Games run entirely by a
+language model promise endless content and then lose track of it. The top
+models in RPGBench's evaluation write engaging stories while keeping the mechanics inconsistent
+\cite{yu2025rpgbench}. AI Dungeon's own help page explains that older story
+text is trimmed once the context fills \cite{latitude2025help}.
+
+\prsection{Solution}
+
+A player opens a party and fills its six seats in any mix. A player alone
+starts with three companions and can add up to five. Two friends and three
+companions make a full party, and so do six friends. A
+companion is a character played by a language model, with a class, a
+personality, and a voice of its own. It remembers the last descent: who took
+the cursed ring, who ran from the ogre, who carried whom out of the pit. It
+acts through the same moves a human player has, and the engine resolves its
+sword swing or its spell with the same rules and the same dice. When a
+companion dies, no reload undoes it; where the dungeon offers resurrection,
+a companion pays the same price a human does. Under the party, with a model
+connected, every descent after the first bundled one is a freshly generated
+dungeon. Before a dungeon opens, the engine walks it to prove that
+every locked door has a key and every goal can be reached. Around the text,
+each companion speaks aloud in its own voice. Richer presentation follows as
+each layer proves it can keep up without making the player wait: a score
+that shifts with the scene, then panels that redraw around it
+(see \faqref{faq:presentation}).
+
+\prsection{Customer Quote}
+
+\begin{customerquote}
+\textit{``In Wizardry I ran all six characters myself. Now my son plays the
+cleric, I play the fighter, and the other four are companions. Three
+sessions ago I sold an amulet our thief, Wren, had found, to pay for my own
+resurrection. Last night, splitting the loot from the lich's vault, she
+brought it up and would not let it go. An hour later she held the bridge so
+we could run, and the ogre killed her. The temple wanted more gold than the
+party had, and reloading does nothing. She is gone. We have a new thief now,
+and my son still won't talk to him.''}
+
+\raggedleft \textbf{Dave Whitman}, lifelong text-adventure player
+\end{customerquote}
+
+\prsection{Getting Started}
+
+A player installs crypt, runs it, and is in a bundled dungeon within a minute, with
+three companions already in the party. Inviting a friend hands that
+friend a seat. From inside Claude Code, the
+game connects through a built-in bridge and Claude becomes the dungeon
+master directly. From a terminal, the game runs its own client and talks to
+whatever model the player has available, down to a fully offline mode that
+still plays with built-in narration. A player joins the hosted service with
+an invite link. There is no account at launch; an invite link is the
+identity. There is no world to download. A dungeon is one command
+away (see \faqref{faq:start}).
+
+\prsection{Spokesperson Quote}
+
+\begin{spokespersonquote}
+``I built crypt to learn how to engineer an AI-enhanced product: where to
+put the model, how to measure whether it is any good, and how to tune it. A
+companion is the hardest exercise I could find: an agent with a memory and a
+personality that has to play fair inside rules it cannot bend. The engine
+knows which moves are legal and what happened, so I can score every
+companion's rule-following against it, and every memory claim about
+something the engine recorded. How well a
+companion chooses, and whether it stays in character, I score with judges.
+The game is the part people see; the learning is why it exists.''
+
+\raggedleft \textbf{Jim Freeman}, crypt project
+\end{spokespersonquote}
+
+\prsection{Call to Action}
+
+crypt is free and open source. A player can join a party on the hosted
+crypt service with an invite link or run the game on their own machine. To play it, build it,
+or read how the engine and the companions divide the work, visit the
+repository at \mbox{github.com/punt-labs/crypt}.
+
+\newpage
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section*{Frequently Asked Questions}
+
+\subsection*{External FAQs}
+
+\begin{faqpair}{What is crypt and who is it for?}
+crypt is a text-adventure dungeon crawler for players who loved Zork,
+Wizardry, and the MUDs. Its center is the party: six seats, filled by
+friends, by AI companions, or by both. Companions remember earlier sessions,
+keep their own personalities, speak in their own voices, and can die, with
+no reload to undo it (see \faqref{faq:death}). The classic mechanics run in a deterministic engine: grid dungeons,
+turn-based combat, character classes, inventory, and leveling. With a model
+connected, a language model writes a new dungeon for each descent, so the
+party never runs out of places to go. In rules-only play the game serves
+hand-authored scenarios from a bundled set (see \featureref{feat:party}).
+\end{faqpair}
+
+\begin{faqpair}{How is this different from AI Dungeon, or from other games that pair an engine with a language model?}
+crypt plays at Wizardry's tempo: one keypress per decision, in a corridor
+or in combat, with the party's state always on screen. Its terminal client
+has no page to freeze, and vox plays each voice in a separate process. The
+engine answers the moment a key is pressed, and narration arrives behind
+it. The closest commercial neighbor, TableForge, plays as a browser chat
+surface. In one free-tier session, a turn was a mouse path: open Quick
+Actions, pick an action chip or type, press Send, and wait. By default voice
+played only when the player clicked a play button under each message, party
+state sat behind tabs, and nothing observed was keyboard-reachable. The wait
+appeared to have two layers. One was model and voice synthesis time, the layer crypt's
+predictive cache targets. The other was the browser laboring under the
+page itself, and the tab froze once and had to be reloaded. The session was
+slow enough to doubt it holds attention for hours
+\cite{freeman2026tableforgehandson}.
+
+AI Dungeon is collaborative storytelling with no rules engine. Its
+multiplayer mode sets no limit on players in one story
+\cite{latitude2026multiplayerfaq}, and the story lives in the model's
+context, which trims older text as it fills \cite{latitude2025help}. In
+crypt, hit points, inventory, and death live in the engine and do not drift
+as a session grows long.
+
+TableForge's makers say it gives ``final authority over dice, damage,
+conditions, and resources to code.''
+An AI dungeon master narrates on top, a party seats up to six human
+players, and one to four AI companions join depending on the plan
+\cite{tableforge2026home,tableforge2026faq,tableforge2026multiplayercompare}.
+Friends \& Fables, Hidden Door, Auferet, and Questie each cover part of the
+same ground \cite{fables2026home,hiddendoor2026home,auferet2026multiplayer,questie2026partymode}.
+On the pages read in November 2026, none of six reviewed products stated
+five things a crypt player gets. A crypt player can read the source and
+play offline with no model at all. A player inside Claude Code brings their
+own model, and it runs the game through the engine's tools. A companion who
+says she was cheated out of an amulet three sessions ago is checked against
+what the engine recorded. A companion who fell to the ogre stays dead
+through the game's own save and load, and on the hosted service. A score and panels follow the scene as each passes
+its gate. Hidden Door comes nearest on two of these. A world creator can set
+characters to permadeath. Its Creator MCP lets Claude author worlds, and
+Hidden Door's own story engine runs play \cite{hiddendoor2026home}.
+At least eight open-source games also pair a rules engine with a language
+model, among them kliuchnikovv/dnd, Mnehmos/rpg-mcp, open-dungeon, and a
+fork of Lebbitheplow/open-game-master
+\cite{kliuchnikovv2026dnd,mnehmos2026rpgmcp,slowbutfast2026opendungeon,alecvlad2026opengamemaster}
+(see \faqref{faq:landscape}).
+\end{faqpair}
+
+\begin{faqpair}{Can I play with friends, or do I have to play alone?}
+Both, in one party. A player alone starts with three companions and can add
+up to five. A player and two friends leave three seats for companions. Six
+friends fill all six and play with no companions at all. A friend can join
+between descents and take a companion's seat, and the companion steps aside with its memory intact
+(see \featureref{feat:multiplayer}).
+\end{faqpair}
+
+\begin{faqpair}{What happens when a companion dies?}\label{faq:death}
+It stays dead, the same as a human player's character. The engine records
+the death the moment it happens, and reloading a save cannot undo it. Where
+the dungeon offers resurrection, at a temple or through a spell, it follows
+the same rules and costs the same for humans and companions. A fallen
+companion's seat opens for a new companion, a new character, or a friend.
+The game's own save and load never undo a death, and the hosted service
+enforces it. A local player with the source can copy a save directory, as
+Wizardry players copied disks; the game does not try to stop that
+(see \featureref{feat:companions}).
+\end{faqpair}
+
+\begin{faqpair}{Do I need an API key or an internet connection to play?}
+No. crypt runs in tiers. A large model accepts the widest range of
+free-text commands, writes the longest and most varied descriptions, and
+gives companions the most detailed recall and dialogue. A small local model
+still generates, narrates, and plays companions, with shorter descriptions
+and a narrower range of commands it understands. With no model at all, the
+game falls back to built-in rules and templates, companions fight by
+scripted tactics, and the game stays fully playable offline.
+\end{faqpair}
+
+\begin{faqpair}{Will a companion or the narrator cheat, forget my inventory, or break the rules?}
+No. A model never decides a game outcome. Every rule, every die roll, every
+point of damage, and every saved game is handled by the engine in code. A
+companion chooses what to try, the same as a human player, and the engine
+decides what happens. The narrator describes the result, but it cannot
+change your hit points, revive a dead companion, or hand out a sword the
+dungeon does not hold (see \faqref{faq:line}).
+\end{faqpair}
+
+\begin{faqpair}{How do I get started?}\label{faq:start}
+Three ways in. On the hosted service, a player opens an invite link and is
+in a party with three companions. There is no account at launch; the invite
+link is the identity. On a terminal, a player installs crypt from the
+repository, runs it, and plays against whatever model is configured. That
+can be a model provider key or a small local model. With no model at all,
+the game plays fully offline with built-in narration and scripted companion
+tactics. Inside
+Claude Code, a player adds the crypt bridge and Claude becomes the dungeon
+master, running the game through the engine's tools
+(see \featureref{feat:bridge}). In every mode a bundled scenario opens
+within a minute of starting. A generated dungeon opens after the engine's
+solvability walk passes, and the validation run measures how long that
+takes.
+\end{faqpair}
+
+\begin{faqpair}{How much does it cost?}\label{faq:cost}
+Nothing. crypt is free and open source. Run locally, it uses the player's
+own model provider key, a small local model, or no model at all. Any model
+cost is the player's own, and it can be zero. The hosted service is free
+and invite-only, and it runs under a monthly spending ceiling. At the
+ceiling, the hosted game drops to the small-model tier, then to rules-only
+play, and new invites pause until the next month. In rules-only play no
+model generates dungeons, so the game serves hand-authored scenarios from
+the bundled set, which is finite (see \featureref{feat:dist}).
+\end{faqpair}
+
+\begin{faqpair}{What happens to my data?}\label{faq:data}
+What a player types and what each companion remembers are game state, and
+the server stores them with the rest of the game. On the hosted service,
+that text goes to the model provider the operator configures, because the
+model reads it to interpret commands and play companions. In local mode it
+goes wherever the player's own model runs, and with a local model or no
+model it never leaves the player's machine. There are no accounts at
+launch, so the hosted service collects no email address; an invite link is
+the identity. The engine bounds what prompt injection can do to outcomes:
+an injected instruction cannot reposition a companion, change a roll, or
+alter inventory. What it can change is what a companion or the narrator
+says. On the hosted service, generated text passes an output check before
+it reaches other players, and the check is one of the Chapter 10
+guardrails exercises \cite{huyen2025aie}. The hosted service is not designed for children, and anything
+typed into it reaches a model. A family that wants everything kept on its
+own machine can run crypt locally.
+\end{faqpair}
+
+\newpage
+\subsection*{Internal FAQs}
+
+\subsubsection*{Purpose \& Learning Objectives}
+
+\begin{faqpair}{Why build this? What is the real objective?}\label{faq:why}
+crypt is a build-to-learn project, roughly four parts learning to one part
+game. The curriculum is Chip Huyen's \textit{AI Engineering}
+\cite{huyen2025aie}. Chapters 3 through 10 each get a concrete exercise in
+a running application instead of a toy notebook; Chapters 1 and 2 are
+background reading (see \faqref{faq:curriculum}). Her central discipline is
+evaluation-driven development \cite{huyen2025aie}. In crypt the
+deterministic engine knows which moves are legal and what happened, so
+rule-following and memory have a recorded answer to score against. The
+dungeon crawl is the vehicle, and I grew up playing the games it draws
+on; the understanding is the product. The finish line is a public, playable
+game running in production on AWS, with per-call latency, tokens, cost,
+eval score, and error rate recorded for every model call. Production work is
+part of the curriculum: Huyen's chapters on inference optimization and on
+monitoring and the feedback flywheel need a live system to practice on
+(see \featureref{feat:aws}).
+\end{faqpair}
+
+\begin{faqpair}{Why is the party the center of the product?}\label{faq:party}
+Three reasons: the player, the curriculum, and the evidence. Wizardry's
+party of six is the part of the genre I miss most, and playing with friends
+or with model-played companions is the hook I want for myself. In Huyen's
+curriculum, a companion is the deepest agents exercise in the project: it
+plans, calls tools, keeps a memory, and fails in ways that need guarding
+against. Generative Agents is the peer-reviewed anchor for that design.
+Park et al. gave 25 language-model agents memory, reflection, and planning,
+and the agents behaved believably over days of simulated life
+\cite{park2023generativeagents}. A candidate dataset exists. FIREBALL
+holds about 25,000 sessions of D\&D 5e play recorded through a Discord bot,
+with structured game state \cite{zhu2023fireball}. Whether it transfers to
+how players act in a crypt party is untested, and its license terms for
+training use are checked before any fine-tuning run.
+
+Build order follows from the party. Companions come before panels, because
+a beautifully presented room with nobody worth adventuring beside is the
+failure to avoid. Generated scenarios supply the places the party goes
+(see \featureref{feat:dm}). Presentation comes last and deepens only as far
+as its gates allow (see \faqref{faq:presentation}).
+\end{faqpair}
+
+\begin{faqpair}{Where is the boundary between classical code and the language model?}\label{faq:line}
+The engine owns anything that must be exact and repeatable: state
+transitions, combat resolution, inventory limits, movement, death, and
+save and load. The models own anything that benefits from creativity and
+language: generating a scenario, describing a room, interpreting free-text
+commands, and playing a companion. A companion acts only by calling the same
+engine tools a human player's commands reach. It can choose to attack,
+cast, flee, or argue over the loot, and the engine resolves the attempt by
+the rules. A companion's memory and personality live outside the engine.
+They decide what the companion tries; the engine decides what happens.
+Generated presentation sits on the same side as narration: a panel, a
+score, or a voice displays engine state and never changes it.
+
+The evidence for keeping state in code is consistent. RPGBench finds that
+the top models in its evaluation write engaging stories as game engines while leaving the
+mechanics inconsistent \cite{yu2025rpgbench}. Song et al. show that giving
+a game master function calls for state improves both narration and state
+consistency \cite{song2024labyrinth}. Infobip reports taking dice and turn
+order away from the model after its pure-language-model D\&D engine fell
+below 65\% accuracy as context grew. That figure is a vendor self-report
+with no published method \cite{infobip2025dnd}.
+
+Other systems let a model enforce the rules. CriticaLLM pairs a game-master
+model with a judge model that validates player input
+\cite{berlaimont2026criticallm}. Bicking's Intra separates some state from
+the model but leaves outcome resolution to the model
+\cite{bicking2025intra}. A study of hybrid narrative managers at ICTAI 2026
+compares several designs and finds that none dominates on every measure
+\cite{clerc2026hybridnarrative}. crypt keeps rules in code because the
+engine's answer can be checked. The same state and the same action give
+the same result, and a test can assert it. A judge model's ruling has no
+such check, so a wrong ruling looks the same as a right one. The engine
+owning state is the
+reason a companion's death stays final and its memory of an amulet matches
+what the engine recorded. The exact placement of the line for each new
+capability, such as how much a companion may propose before the engine
+rejects it, is tested by building.
+\end{faqpair}
+
+\begin{faqpair}{How will the model's performance be evaluated?}\label{faq:eval}
+With all three of Huyen's evaluation approaches \cite{huyen2025aie},
+anchored where possible to what the engine records. Exact evaluation
+covers three things. The interpreter is scored against a hand-labeled set
+of player inputs and their intended actions. Agreement with the rule-based
+parser is reported only on inputs the rule-based parser handles. Balance is
+measured by running a fixed set of automated sessions, 200 per scenario,
+against survival and progression targets. Companion rule-following is exact
+too: every tool call a companion makes is checked against what the engine
+allowed. Memory is exact for claims about recorded events, after one
+extraction step. A judge model pulls factual claims out of companion
+dialogue, such as who sold the amulet or who fled the ogre. Each extracted
+claim is then checked exactly against the engine's event log. The exact
+score inherits the extractor's recall, which is reported alongside it.
+
+AI-as-a-judge covers what the engine cannot score: whether a companion's
+choice was a good one, whether its personality holds across sessions, and
+narration quality. Tester personas do the judging. Their scores are
+treated cautiously, because Huyen shows that a judge's scores drift over
+time \cite{huyen2025aie}. For generated panels, a judge also scores
+multi-turn consistency: whether the screen still reads as the same game on
+turn two hundred as on turn one. EvoGenUI-Bench measures that property for
+generated interfaces \cite{evogenuibench2026}. Comparative evaluation ranks
+one model or prompt against another, which Huyen finds more reliable than
+absolute scores \cite{huyen2025aie}. These feed a private leaderboard that
+ranks each model tier by cryptd's own criteria, so model and prompt choices
+are measured before they ship (see \featureref{feat:eval}).
+\end{faqpair}
+
+\begin{faqpair}{What AI-engineering skills is this meant to build?}\label{faq:skills}
+Seven, in order of depth. Integrating a model into a working application
+behind a clean boundary. Designing fallback tiers so the game keeps every
+rule and stays playable, with plainer narration, when the model is weak or
+absent. Building evaluation that
+scores model output against ground truth. Tuning prompts and swapping
+models to raise those scores. Building agents with memory and personality
+that act only through tools. Serving several models per turn within a
+latency and cost budget, in production, with monitoring. Fine-tuning a
+small model for the game's narrow narration, parsing, and companion tasks.
+Each builds on the one before, and the game gives each a concrete place to
+practice.
+\end{faqpair}
+
+\begin{faqpair}{How does the project map to Chip Huyen's curriculum?}\label{faq:curriculum}
+Chapters 3 through 10 of \textit{AI Engineering} \cite{huyen2025aie} each
+get a concrete exercise in crypt, and the milestones are sequenced to
+match. Chapters 1 and 2, an introduction to building with foundation
+models and an account of how those models work, are background reading
+with no exercise of their own. Evaluation methodology
+and evaluating AI systems (Ch 3 and 4) become the evaluation suite and the
+private leaderboard that rank the model tiers. Prompt engineering (Ch 5)
+becomes the interpreter and narrator system prompts, plus the persona and
+defensive prompts that keep a companion in character and inside the rules,
+scored for sensitivity when they change. Chapter 6 covers retrieval and
+agents, and the companions exercise both. Companion memory is retrieval:
+before a companion acts, it retrieves from the engine's recorded events
+and from its own earlier reflections. Its agent side is planning and
+action only through the engine's tools \cite{park2023generativeagents}.
+The game-as-dungeon-master and the tester personas are agents over the
+same tools. Fine-tuning (Ch 7) is an experiment, run whatever its outcome:
+train one small model on the harvested corpus and compare it to prompting
+on the leaderboard. A tuned model ships only if it wins that comparison.
+Dataset engineering (Ch 8) becomes a corpus of intent-to-action,
+event-to-narration, and companion-decision pairs, harvested from real and
+automated sessions. FIREBALL, D\&D 5e play recorded through a Discord bot,
+is a candidate addition \cite{zhu2023fireball}; its transfer to crypt is
+untested, and its license terms for training use are checked before any
+fine-tuning run. Inference
+optimization (Ch 9) becomes the latency budget for a turn with several
+companions and the predictive cache that prepares the next screen while
+the player reads. Architecture and user feedback (Ch 10) becomes production
+on AWS. Every model call records latency, tokens, cost, eval score, and
+errors, and player comments and persona reports feed the next iteration.
+\end{faqpair}
+
+\subsubsection*{Audience \& Demand}
+
+\begin{faqpair}{Who is the audience, and is demand a concern?}\label{faq:audience}
+The audience is players nostalgic for Zork, Wizardry, and MUDs who miss
+adventuring in a party and want a dungeon that does not run out. Demand is
+a minor concern here by design. This is a learning project, roughly four
+parts learning to one part game. Success is a public, playable game that
+records per-call latency, tokens, cost, eval score, and error rate for
+every model call. Demand still has a floor, because Huyen's chapter on
+architecture and user feedback (Ch 10) needs players. Its monitoring and
+feedback exercises need at least 10 returning players over a month. A
+returning player is one saved party that plays on two or more distinct
+days in a month; the save identity, not the invite link, is the unit.
+Below that number, those chapters run on
+persona play-testers, and the results are labeled as persona results
+(see \faqref{faq:success}). Any wider demand claim is a
+hypothesis with no primary research behind it yet. \texttt{[CITATION
+NEEDED]}
+\end{faqpair}
+
+\subsubsection*{Competition}
+
+\begin{faqpair}{Who else builds games like this, and where does crypt stand?}\label{faq:landscape}
+Pairing a rules engine with a language model is an established pattern,
+commercially and in open source.
+
+Six commercial products were reviewed from their own pages in November
+2026. TableForge is the closest neighbor. Its makers say it gives ``final
+authority over dice, damage, conditions, and resources to code'' and uses
+AI ``for interpretation and narration''
+\cite{tableforge2026multiplayercompare}. A host's plan sets the party: up
+to six human players and one to four ``travelling NPC companions that
+fight beside you,'' with ``persistent cross-session memory'' claimed for
+the campaign \cite{tableforge2026home,tableforge2026faq}. Friends \& Fables
+seats up to six players around an AI game master that ``narrates,
+adjudicates rules, and reacts to your world.'' Its home page names no AI
+companions \cite{fables2026home}. Hidden Door runs a story
+engine that checks every beat ``against canon,'' offers world creators a
+``None / Normal / Permadeath'' setting, and has a Creator MCP for building
+worlds from Claude \cite{hiddendoor2026home}. Auferet has a dice roller and
+stat tracking, but ``the AI runs the world, the NPCs, and the outcomes.''
+Its page warns that ``AI narration can still apply a rule incorrectly''
+\cite{auferet2026multiplayer}. Questie's Party Mode seats one human with up
+to four voiced AI companions and has no rules engine beyond a d20 roll
+\cite{questie2026partymode}. AI Dungeon's multiplayer has no rules engine
+and no set player limit \cite{latitude2026multiplayerfaq}.
+
+One free-tier TableForge campaign was also played hands-on, in Safari on
+macOS \cite{freeman2026tableforgehandson}. The engine owns the numbers, as
+the vendor says: a 5e character sheet, a grid map, and a quest log sit in
+tabs beside the chat. A turn is a run of clicks: Quick Actions, an action
+chip or typed text, Send, then a play button under each message to hear
+it. Group voice autoplay exists as a setting and defaults off. The session
+felt sluggish, and the browser tab froze once and needed a reload.
+Companions were not seated on the free tier played; the Companions tab
+read ``No companions travel with the party yet.'' TableForge's companion
+memory therefore remains a vendor claim, unobserved; no page addresses
+companion death.
+
+None of six reviewed products stated five properties of crypt. None stated
+open-source code with a fully offline, rules-only mode; all six are hosted
+browser or app services. None stated a bridge that lets the player's own
+model, such as Claude Code over MCP, run the game. Hidden Door's Creator
+MCP authors worlds, and its own engine runs play. None stated that
+companion memory is checked against engine-recorded state; TableForge's
+campaign memory is stored game state, and its pages do not say how
+companions use it. None stated permanent death for companions that no
+reload undoes; Hidden Door's permadeath setting applies to characters, and
+its page does not address companions or reloads. None stated generated
+panels or a layered score; TableForge and Friends \& Fables generate art,
+battle maps, and voice, and Questie gives each companion its own voice.
+Each absence rests on one to three vendor pages per product, so it records
+what the vendors state.
+
+In open source, at least eight projects keep dice, hit points, and state in
+code and let a model narrate or propose actions
+\cite{kliuchnikovv2026dnd,mnehmos2026rpgmcp,thegreystone2026rpgmcp,shadowgate152026dungeonmaster,slowbutfast2026opendungeon,alecvlad2026opengamemaster,datashaman2026aittrpg,undergroundrap2026aimud}.
+kliuchnikovv/dnd is the nearest in form. It runs a Go engine in a terminal
+that never calls a model, and it still plays offline with its narrator
+disabled \cite{kliuchnikovv2026dnd}. Mnehmos/rpg-mcp runs as an MCP server
+in Claude Code under the rule that models propose and never execute
+\cite{mnehmos2026rpgmcp}. Their GitHub star counts are between 0 and 46
+for the repositories whose counts were collected. The open-game-master
+entry is a fork of Lebbitheplow/open-game-master
+\cite{alecvlad2026opengamemaster}, so its star count is not meaningful. TaleWeave AI is a multiplayer text adventure with AI characters
+whose model drives character actions with less engine authority
+\cite{ssube2024taleweave}.
+
+Outside games, four neighbors set expectations. Generative Agents
+is the research reference for agents with memory, reflection, and planning,
+set in a simulated town where nobody can die
+\cite{park2023generativeagents}. NVIDIA ACE puts model-driven characters
+into graphical games, including inZOI, where an on-device small language
+model drives companion characters \cite{nvidia2025aceinzoi}. AI Dungeon
+is a different category, collaborative storytelling with no rules engine,
+with company-reported 8M+ registered players \cite{latitude2025growth}. Google's A2UI is the
+architecture analogue for generated panels: a model emits a declarative
+description from a trusted widget catalog, and the client renders it
+\cite{google2025a2ui}. The survey by Gallotta et al. maps these roles,
+player, character, game master, and designer, across the field
+\cite{gallotta2024llmgames}.
+
+TableForge, or any of the open-source projects, could add engine-checked
+companion memory or permanent companion death, and crypt holds no
+structural barrier against that. A
+learning project does not need one. The party is where the curriculum goes
+deepest, and that holds whatever other games ship.
+\end{faqpair}
+
+\subsubsection*{Technical}
+
+\begin{faqpair}{What are the major technical risks?}\label{faq:risks}
+Seven. Six are open risks on Must Do features, and each has a spike and a
+gate before the work that depends on it.
+
+Companion memory fidelity. A companion that misremembers who sold the
+amulet breaks the promise. Memory is retrieval over the engine's recorded
+events and the companion's own reflections, and every memory a companion
+cites is checked against the event log. Spike: the validation run in
+\faqref{faq:nextstep}. Gate: memory-claim accuracy of 95 percent; below 80
+percent, retrieval is redesigned (see \faqref{faq:success}).
+
+Per-turn latency and cost at three to five companions. Three companions run
+three agents, plus the narrator, on every turn, and five run five.
+Batching companion decisions into one call, running companions on a small
+model, and letting them decide while the player reads are the planned
+answers. Spike: measure p95 turn latency and cost per turn with three and
+with five companions on each tier. Latency gate, for p95 with three
+companions on the hosted tier: under 4 seconds is the target. Between 4 and
+8 seconds, companion calls are batched into one request per turn before any
+presentation tier ships. Above 8 seconds, the solo default drops to two
+companions, batching is mandatory, and the panels tier stays blocked. Cost
+gate: the same spike records tokens and cost per turn at three companions
+on the hosted tier. That number times a monthly turn budget sets the hosted
+spending ceiling, and the Viability rating moves off MEDIUM when the ceiling
+is written into the deployment config.
+
+Scenario solvability. A generated dungeon must have a key for every locked
+door, a way past every trap, prices a party can pay, and cursed items whose
+curse can be lifted. Spike: generate a batch of dungeons, run the engine's
+solvability walk on each, and play a sample with automated parties. Gate:
+every generated dungeon passes the walk before it opens, and a failure
+falls back to a hand-authored scenario.
+
+Multiplayer transport. The transport for a shared party is open (DES-034),
+and the daemon's concurrent sessions are the starting point. Spike: two
+clients in one party over the chosen transport, with turn order enforced by
+the engine. Gate: no transport work starts until the single-companion
+validation run passes.
+
+Model quality for scenario generation on the small tier: whether a small or
+local model can write a scenario and play a companion well enough, or
+whether only a large model will do. The leaderboard answers this per tier.
+Gate: a small-tier generated scenario passes the solvability walk on the
+first try at least 70 percent of the time; below that, small-tier play uses
+bundled scenarios.
+
+The integration boundary: a companion will try moves the rules forbid, and
+the engine has to refuse them without the refusal breaking character. Gate:
+under 5 illegal attempts per 100 companion turns.
+
+Generated presentation: latency and session-long acceptance of a screen
+that changes every turn are both unanswered, and each presentation tier
+waits on its own gate (see \faqref{faq:presentation}).
+\end{faqpair}
+
+\begin{faqpair}{How do companions run in each mode, and where do their model calls go?}\label{faq:modes}
+Three modes, three answers. On the hosted service, the daemon runs every
+companion on the model the operator configures. Every one of those calls
+records latency, tokens, cost, eval score, and errors in the AWS
+monitoring. In the local terminal client, the daemon runs companions on the
+player's configured model or on the small local model. In the rules-only
+tier, offline or hosted at the spending ceiling, companions follow scripted
+tactics and make no model calls. No model generates dungeons there either,
+so the game serves hand-authored scenarios from the bundled set, which is
+finite. Through
+the Claude Code bridge, Claude is the interpreter and the narrator, and the
+companions run inside the same Claude session through the engine's tools.
+Their model calls are the player's own, so the project's monitoring sees
+only the engine events those calls produce and never the calls themselves.
+Evaluation of bridge play uses the engine's event log alone.
+\end{faqpair}
+
+\begin{faqpair}{What are the dependencies and their fallbacks?}\label{faq:deps}
+Six. vox, the Punt Labs text-to-speech tool, gives each companion a voice;
+without it, the game is text only. ElevenLabs Music generates the layered
+score; without it, there is no score. AWS is the deployment target for the
+hosted service, and at hypothesis stage the project needs no second cloud
+as a fallback. Model providers serve the large and small tiers; the tiered
+design already falls back from a large model to a small local one to
+rules-only play. Claude Code is one client among three, so the terminal
+client and the hosted service work without it. The multiplayer transport
+is open per DES-034, and the release ships with it. If the transport
+slips, single-player with companions ships first, and friends join once
+the transport works.
+\end{faqpair}
+
+\begin{faqpair}{How does generated presentation earn its place in the game?}\label{faq:presentation}
+By passing a gate the project measures before the tier ships. Presentation
+deepens in three tiers, in ascending risk.
+
+Every tier is measured against tempo. TableForge's wait, from Send to text
+and from Send to voice, is the baseline the predictive cache is measured
+against; a follow-up timing run of ten turns will put a number on it
+\cite{freeman2026tableforgehandson}. Click count per turn is the second
+tempo metric: the target is one keypress per action and zero clicks to see
+party state.
+
+Voice comes first. Each companion speaks in its own voice through vox, the
+text-to-speech tool Punt Labs already ships. TableForge voiced about four
+long sentences per turn \cite{freeman2026tableforgehandson}. crypt's spoken
+narration defaults to at most two sentences per turn, each under 15 words,
+in the Zork register where a room is two lines and the prompt returns; a
+``tell me more'' keypress requests the long version. Sentences per spoken
+turn and words per sentence are the Chapter 5 prompt targets, synthesis
+starts on the first sentence, and the gate is integration.
+
+A layered adaptive score comes second: stems that enter and leave as the
+scene shifts from corridor to combat to treasure room. Generation uses
+ElevenLabs Music, with Audio Reference steering each new stem toward the
+tempo, instrumentation, and mood of the ones already playing
+\cite{elevenlabs2026music}. The vendor does not claim key matching, so
+key is part of what the gate measures. Its gate is coherence: stems
+generated across a full session still sound like one piece of music to a
+listening judge.
+
+Generated panels come third: the screen around the text redraws to fit the
+scene, with a map, a party roster, or a ledger of loot. The model fills a
+schema from a fixed widget vocabulary, the A2UI pattern, and the client
+renders it \cite{google2025a2ui}. In pairwise tests, people prefer
+generated pages to markdown answers \cite{leviathan2026generativeui}, and
+they prefer generated task-specific interfaces in over 70\% of cases
+\cite{chen2025generativeinterfaces}. Both studies measure one-shot pages
+for information tasks, so their results do not transfer directly to a game
+screen that persists across a session. Two risks remain open. Latency is the
+documented failure: Gemini's dynamic view takes a minute or more to
+generate \cite{google2025genui}. Session-long acceptance of a screen that
+changes every turn has no measurement anywhere, and Nielsen Norman Group
+names lost consistency as the cost of generated UI
+\cite{nng2024generativeui}. The design answer to consistency is a fixed
+frame: the layout holds still, and only the contents of its panels
+regenerate. The answer to latency is a predictive cache. Turn-based play
+gives the game dead time while the player reads, and the engine already
+enumerates the legal next states, so the set of screens to prepare per turn
+is small. The cost of a prepared panel is measured in the latency spike
+for this tier, because no published figure covers schema-filled panels. The
+gate for panels is a cache hit rate and a p95 latency under a budget fixed
+before the tier is built.
+
+Generated images in terminals that support them are a fourth, optional
+step. Terminal image protocols are fragmented across Kitty, iTerm2, and
+Sixel \cite{kitty2026graphics,iterm2images,arewesixelyet}, so the text and
+half-block display stays the baseline, and the gate is reliable protocol
+detection. For latency, Unbounded reached about one second per generated
+scene image with distillation \cite{li2025unbounded}, which is the
+reference point for this tier.
+\end{faqpair}
+
+\begin{faqpair}{What happens if generated presentation fails its gates?}\label{faq:fallback}
+If two or more presentation tiers fail their gates, the project turns to an
+agent-authored world. The part of crypt that sets it apart then has to come
+from the dungeon growing, because presentation cannot supply it. AI wizards, in the LPMud
+sense of builders with the power to add to the world
+\cite{wikipedia2026lpmud}, dig new rooms, monsters, and puzzles overnight.
+The engine validates every build for solvability and balance before it
+opens, and companion parties play-test it before a human sees it. SpacetimeMUD
+already has an agent building rooms through the player interface at demo
+scale \cite{clockworklabs2024spacetimemud}. The fallback exercises the same
+curriculum from another direction: planning agents, exact evaluation of
+their output, and a feedback flywheel from player ratings. Its risk is
+quality, as critiques of the agent-populated network Moltbook show
+\cite{wikipedia2026moltbook}. It is the last Should Do item, and it starts
+only on that trigger (see \featureref{feat:agentworld}).
+\end{faqpair}
+
+\begin{faqpair}{What is the state of the build, and what remains?}
+Working today: the deterministic engine, the daemon that serves it with
+concurrent sessions, the thin client with a terminal UI, the Claude Code
+bridge, and the tiered model integration. vox, the voice tool companions
+use, ships separately. The order of the remaining work is content first,
+presentation second. The validation run comes first (see
+\faqref{faq:nextstep}). Companions with memory and permanent death follow,
+then generated scenarios with engine-proved solvability, then the hosted
+service on AWS with monitoring, invite-only behind a monthly ceiling, and
+the multiplayer transport, so friends join on launch day. The fine-tuning experiment runs once the
+harvested corpus exists. Presentation follows in gate order: voice, music,
+panels, images. If scope compresses, presentation tiers are cut from the
+top down, and the party and production stay.
+\end{faqpair}
+
+\begin{faqpair}{What is the next step to validate the plan?}\label{faq:nextstep}
+One companion, one scripted dungeon, repeated sessions, before any
+multiplayer transport work. The run scores three things. Rule-following:
+the engine accepts zero illegal moves, and the run counts how often the
+companion attempts one. Memory: every claim the companion makes about an
+earlier event is checked against the engine's event log. Latency: p95 turn
+time on each model tier with one companion; the three-companion latency and
+cost figures come from the spike in \faqref{faq:risks}. The thresholds in \faqref{faq:success} decide
+whether companions go forward as designed, need re-prompting, or need a
+retrieval redesign. This run is the first mission.
+\end{faqpair}
+
+\subsubsection*{Scope \& Success}
+
+\begin{faqpair}{What does success look like for a learning project?}\label{faq:success}
+Two things. A documented understanding of where the model helps, where it
+falls short, how to measure its performance, and what it takes to improve
+it. And a public, playable game running in production on AWS, recording
+per-call latency, tokens, cost, eval score, and error rate, in which a
+nostalgic player enjoys a party. The game is where those lessons get
+tested. A working evaluation suite, a defensible answer to the
+code-versus-model boundary, companions that keep their memories and their
+rules, and hands-on experience with serving, monitoring, tuning, and
+fine-tuning are the deliverables.
+
+Five thresholds turn that into decisions.
+
+Companion illegal moves. The engine accepts none, so the measure is
+attempts per 100 companion turns. Target: under 5. Above that, the
+companion prompts are reworked before companions go further.
+
+Memory-claim accuracy against engine-recorded events. Target: 95 percent.
+Below 80 percent, companion memory retrieval is redesigned.
+
+p95 turn latency with three companions on the hosted tier. Target: under 4
+seconds. Between 4 and 8 seconds, companion calls are batched into one
+request per turn before any presentation tier ships. Above 8 seconds, the
+solo default drops to two companions, batching is mandatory, and the
+panels tier stays blocked.
+
+Cost per turn. The latency spike (\faqref{faq:risks}) records tokens and
+cost per turn at three companions on the hosted tier. That number times a monthly turn budget sets
+the hosted ceiling, and the Viability rating moves off MEDIUM when the
+ceiling is written into the deployment config.
+
+Real players for the monitoring and feedback chapters. Minimum: 10
+returning players over a month. A returning player is one saved party that
+plays on two or more distinct days in a month; the save identity, not the
+invite link, is the unit. Below that, those chapters run on persona
+play-testers, and their results are labeled as persona results.
+\end{faqpair}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\newpage
+\section*{Risk Assessment}
+
+\renewcommand{\arraystretch}{1.6}
+\begin{tabularx}{\textwidth}{@{} l l X @{}}
+\toprule
+\textbf{\color{SectionBlue}Risk} & \textbf{\color{SectionBlue}Rating} & \textbf{\color{SectionBlue}Assessment} \\
+\midrule
+Value      & \textcolor{RiskGreen}{LOW} & The project is four parts learning to one part game, so its value is the engineering knowledge gained, and the work produces that knowledge whether or not players arrive. Player demand has a floor: the monitoring and feedback chapters need 10 returning players over a month. Below that, they run on persona play-testers and report persona results (see \faqref{faq:audience}). \\
+Usability  & \textcolor{RiskAmber}{MEDIUM} & Four open usability risks, each with a measurement. Parser frustration, the known failure of the genre: the interpreter tries the rules parser first and calls a model only for input the rules cannot parse. Measure: the share of player inputs the rules interpreter resolves without a model, target over 80 percent on the bundled scenarios. Companion chatter: one companion speaks unprompted per turn, and the persona play-testers rate readability. Waiting on agent calls: companions decide while the player reads, and the p95 latency gate in \faqref{faq:risks} sets what happens above 4 and 8 seconds. Prompt injection by other humans in the party: the engine bounds what injection can do to outcomes, so an injected instruction cannot reposition a companion, change a roll, or alter inventory. What it can change is what a companion or the narrator says. On the hosted service, generated text passes an output check before it reaches other players, one of the Chapter 10 guardrails exercises \cite{huyen2025aie}. \\
+Feasibility & \textcolor{RiskAmber}{MEDIUM} & The engine, daemon, client, concurrent sessions, and model integration already work. Six Must Do risks are open, each with a spike and a gate: companion memory fidelity; per-turn latency and cost at three to five companions; scenario solvability for doors, keys, shops, traps, and cursed items; the multiplayer transport, open per DES-034, which the release ships with; model quality for small-tier scenario generation; and the integration boundary (see \faqref{faq:risks}). Presentation tiers each ship only through their own gate (see \faqref{faq:presentation}). \\
+Viability  & \textcolor{RiskAmber}{MEDIUM} & No revenue model to satisfy, but the hosted service spends money on every model call. It launches invite-only with a monthly spending ceiling. At the ceiling, the service drops to the small-model tier, then to rules-only play, and new invites pause. The three-companion latency spike records tokens and cost per turn on the hosted tier; that number times a monthly turn budget sets the ceiling. The rating moves off MEDIUM when the ceiling is written into the deployment config (see \faqref{faq:cost} and \faqref{faq:success}). \\
+\bottomrule
+\end{tabularx}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\newpage
+\section*{Feature Appendix}
+
+\subsection*{Must Do}
+\begin{enumerate}[nosep,leftmargin=2.5em]
+  \featureitem{Party of six}{any mix of human players and companions fills the six seats; a solo party starts with three companions and can seat up to five, and a friend can take a companion's seat between descents}\label{feat:party}
+  \featureitem{Companions}{model-played characters with a personality and memory across sessions, acting only through the engine tools a human player uses; memory is retrieval over engine-recorded events and the companion's own reflections; death cannot be undone by reloading a save, and resurrection, where the dungeon offers it, follows the same rules and costs as for humans}\label{feat:companions}
+  \featureitem{Multiplayer transport}{friends in different places share one party; the transport is open per DES-034, starting from the daemon's concurrent sessions, and ships in the release (see \faqref{faq:deps})}\label{feat:multiplayer}
+  \featureitem{Deterministic engine}{rules, combat, inventory, movement, death, save and load, run in code and never in a model}\label{feat:engine}
+  \featureitem{Daemon and tiered model integration}{large model, small local model, and a no-model fallback, so the game is always playable}\label{feat:tiers}
+  \featureitem{Free-text interpretation}{the model turns plain-language input into engine actions}\label{feat:interpret}
+  \featureitem{Generated narration}{the model describes rooms, events, and characters on demand}\label{feat:narrate}
+  \featureitem{Claude Code bridge}{Claude plays the dungeon master through the stdio bridge into the engine, and companions run inside the same Claude session through the engine's tools (see \faqref{faq:modes})}\label{feat:bridge}
+  \featureitem{Generated scenarios}{the model writes a new dungeon for each descent, with shops, traps, and cursed items, and the engine proves it solvable before it opens}\label{feat:dm}
+  \featureitem{Evaluation suite and private leaderboard}{scored, repeatable measurement of interpreter accuracy against a hand-labeled intent set, companion rule-following and memory claims against engine-recorded events, judge-scored decision quality and personality consistency, and game balance}\label{feat:eval}
+  \featureitem{Fine-tuning experiment}{train one small model on the harvested corpus and compare it to prompting on the leaderboard, whatever the outcome; this is Huyen's fine-tuning chapter in practice}\label{feat:ftexp}
+  \featureitem{AWS production}{the game runs in production on AWS, recording per-call latency, tokens, cost, eval score, and error rate for every model call, the system Huyen's inference-optimization and monitoring chapters practice on}\label{feat:aws}
+  \featureitem{Hosted service and public availability}{a stranger can join a hosted party with an invite link, with no account at launch, or install and play without a developer checkout; the hosted service launches invite-only under a monthly spending ceiling, and at the ceiling it drops to the small-model tier, then to rules-only play, and new invites pause}\label{feat:dist}
+\end{enumerate}
+
+\subsection*{Should Do}
+\noindent{\small Presentation tiers ship in this order, lowest feasibility risk first, each when its gate passes (see \faqref{faq:presentation}). The agent-authored world comes last, on its trigger.}
+\begin{enumerate}[nosep,leftmargin=2.5em]
+  \featureitem{Per-companion voice}{each companion speaks in its own voice through vox; gate: integration only}\label{feat:voice}
+  \featureitem{Layered adaptive music}{stems that follow the scene, generated with ElevenLabs Music under Audio Reference; gate: stems stay coherent across a full session}\label{feat:music}
+  \featureitem{Fixed-frame generated panels}{the layout holds still and panel contents regenerate from a fixed widget vocabulary, prepared ahead by a predictive cache; gate: cache hit rate and p95 latency under a stated budget}\label{feat:panels}
+  \featureitem{Generated images}{scene images in terminals that support an image protocol, with text and half-block display as the baseline; gate: reliable protocol detection across fragmented terminal support}\label{feat:images}
+  \featureitem{Fine-tuned small model shipped}{a model tuned for the game's narrow narration, parsing, and companion tasks ships only if the fine-tuning experiment shows it beats prompting and a stock small model on the leaderboard (see \featureref{feat:ftexp})}\label{feat:finetune}
+  \featureitem{Agent-authored persistent world}{AI wizards that dig new rooms overnight, validated by the engine and play-tested by companion parties; pursued if two or more presentation tiers fail their gates, because the dungeon's growth then has to set crypt apart (see \faqref{faq:fallback})}\label{feat:agentworld}
+\end{enumerate}
+
+\subsection*{Won't Do}
+\begin{enumerate}[nosep,leftmargin=2.5em]
+  \featureitem{Model-decided game rules}{no model, narrator or companion, ever resolves combat, damage, or death; that is the one boundary the design refuses to cross}\label{feat:norules}
+  \featureitem{Graphical 3D client}{the game is text-first by identity; a rendered 3D world is a different product}\label{feat:no3d}
+  \featureitem{Real-time action}{crypt is turn-based like its ancestors; twitch gameplay is out of scope}\label{feat:norealtime}
+  \featureitem{Monetization}{a build-to-learn project has no store, subscription, or paid tier}\label{feat:nomoney}
+\end{enumerate}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\newpage
+\printbibliography
+
+\end{document}
