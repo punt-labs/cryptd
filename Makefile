@@ -232,7 +232,8 @@ prfaq:                                     ## Compile prfaq.tex to prfaq.pdf; fa
 	    echo "Warning: $$overfull overfull hbox warning(s) in $$f; content extends beyond margins:" >&2; \
 	    grep "Overfull \\\\hbox" "$$dir/$$job.log" >&2; \
 	  fi; \
-	  mv "$$dir/$$job.pdf" "$$dir/$$base.pdf"; \
+	  mv "$$dir/$$job.pdf" "$$dir/$$base.pdf" \
+	    || { echo "Error: could not replace $$dir/$$base.pdf; built PDF left at $$dir/$$job.pdf" >&2; exit 1; }; \
 	  echo "  $$dir/$$base.pdf"; \
 	  for ext in $(LATEX_EXTS); do rm -f "$$dir/$$job.$$ext"; done; \
 	done
