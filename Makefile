@@ -5,7 +5,8 @@
        generate-dungeon validate-dungeon \
        eval-balance eval-balance-quick eval-balance-generated eval-balance-unix \
        demo demo-solo demo-exploration demo-inventory \
-       demo-combat demo-save-load demo-unix-catacombs
+       demo-combat demo-save-load demo-unix-catacombs \
+       prfaq clean-tex
 
 SCENARIO_DIR = testdata/scenarios
 DEMO_DIR     = testdata/demos
@@ -171,6 +172,46 @@ eval-balance-generated:                    ## Balance eval on generated scenario
 
 eval-balance-unix:                         ## Balance eval on unix-catacombs (500 sessions)
 	CRYPT_SCENARIO_DIR=scenarios go run ./cmd/eval-balance --scenario unix-catacombs --class all --players 500 --max-moves 200
+
+##@ Docs
+# Only the PR/FAQ at the repo root. docs/architecture.tex and docs/gameplay.tex
+# have their own build path and are not compiled here.
+TEX_FILES = prfaq.tex
+
+# LaTeX intermediate files to remove after compilation, at the repo root only.
+# prfaq.pdf itself is tracked and is never removed; everything here is a build
+# artifact .gitignore already excludes.
+LATEX_ARTIFACTS = *.aux *.log *.out *.bbl *.bcf *.blg *.run.xml *.fls \
+                  *.fdb_latexmk *.synctex.gz *.toc
+
+prfaq:                                     ## Compile prfaq.tex to prfaq.pdf and clean intermediate artifacts
+	@for f in $(TEX_FILES); do \
+	  echo "Compiling $$f ..."; \
+	  dir=$$(dirname "$$f"); base=$$(basename "$$f" .tex); \
+	  rm -f "$$dir/$$base.pdf"; \
+	  pdflatex -interaction=nonstopmode -halt-on-error -output-directory="$$dir" "$$f" > /dev/null 2>&1 \
+	    || { echo "Error: $$f failed to compile (pdflatex)" >&2; exit 1; }; \
+	  if [ -f "$$dir/$$base.bcf" ]; then \
+	    command -v biber > /dev/null 2>&1 \
+	      || { echo "Error: $$f uses biblatex but biber is not installed" >&2; exit 1; }; \
+	    (cd "$$dir" && biber "$$base") > /dev/null 2>&1 \
+	      || { echo "Error: $$f failed to resolve citations (biber)" >&2; exit 1; }; \
+	    pdflatex -interaction=nonstopmode -halt-on-error -output-directory="$$dir" "$$f" > /dev/null 2>&1 \
+	      || { echo "Error: $$f failed to compile (pdflatex, post-biber)" >&2; exit 1; }; \
+	  fi; \
+	  pdflatex -interaction=nonstopmode -halt-on-error -output-directory="$$dir" "$$f" > /dev/null 2>&1 \
+	    || { echo "Error: $$f failed to compile (pdflatex, final pass)" >&2; exit 1; }; \
+	  echo "  $$dir/$$base.pdf"; \
+	  overfull=$$(grep -c "Overfull \\\\hbox" "$$dir/$$base.log" 2>/dev/null || true); \
+	  if [ "$${overfull:-0}" -gt 0 ]; then \
+	    echo "Warning: $$overfull overfull hbox warning(s) in $$f — content extends beyond margins:" >&2; \
+	    grep "Overfull \\\\hbox" "$$dir/$$base.log" >&2; \
+	  fi; \
+	done
+	@rm -f $(LATEX_ARTIFACTS)
+
+clean-tex:                                 ## Remove LaTeX intermediate files
+	@rm -f $(LATEX_ARTIFACTS)
 
 ##@ Help
 help:                                      ## Show this help
