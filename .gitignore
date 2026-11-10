@@ -198,6 +198,9 @@ prfaq.out
 prfaq.run.xml
 prfaq.blg
 prfaq.bbl
+# Temp jobname the prfaq target builds under; left behind on a failed
+# citation/reference check so the log can be read. Never commit it.
+prfaq.build.pdf
 prfaq.bcf
 .idea/
 copilot-session-*.md

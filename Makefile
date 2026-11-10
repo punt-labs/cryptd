@@ -192,9 +192,13 @@ LATEX_EXTS = aux log out bbl bcf blg run.xml fls fdb_latexmk synctex.gz toc
 # diagnostic, and every error names it.
 PDFLATEX = pdflatex -interaction=nonstopmode -halt-on-error
 BIBER_PROBLEM = (WARN|ERROR) -
-TEX_UNRESOLVED = undefined|Rerun to get|Please \(re\)run Biber
+# Anchored to LaTeX's own warning forms so body text echoed under an
+# overfull-box warning (e.g. "undefined behaviour") cannot trip it.
+TEX_UNRESOLVED = (Citation|Reference) .* undefined|There were undefined|Rerun to get|Please \(re\)run Biber
 
 prfaq:                                     ## Compile prfaq.tex to prfaq.pdf; fails on unresolved citations or references
+	@command -v pdflatex > /dev/null 2>&1 \
+	  || { echo "Error: pdflatex is not installed; install a TeX distribution (TeX Live or MacTeX)" >&2; exit 1; }
 	@for f in $(TEX_FILES); do \
 	  echo "Compiling $$f ..."; \
 	  dir=$$(dirname "$$f"); base=$$(basename "$$f" .tex); job="$$base.build"; \
