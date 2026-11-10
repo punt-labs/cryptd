@@ -204,7 +204,7 @@ prfaq:                                     ## Compile prfaq.tex to prfaq.pdf and
 	  echo "  $$dir/$$base.pdf"; \
 	  overfull=$$(grep -c "Overfull \\\\hbox" "$$dir/$$base.log" 2>/dev/null || true); \
 	  if [ "$${overfull:-0}" -gt 0 ]; then \
-	    echo "Warning: $$overfull overfull hbox warning(s) in $$f — content extends beyond margins:" >&2; \
+	    echo "Warning: $$overfull overfull hbox warning(s) in $$f; content extends beyond margins:" >&2; \
 	    grep "Overfull \\\\hbox" "$$dir/$$base.log" >&2; \
 	  fi; \
 	done
