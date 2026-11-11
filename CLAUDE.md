@@ -463,3 +463,4 @@ When this file conflicts with punt-kit standards, this file wins (project-specif
 - **`../.bin/`** — cross-repo scripts for repeated operations.
 - **Quarry** — semantic search via MCP tools, connected to the `punt-labs` database. This repo is indexed as the `cryptd` collection.
 @.punt-labs/ethos/CLAUDE.md
+@.punt-labs/punt/CLAUDE.md
