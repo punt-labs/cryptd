@@ -18,7 +18,9 @@ see it, it is your problem now.
 ## Project State
 
 **M0–M2 are complete.** The engine, headless mode, and game loop are implemented
-and tested. See `bd ready` for the next unblocked work.
+and tested. Linear is the tracker of record (Punt Labs team, label `repo:cryptd`);
+`bd ready --label-any repo:cryptd --exclude-label deferred` reads the local mirror
+for the next unblocked work.
 
 The binary is `cryptd`. Working CLI subcommands: `cryptd headless`,
 `cryptd validate`. Future: `cryptd dm`, `cryptd solo`, `cryptd serve`.
@@ -40,7 +42,7 @@ Every milestone ends with a PR merged to `main`. The review cycle:
    gh pr edit <number> --add-reviewer copilot-pull-request-reviewer
    ```
 5. **Repeat** until the last round surfaces no substantial new issues.
-6. **Merge** — squash or merge commit, then close the milestone epic bead.
+6. **Merge** — squash or merge commit, then mark the milestone epic Done in Linear.
 
 ### Copilot Reviewer vs. Copilot Coding Agent
 

@@ -28,7 +28,7 @@ There is no such thing as a "pre-existing" issue. If you see a problem — in co
 
 Three binaries (DES-025): `cryptd` (server/daemon), `crypt` (thin client), `crypt-admin` (authoring). The client (`crypt`) connects to `cryptd serve`, auto-starts the server if needed, and sends natural language text via the `game.play` JSON-RPC method. `cryptd serve` daemonizes by default (bead cryptd-ydf); `-f` for foreground, `-t` for testing on stdin/stdout. Claude Code connects via the `crypt mcp` stdio bridge.
 
-Check `bd ready` for current unblocked work.
+Check `bd ready --label-any repo:cryptd --exclude-label deferred` for current unblocked work; Linear is the tracker of record (see Issue Tracking below).
 
 ## Architecture
 
@@ -383,16 +383,21 @@ Do not assume a clean CI run means the PR is ready: Qodo and Bugbot post comment
 | `docs:` | Documentation |
 | `chore:` | Build, dependencies, CI |
 
-### Beads Issue Tracking
+### Issue Tracking
+
+Linear is the tracker of record: the Punt Labs team, issues labelled `repo:cryptd`, listed in the shared `cryptd` view. Epics are Linear projects carrying the `cryptd` project label (M10 Daemon Session Routing, M11 Full DM Mode, M13 Rich World, M14 Multiplayer, M15 Sound System, Two-package distribution, and the Autonomous development loop). Beads (`bd`) is a read-mostly local mirror; `.punt-labs/punt/CLAUDE.md` (imported below) has the rules for which tracker to write to, and `.beads/README.md` has the mirror commands and the required `bd` build.
 
 ```bash
-bd ready                              # what's next
-bd update <id> --status in_progress   # claim it
-bd close <id>                         # done
-bd sync                               # push to remote
+# Finding work (local reads of the mirror; refresh it first)
+bd config get linear.pull_label   # Must print repo:cryptd; if not, pull main and re-run before any pull
+bd linear sync --pull-if-stale --relations --team c1dfbb2c-985e-40cf-b004-5127646efc9d
+bd ready --label-any repo:cryptd --exclude-label deferred   # what's next
+bd show <id>                                                # details with dependencies
 ```
 
-Org-wide issues (touching 2+ repos or changing a punt-kit standard) go in `../punt-kit/`. Project-specific work goes here.
+Create, claim (In Progress), finish (Done) and cancel issues in Linear, with the `repo:cryptd` label plus a type label (`Bug`, `Feature`, `Improvement`, `Epic`). A local `bd update`, `bd close` or `bd create` is undone by the next pull. After claiming or finishing, refresh the bead with `bd linear sync --pull --issues <PL id> --team c1dfbb2c-985e-40cf-b004-5127646efc9d` (a by-id pull fetches only the named issue). Blockers are `blocks` relations in Linear, mirrored with `bd dep add <bead> <blocker>` when the refresh ran without `--relations`.
+
+Org-wide issues (touching 2+ repos or changing a punt-kit standard) are filed against punt-kit. Project-specific work goes here.
 
 ### Milestone Order
 
@@ -405,11 +410,11 @@ Before ending any session:
 ```bash
 git status                  # Check for uncommitted work
 git add <files>             # Stage changes
-bd sync                     # Sync beads
 git commit -m "..."         # Commit
-bd sync                     # Sync again
 git push                    # Push to remote
 ```
+
+Issue status is written in Linear, never with a local `bd` edit; there is no beads sync step.
 
 Work is NOT complete until `git push` succeeds.
 
