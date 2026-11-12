@@ -57,11 +57,11 @@ Session Routing, M11 Full DM Mode, M13 Rich World, M14 Multiplayer, M15
 Sound System, Two-package distribution, and the Autonomous development
 loop); each epic bead stays in the mirror as its project's marker. The
 guide's "Never" list applies here in full: no bare `bd linear sync`, no
-`bd config set linear.*` (shared by every repo), and never remove
-`issue-prefix` or `linear.pull_label` from `config.yaml`. A pull is a
-beads write: before running one, `bd config get linear.pull_label` on the
-main checkout must print `repo:cryptd`, or the pull imports the whole
-Punt Labs team.
+unscoped `--push`, no `bd config set linear.*` (shared by every repo), and
+never remove `issue-prefix` or `linear.pull_label` from `config.yaml`. A pull is a
+beads write: `bd` reads the `config.yaml` of the checkout it runs in, so
+before running one, `bd config get linear.pull_label` there must print
+`repo:cryptd`, or the pull imports the whole Punt Labs team.
 
 ## bd version
 

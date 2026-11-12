@@ -395,7 +395,7 @@ bd ready --label-any repo:cryptd --exclude-label deferred   # what's next
 bd show <id>                                                # details with dependencies
 ```
 
-Create, claim (In Progress), finish (Done) and cancel issues in Linear, with the `repo:cryptd` label plus a type label (`Bug`, `Feature`, `Improvement`, `Epic`). A local `bd update`, `bd close` or `bd create` is undone by the next pull. After claiming or finishing, refresh the bead with `bd linear sync --pull --issues <PL id> --team c1dfbb2c-985e-40cf-b004-5127646efc9d` (a by-id pull fetches only the named issue). Blockers are `blocks` relations in Linear, mirrored with `bd dep add <bead> <blocker>` when the refresh ran without `--relations`.
+Create, claim (In Progress), finish (Done) and cancel issues in Linear, with the `repo:cryptd` label plus a type label (`Bug`, `Feature`, `Improvement`, `Epic`). A local `bd update` or `bd close` is undone by the next pull of that issue; a local `bd create` leaves an orphan bead with no `external_ref` that no pull removes. After claiming or finishing in Linear, refresh the bead with `bd linear sync --pull --issues <PL id> --team c1dfbb2c-985e-40cf-b004-5127646efc9d` (a by-id pull fetches only the named issue, by its PL id). Blockers are `blocks` relations in Linear, mirrored with `bd dep add <bead> <blocker>` when the refresh ran without `--relations`.
 
 Org-wide issues (touching 2+ repos or changing a punt-kit standard) are filed against punt-kit. Project-specific work goes here.
 
