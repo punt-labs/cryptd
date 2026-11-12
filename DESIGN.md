@@ -187,7 +187,7 @@ From the [official plugin docs](https://code.claude.com/docs/en/plugins) and exa
 
 **Status:** REVISITED — original conclusion was wrong.
 
-The plan originally called for both `/d` and `/dungeon`. The original analysis assumed `/d` was impossible within the plugin, but playtest showed `Unknown skill: d` when a player tried it — `/d` is expected UX for a game. A custom command within the plugin should map `/d` to `/dungeon`. See issue `claude-dungeon-45w`.
+The plan originally called for both `/d` and `/dungeon`. The original analysis assumed `/d` was impossible within the plugin, but playtest showed `Unknown skill: d` when a player tried it — `/d` is expected UX for a game. A custom command within the plugin should map `/d` to `/dungeon`. The command belongs to the crypt plugin repo; the issue that tracked it (`claude-dungeon-45w`, in the predecessor repo's tracker) no longer resolves.
 
 ---
 
