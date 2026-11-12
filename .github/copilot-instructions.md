@@ -42,7 +42,7 @@ Every milestone ends with a PR merged to `main`. The review cycle:
    gh pr edit <number> --add-reviewer copilot-pull-request-reviewer
    ```
 5. **Repeat** until the last round surfaces no substantial new issues.
-6. **Merge** — squash or merge commit, then mark the milestone epic Done in Linear.
+6. **Merge** — squash or merge commit, then set the milestone's epic issue to Done in Linear and its project to Completed (epics are Linear projects, which have no Done status).
 
 ### Copilot Reviewer vs. Copilot Coding Agent
 
