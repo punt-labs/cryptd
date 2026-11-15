@@ -259,7 +259,7 @@ worker: bwk                    # eng pool: bwk|rsc|mdm|rop|adb|kth|djb|bcs|kpz|y
 evaluator:
   handle: mdm                  # must differ from worker, no shared role
 inputs:
-  issue: <PL-id>               # optional Linear issue link
+  ticket: <PL-id>              # optional Linear issue link (ethos inputs key)
 write_set:                     # repo-relative paths, at least one
   - internal/engine/combat.go
   - internal/engine/combat_test.go
