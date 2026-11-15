@@ -1,6 +1,6 @@
 # cryptd
 
-Game engine and server for [crypt](https://github.com/punt-labs/crypt), a text adventure game playable via Claude Code, CLI, or (future) web client. Produces three binaries: `cryptd` (server), `crypt` (client), and `crypt-admin` (scenario authoring).
+Game engine and server for crypt, a text adventure game played from the `crypt` command line client or from Claude Code through `crypt mcp`. Produces three binaries: `cryptd` (server), `crypt` (client), and `crypt-admin` (scenario authoring).
 
 ## Identity
 
