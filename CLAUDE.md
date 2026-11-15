@@ -26,9 +26,9 @@ There is no such thing as a "pre-existing" issue. If you see a problem — in co
 
 **M0 (foundation), M1 (data contracts), M2 (thin E2E slice), M8 (server thin slice), and M9 (DM thin slice) are complete. M10 (session routing) is partially complete: concurrent session infrastructure is live, but DM/player privilege gating, `tools/list_changed` notifications, and multi-session integration tests (cryptd-90e.2, .3, .5) remain open.**
 
-Three binaries (DES-025): `cryptd` (server/daemon), `crypt` (thin client), `crypt-admin` (authoring). The client (`crypt`) connects to `cryptd serve`, auto-starts the server if needed, and sends natural language text via the `game.play` JSON-RPC method. `cryptd serve` daemonizes by default (bead cryptd-ydf); `-f` for foreground, `-t` for testing on stdin/stdout. Claude Code connects via the `crypt mcp` stdio bridge.
+Three binaries (DES-025): `cryptd` (server/daemon), `crypt` (thin client), `crypt-admin` (authoring). The client (`crypt`) connects to `cryptd serve`, auto-starts the server if needed, and sends natural language text via the `game.play` JSON-RPC method. `cryptd serve` daemonizes by default (issue cryptd-ydf); `-f` for foreground, `-t` for testing on stdin/stdout. Claude Code connects via the `crypt mcp` stdio bridge.
 
-Check `bd ready --label-any repo:cryptd --exclude-label deferred` for current unblocked work; Linear is the tracker of record (see Issue Tracking below).
+Check the shared `cryptd` view in Linear for current unblocked work (see Issue Tracking below).
 
 ## Architecture
 
@@ -259,7 +259,7 @@ worker: bwk                    # eng pool: bwk|rsc|mdm|rop|adb|kth|djb|bcs|kpz|y
 evaluator:
   handle: mdm                  # must differ from worker, no shared role
 inputs:
-  bead: <bead-id>              # optional bead link
+  issue: <PL-id>               # optional Linear issue link
 write_set:                     # repo-relative paths, at least one
   - internal/engine/combat.go
   - internal/engine/combat_test.go
@@ -327,7 +327,7 @@ Biff is the team messaging system. Use it for presence, coordination, and async 
 - `/write @<agent> <message>` — send a direct message
 - `/wall <message>` — broadcast to all active agents
 
-Start every session with `/tty cryptd` to register the session, `/plan` to declare your work, and `/loop 5m /biff:read` to poll for incoming messages. All three before any bead work.
+Start every session with `/tty cryptd` to register the session, `/plan` to declare your work, and `/loop 5m /biff:read` to poll for incoming messages. All three before any issue work.
 
 ## Ethos Integration
 
@@ -385,17 +385,9 @@ Do not assume a clean CI run means the PR is ready: Qodo and Bugbot post comment
 
 ### Issue Tracking
 
-Linear is the tracker of record: the Punt Labs team, issues labelled `repo:cryptd`, listed in the shared `cryptd` view. Epics are Linear projects carrying the `cryptd` project label (M10 Daemon Session Routing, M11 Full DM Mode, M13 Rich World, M14 Multiplayer, M15 Sound System, Two-package distribution, and the Autonomous development loop). Beads (`bd`) is a read-mostly local mirror; `.punt-labs/punt/CLAUDE.md` (imported below) has the rules for which tracker to write to, and `.beads/README.md` has the mirror commands and the required `bd` build.
+Linear is the tracker of record: the Punt Labs team, issues labelled `repo:cryptd`, listed in the shared `cryptd` view. Epics are Linear projects carrying the `cryptd` project label (M10 Daemon Session Routing, M11 Full DM Mode, M13 Rich World, M14 Multiplayer, M15 Sound System, Two-package distribution, and the Autonomous development loop). `.punt-labs/punt/CLAUDE.md` (imported below) has the rules for which tracker to write to.
 
-```bash
-# Finding work (local reads of the mirror; refresh it first)
-bd config get linear.pull_label   # Must print repo:cryptd; if not, pull main and re-run before any pull
-bd linear sync --pull-if-stale --relations --team c1dfbb2c-985e-40cf-b004-5127646efc9d
-bd ready --label-any repo:cryptd --exclude-label deferred   # what's next
-bd show <id>                                                # details with dependencies
-```
-
-Create, claim (In Progress), finish (Done) and cancel issues in Linear, with the `repo:cryptd` label plus a type label (`Bug`, `Feature`, `Improvement`, `Epic`). A local `bd update` or `bd close` is undone by the next pull of that issue; a local `bd create` leaves an orphan bead with no `external_ref` that no pull removes. After claiming or finishing in Linear, refresh the bead with `bd linear sync --pull --issues <PL id> --team c1dfbb2c-985e-40cf-b004-5127646efc9d` (a by-id pull fetches only the named issue, by its PL id). Blockers are `blocks` relations in Linear: a pull adds `blocks` edges but removes none, so mirror an added blocker with `bd dep add <bead> <blocker>` (when the refresh ran without `--relations`) and a cleared one with `bd dep remove <bead> <blocker>`. These `bd dep` edits are the sanctioned local-mirror writes.
+Create, claim (In Progress), finish (Done) and cancel issues in Linear, with the `repo:cryptd` label plus a type label (`Bug`, `Feature`, `Improvement`, `Epic`). Blockers are `blocks` relations in Linear.
 
 Org-wide issues (touching 2+ repos or changing a punt-kit standard) are filed against punt-kit. Project-specific work goes here.
 
@@ -414,7 +406,7 @@ git commit -m "..."         # Commit
 git push                    # Push to remote
 ```
 
-Issue status is written in Linear, never with a local `bd` edit; there is no beads sync step.
+Issue status is written in Linear.
 
 Work is NOT complete until `git push` succeeds.
 
@@ -458,7 +450,7 @@ for the full specification.
 **`../punt-kit/`** is the Punt Labs standards repo. Applicable standards:
 
 - [`punt-kit/standards/github.md`](../punt-kit/standards/github.md) — branch protection, PR workflow
-- [`punt-kit/standards/workflow.md`](../punt-kit/standards/workflow.md) — beads, branch discipline, micro-commits
+- [`punt-kit/standards/workflow.md`](../punt-kit/standards/workflow.md) — backlog, branch discipline, micro-commits
 
 When this file conflicts with punt-kit standards, this file wins (project-specific overrides).
 

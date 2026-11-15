@@ -1607,12 +1607,12 @@ Tea TUI.
 - DES-018 (Lux as primary display surface) is superseded; its `LuxRenderer` fallback
   design no longer applies. DES-019's structured-action input now flows through the `crypt`
   TUI rather than Lux buttons. The `Renderer` interface itself is unchanged.
-- Backlog: the M5 Lux HUD beads and the M12 Lux HUD Release Pass epic are closed as
+- Backlog: the M5 Lux HUD issues and the M12 Lux HUD Release Pass epic are closed as
   abandoned. The twin-renderer client (M8b) is the display direction going forward.
 
 ### Operator ruling
 
-Jim, 2026-11-08: remove the Lux integration and kill the associated beads. Bead:
+Jim, 2026-11-08: remove the Lux integration and kill the associated issues. Issue:
 cryptd-oal.
 
 ---
@@ -1660,7 +1660,7 @@ mis-scoping cryptd-90e.2 twice). Two facts in the existing record already contra
   the protocol natively and mcp-proxy was dropped as a prerequisite) is which
   connecting clients may call privileged/authoring engine methods versus play-only methods —
   a client-privilege question, not a "who is the DM" question. See the M10 session-routing
-  beads (cryptd-90e and children), which this ADR re-scopes accordingly.
+  issues (cryptd-90e and children), which this ADR re-scopes accordingly.
 
 ### Consequences
 

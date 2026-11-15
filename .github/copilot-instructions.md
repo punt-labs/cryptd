@@ -19,8 +19,7 @@ see it, it is your problem now.
 
 **M0–M2 are complete.** The engine, headless mode, and game loop are implemented
 and tested. Linear is the tracker of record (Punt Labs team, label `repo:cryptd`);
-`bd ready --label-any repo:cryptd --exclude-label deferred` reads the local mirror
-for the next unblocked work.
+The shared `cryptd` view in Linear lists the next unblocked work.
 
 The binary is `cryptd`. Working CLI subcommands: `cryptd headless`,
 `cryptd validate`. Future: `cryptd dm`, `cryptd solo`, `cryptd serve`.
