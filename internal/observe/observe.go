@@ -1,4 +1,5 @@
 // Package observe configures cryptd's shared diagnostics and usage capture.
+// See DESIGN.md (DES-035) for the sink, schema, and failure-handling decisions.
 package observe
 
 import (

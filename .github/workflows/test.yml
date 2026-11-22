@@ -40,8 +40,10 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - name: Run end-to-end and acceptance tests
-        run: go test -race -count=1 -tags 'e2e acceptance' ./e2e/...
+      - name: Run end-to-end tests
+        run: go test -race -count=1 -timeout 120s -tags e2e ./e2e/...
+      - name: Run acceptance tests
+        run: go test -race -count=1 -timeout 600s -tags acceptance ./e2e/...
 
   coverage:
     name: Engine Coverage
