@@ -1910,3 +1910,50 @@ raises the minimum toolchain for cryptd.
   data with diagnostics.
 - Build rotating logs and a local usage store inside cryptd. Rejected because
   it duplicates the shared privacy, rotation, and retention mechanisms.
+
+---
+
+## DES-036: Agent Quality Checks Are Advisory Per Edit
+
+**Date:** 2026-11-22
+**Status:** SETTLED
+**Topic:** Agent quality-check stages
+
+### Decision
+
+Adopt ethos DES-085 through the project-default `crypt-go` check set. Go edits
+receive advisory `gofmt -l`, tagged package vet and race-enabled package tests
+with integration tests included. Vet also compiles E2E and acceptance tests;
+package test execution excludes the E2E subprocess suites. Shell edits receive
+advisory shellcheck. Generated agents call `ethos hook post-edit --agent <handle>`.
+Requires the ethos release after v5.1.1; tested on ethos main `f4f884f`.
+
+Run blocking `make check` at commit and handoff, not after every edit. Commit
+enforces the existing before-every-commit rule; handoff gates completed work
+without blocking intentionally incomplete multi-file changes or red TDD tests.
+
+### Rationale
+
+On an 8-core Linux machine, five warm runs per Go file gave median edit times
+of 1.440 s (engine), 2.142 s (game) and 2.427 s (daemon), versus 5.792–6.839 s
+for the old full gate. Package feedback catches more than formatting while
+remaining bounded. Markdown edits remain unchecked at edit in either policy.
+
+### Alternatives Considered
+
+- Full `make check` per edit, blocking with exit 2: the old hook took about
+  6 s warm and 46–49 s after clearing the Go build cache. Rejected because it
+  repeats repository-wide work and blocks intermediate edits.
+- Gofmt-only advisory edits, the audit proposal: warm medians were 0.014 s
+  for engine/game and 0.013 s for daemon; maxima rounded to the same values.
+  Cold runs stayed 0.013–0.014 s. Rejected as the default because saving
+  about 1.43–2.41 s per warm Go edit loses package vet and test feedback.
+
+### Consequences
+
+Edit failures, including formatting and timeouts, return advisory context
+with exit 0 and no blocking decision. Cold-cache game tests hit the 30 s
+test limit; daemon vet/tests hit their 20 s/30 s limits. Keep those bounded
+budgets; full checks still gate commit and handoff. Every commit now pays
+the full quick-gate cost (~6 s warm). Integration/E2E/acceptance/coverage
+full-suite gates remain under `make check-full`.
