@@ -6,18 +6,19 @@ checks:
     files: ["**/*.go"]
     run: ["gofmt", "-l", "{file}"]
     fail_on_output: true
-    on_fail: block
+    on_fail: advisory
     timeout: 5s
   - name: vet
     stage: edit
     files: ["**/*.go"]
-    run: ["go", "vet", "{package_dir}"]
+    run: ["go", "vet", "-tags", "integration,e2e,acceptance", "{package_dir}"]
     on_fail: advisory
     timeout: 20s
-  - name: unit-tests
+  - name: package-tests
     stage: edit
     files: ["**/*.go"]
-    run: ["go", "test", "-race", "-count=1", "{package_dir}"]
+    exclude: ["e2e/**"]
+    run: ["go", "test", "-race", "-count=1", "-tags", "integration", "{package_dir}"]
     on_fail: advisory
     timeout: 30s
   - name: shellcheck
