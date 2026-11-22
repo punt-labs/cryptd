@@ -1902,3 +1902,11 @@ configure no network exporter. The shared package owns retention and opt-out.
 The shared package supplies rotation across processes, redaction, and schema
 validation without duplicating those implementations. Its Go 1.26 requirement
 raises the minimum toolchain for cryptd.
+
+### Alternatives Considered
+
+- Keep the daemon's stderr log and add usage records to it. Rejected because
+  it leaves other entry points without a private durable sink and mixes usage
+  data with diagnostics.
+- Build rotating logs and a local usage store inside cryptd. Rejected because
+  it duplicates the shared privacy, rotation, and retention mechanisms.
