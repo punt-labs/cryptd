@@ -1891,7 +1891,8 @@ Diagnostics are written to `~/.punt-labs/cryptd/logs/cryptd.log`. Log safe
 error categories and recovered panic locations rather than raw error strings
 or crash dumps, which may contain game content or credentials. Refuse to
 start if a private diagnostic sink cannot be initialized; report that failure
-on stderr when available.
+on stderr when available. Startup uses the shared handler's bounded rotation
+lock wait and reports a timeout on stderr without opening an alternate sink.
 
 Record operation names, durations, and an allowlisted outcome in the separate
 local SQLite store. Capture no scenario, player, or session identifiers and
