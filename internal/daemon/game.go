@@ -7,12 +7,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"sort"
 
 	"github.com/punt-labs/cryptd/internal/engine"
 	"github.com/punt-labs/cryptd/internal/game"
 	"github.com/punt-labs/cryptd/internal/model"
+	"github.com/punt-labs/cryptd/internal/observe"
 	"github.com/punt-labs/cryptd/internal/protocol"
 	"github.com/punt-labs/cryptd/internal/scenariodir"
 )
@@ -56,6 +57,7 @@ type RunLoopRequest struct {
 // exclusively owns its *engine.Engine and *model.GameState. No mutex needed —
 // serialization by construction.
 type Game struct {
+	log      *slog.Logger
 	id       string
 	commands chan Command
 	done     chan struct{} // closed when the game goroutine exits
@@ -63,8 +65,9 @@ type Game struct {
 
 // newGame creates a Game and starts its goroutine. The goroutine runs until ctx
 // is cancelled or the commands channel is closed.
-func newGame(ctx context.Context, id, scenarioDir, defaultScenario string) *Game {
+func newGame(ctx context.Context, log *slog.Logger, id, scenarioDir, defaultScenario string) *Game {
 	g := &Game{
+		log:      log,
 		id:       id,
 		commands: make(chan Command, 1),
 		done:     make(chan struct{}),
@@ -81,7 +84,7 @@ func (g *Game) run(ctx context.Context, scenarioDir, defaultScenario string) {
 	defer close(g.done)
 	defer func() {
 		if r := recover(); r != nil {
-			log.Printf("daemon: game %s panicked: %v", g.id, r)
+			observe.LogPanic(g.log, "Game goroutine panicked", r)
 		}
 	}()
 
@@ -107,7 +110,7 @@ func (g *Game) run(ctx context.Context, scenarioDir, defaultScenario string) {
 					cmd.Reply <- CommandResult{Err: &RPCError{Code: CodeNoActiveGame, Message: "no active game — call new_game first"}}
 					continue
 				}
-				result, rpcErr := dispatch(eng, state, cmd.Name, cmd.Args)
+				result, rpcErr := g.dispatch(eng, state, cmd.Name, cmd.Args)
 				cmd.Reply <- CommandResult{Result: result, Err: rpcErr}
 
 			case "run_loop":
@@ -118,6 +121,7 @@ func (g *Game) run(ctx context.Context, scenarioDir, defaultScenario string) {
 				lr := cmd.LoopReq
 				loopCtx, loopCancel := context.WithCancel(ctx)
 				rend := NewRPCRenderer(lr.Scanner, lr.Writer)
+				rend.log = g.log
 				rend.skipInitialRender = lr.SkipInitialRender
 
 				loop := game.NewLoop(eng, lr.Interp, lr.Narr, rend)
@@ -125,7 +129,9 @@ func (g *Game) run(ctx context.Context, scenarioDir, defaultScenario string) {
 
 				var loopErr *RPCError
 				if err := loop.Run(loopCtx, state); err != nil {
-					log.Printf("daemon: game loop error: %v", err)
+					if loopCtx.Err() == nil {
+						g.log.Error("Game loop stopped unexpectedly", "error_kind", observe.ErrorKind(err))
+					}
 					loopErr = &RPCError{Code: CodeInternalError, Message: err.Error()}
 				}
 				loopCancel() // stop readLoop goroutine
@@ -142,11 +148,11 @@ func (g *Game) run(ctx context.Context, scenarioDir, defaultScenario string) {
 				}
 				data, err := json.Marshal(finalResp)
 				if err != nil {
-					log.Printf("daemon: marshal final response: %v", err)
+					g.log.Error("Could not encode final game response")
 				} else {
 					data = append(data, '\n')
 					if _, err := lr.Writer.Write(data); err != nil {
-						log.Printf("daemon: game %s: write final response: %v", g.id, err)
+						g.log.Debug("Could not write final game response")
 					}
 				}
 
@@ -242,13 +248,13 @@ func (g *Game) Inspect(ctx context.Context, fn func(*engine.Engine, *model.GameS
 	}
 }
 
-// --- dispatch (free functions, called only from inside the game goroutine) ---
+// --- dispatch (called only from inside the game goroutine) ---
 
 // dispatch routes a tool call to the appropriate engine method.
-func dispatch(eng *engine.Engine, state *model.GameState, name string, args json.RawMessage) (any, *RPCError) {
+func (g *Game) dispatch(eng *engine.Engine, state *model.GameState, name string, args json.RawMessage) (any, *RPCError) {
 	switch name {
 	case "move":
-		return dispatchMove(eng, state, args)
+		return g.dispatchMove(eng, state, args)
 	case "look":
 		return dispatchLook(eng, state)
 	case "pick_up":
@@ -264,13 +270,13 @@ func dispatch(eng *engine.Engine, state *model.GameState, name string, args json
 	case "inventory":
 		return dispatchInventory(eng, state)
 	case "attack":
-		return dispatchAttack(eng, state, args)
+		return g.dispatchAttack(eng, state, args)
 	case "defend":
-		return dispatchDefend(eng, state)
+		return g.dispatchDefend(eng, state)
 	case "flee":
-		return dispatchFlee(eng, state)
+		return g.dispatchFlee(eng, state)
 	case "cast_spell":
-		return dispatchCastSpell(eng, state, args)
+		return g.dispatchCastSpell(eng, state, args)
 	case "use_item":
 		return dispatchUseItem(eng, state, args)
 	case "context":
@@ -361,7 +367,7 @@ func (a moveArgs) validate() *RPCError {
 	return nil
 }
 
-func dispatchMove(eng *engine.Engine, state *model.GameState, raw json.RawMessage) (any, *RPCError) {
+func (g *Game) dispatchMove(eng *engine.Engine, state *model.GameState, raw json.RawMessage) (any, *RPCError) {
 	if state.Dungeon.Combat.Active {
 		return nil, &RPCError{Code: CodeStateBlocked, Message: "cannot move during combat"}
 	}
@@ -394,7 +400,7 @@ func dispatchMove(eng *engine.Engine, state *model.GameState, raw json.RawMessag
 	case combatErr == nil:
 		response.Combat = combatSummary(combatResult, state)
 		if state.Dungeon.Combat.Active && !isHeroTurn(state) {
-			turns, truncated := processEnemyTurns(eng, state)
+			turns, truncated := g.processEnemyTurns(eng, state)
 			response.EnemyTurns = &turns
 			if truncated {
 				response.Warning = enemyPhaseWarning
@@ -404,7 +410,7 @@ func dispatchMove(eng *engine.Engine, state *model.GameState, raw json.RawMessag
 		errors.As(combatErr, new(*engine.AlreadyInCombatError)):
 		// Expected — room has no enemies or combat already active.
 	default:
-		log.Printf("daemon: dispatchMove: StartCombat error: %v", combatErr)
+		g.log.Error("Could not start combat after movement", "error_kind", observe.ErrorKind(combatErr))
 		response.Warning = "combat failed to start due to an internal error"
 	}
 
@@ -577,7 +583,7 @@ type attackArgs struct {
 // same way.
 func (a attackArgs) validate() *RPCError { return nil }
 
-func dispatchAttack(eng *engine.Engine, state *model.GameState, raw json.RawMessage) (any, *RPCError) {
+func (g *Game) dispatchAttack(eng *engine.Engine, state *model.GameState, raw json.RawMessage) (any, *RPCError) {
 	if !state.Dungeon.Combat.Active {
 		return nil, &RPCError{Code: CodeStateBlocked, Message: "not in combat"}
 	}
@@ -622,7 +628,7 @@ func dispatchAttack(eng *engine.Engine, state *model.GameState, raw json.RawMess
 			LevelUp:    checkLevelUp(eng, state),
 		}
 	} else if state.Dungeon.Combat.Active && !isHeroTurn(state) {
-		turns, truncated := processEnemyTurns(eng, state)
+		turns, truncated := g.processEnemyTurns(eng, state)
 		response.EnemyTurns = &turns
 		if truncated {
 			response.Warning = enemyPhaseWarning
@@ -632,7 +638,7 @@ func dispatchAttack(eng *engine.Engine, state *model.GameState, raw json.RawMess
 	return response, nil
 }
 
-func dispatchDefend(eng *engine.Engine, state *model.GameState) (any, *RPCError) {
+func (g *Game) dispatchDefend(eng *engine.Engine, state *model.GameState) (any, *RPCError) {
 	if !state.Dungeon.Combat.Active {
 		return nil, &RPCError{Code: CodeStateBlocked, Message: "not in combat"}
 	}
@@ -648,7 +654,7 @@ func dispatchDefend(eng *engine.Engine, state *model.GameState) (any, *RPCError)
 	}
 
 	if state.Dungeon.Combat.Active && !isHeroTurn(state) {
-		turns, truncated := processEnemyTurns(eng, state)
+		turns, truncated := g.processEnemyTurns(eng, state)
 		response.EnemyTurns = &turns
 		if truncated {
 			response.Warning = enemyPhaseWarning
@@ -658,7 +664,7 @@ func dispatchDefend(eng *engine.Engine, state *model.GameState) (any, *RPCError)
 	return response, nil
 }
 
-func dispatchFlee(eng *engine.Engine, state *model.GameState) (any, *RPCError) {
+func (g *Game) dispatchFlee(eng *engine.Engine, state *model.GameState) (any, *RPCError) {
 	if !state.Dungeon.Combat.Active {
 		return nil, &RPCError{Code: CodeStateBlocked, Message: "not in combat"}
 	}
@@ -674,7 +680,7 @@ func dispatchFlee(eng *engine.Engine, state *model.GameState) (any, *RPCError) {
 	}
 
 	if !result.Success && state.Dungeon.Combat.Active && !isHeroTurn(state) {
-		turns, truncated := processEnemyTurns(eng, state)
+		turns, truncated := g.processEnemyTurns(eng, state)
 		response.EnemyTurns = &turns
 		if truncated {
 			response.Warning = enemyPhaseWarning
@@ -696,7 +702,7 @@ func (a castSpellArgs) validate() *RPCError {
 	return nil
 }
 
-func dispatchCastSpell(eng *engine.Engine, state *model.GameState, raw json.RawMessage) (any, *RPCError) {
+func (g *Game) dispatchCastSpell(eng *engine.Engine, state *model.GameState, raw json.RawMessage) (any, *RPCError) {
 	var a castSpellArgs
 	if err := json.Unmarshal(raw, &a); err != nil {
 		return nil, &RPCError{Code: CodeInvalidParams, Message: "invalid arguments: " + err.Error()}
@@ -729,7 +735,7 @@ func dispatchCastSpell(eng *engine.Engine, state *model.GameState, raw json.RawM
 	}
 
 	if state.Dungeon.Combat.Active && !isHeroTurn(state) {
-		turns, truncated := processEnemyTurns(eng, state)
+		turns, truncated := g.processEnemyTurns(eng, state)
 		response.EnemyTurns = &turns
 		if truncated {
 			response.Warning = enemyPhaseWarning
@@ -936,7 +942,7 @@ const enemyPhaseWarning = "enemy turn phase ended early due to an internal error
 // processEnemyTurns runs all enemy turns until it's the hero's turn (or combat
 // ends). The returned bool is true when an unexpected engine error cut the
 // phase short, leaving combat mid-enemy-turn; callers surface it to the client.
-func processEnemyTurns(eng *engine.Engine, state *model.GameState) ([]protocol.EnemyTurn, bool) {
+func (g *Game) processEnemyTurns(eng *engine.Engine, state *model.GameState) ([]protocol.EnemyTurn, bool) {
 	var turns []protocol.EnemyTurn
 	maxIter := len(state.Dungeon.Combat.TurnOrder) * 2
 	if maxIter < 1 {
@@ -945,7 +951,7 @@ func processEnemyTurns(eng *engine.Engine, state *model.GameState) ([]protocol.E
 	for i := 0; i < maxIter && state.Dungeon.Combat.Active && !isHeroTurn(state); i++ {
 		result, err := eng.ProcessEnemyTurn(state)
 		if err != nil {
-			log.Printf("daemon: processEnemyTurns: unexpected error: %v", err)
+			g.log.Error("Could not finish enemy turns", "error_kind", observe.ErrorKind(err))
 			return turns, true
 		}
 		if result.Action == "skip" {

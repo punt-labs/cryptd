@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"sync"
 
 	"github.com/punt-labs/cryptd/internal/model"
@@ -20,10 +21,11 @@ import (
 // RPCRenderer only handles the play loop. Handshake methods (session.init,
 // game.new) are handled by the daemon before the game loop starts.
 type RPCRenderer struct {
-	scanner          *bufio.Scanner
-	writer           io.Writer
-	events           chan model.InputEvent
-	startOnce        sync.Once
+	log               *slog.Logger
+	scanner           *bufio.Scanner
+	writer            io.Writer
+	events            chan model.InputEvent
+	startOnce         sync.Once
 	skipInitialRender bool // when true, the first Render() call is a no-op
 
 	// mu guards lastID so the reader goroutine and Render() do not race.
@@ -37,6 +39,7 @@ type RPCRenderer struct {
 // the handshake phase, avoiding buffered-data loss from creating a second scanner.
 func NewRPCRenderer(scanner *bufio.Scanner, w io.Writer) *RPCRenderer {
 	return &RPCRenderer{
+		log:     slog.New(slog.DiscardHandler),
 		scanner: scanner,
 		writer:  w,
 		events:  make(chan model.InputEvent, 1),
@@ -115,8 +118,7 @@ func (r *RPCRenderer) readLoop(ctx context.Context) {
 
 		var req protocol.Request
 		if err := json.Unmarshal(line, &req); err != nil {
-			// Malformed JSON — skip the line. The game loop does not have a
-			// way to report protocol errors; those belong to the daemon layer.
+			r.log.Warn("Rejected malformed play request")
 			continue
 		}
 
@@ -124,9 +126,11 @@ func (r *RPCRenderer) readLoop(ctx context.Context) {
 		case "game.play":
 			var params protocol.PlayRequest
 			if err := json.Unmarshal(req.Params, &params); err != nil {
+				r.log.Warn("Rejected malformed play parameters")
 				continue
 			}
 			if params.Text == "" {
+				r.log.Warn("Rejected play request with no command")
 				continue
 			}
 			ev := model.InputEvent{Type: "input", Payload: params.Text}
@@ -149,7 +153,7 @@ func (r *RPCRenderer) readLoop(ctx context.Context) {
 			return
 
 		default:
-			// Unknown method during the play loop — ignore.
+			r.log.Warn("Rejected unsupported method during play")
 		}
 	}
 

@@ -3,10 +3,11 @@ package interpreter
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/punt-labs/cryptd/internal/inference"
 	"github.com/punt-labs/cryptd/internal/model"
+	"github.com/punt-labs/cryptd/internal/observe"
 )
 
 // LLMSystemPrompt instructs a large language model to produce structured JSON
@@ -38,14 +39,15 @@ Use exact IDs from the game state context. Resolve ambiguous references using co
 // input into engine actions. On failure (network error, unparseable response,
 // unknown action type), it falls back to the Rules interpreter.
 type LLM struct {
+	log      *slog.Logger
 	client   *inference.Client
 	fallback model.CommandInterpreter
 }
 
 // NewLLM creates an LLM interpreter that sends player input to the given
 // inference client and falls back to the provided interpreter on failure.
-func NewLLM(client *inference.Client, fallback model.CommandInterpreter) *LLM {
-	return &LLM{client: client, fallback: fallback}
+func NewLLM(client *inference.Client, fallback model.CommandInterpreter, loggers ...*slog.Logger) *LLM {
+	return &LLM{client: client, fallback: fallback, log: observe.LoggerOrDiscard(loggers)}
 }
 
 // Interpret tries the rules interpreter first for deterministic commands.
@@ -76,7 +78,7 @@ func (l *LLM) Interpret(ctx context.Context, input string, state model.GameState
 		if ctx.Err() != nil {
 			return model.EngineAction{}, ctx.Err()
 		}
-		log.Printf("cryptd: LLM interpret failed, falling back to rules: %v", err)
+		l.log.WarnContext(ctx, "Inference could not interpret command; using rules", "error_kind", observe.ErrorKind(err))
 		return rulesAction, nil
 	}
 

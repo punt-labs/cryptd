@@ -2,25 +2,31 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
+	"log/slog"
 	"net"
 	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 
 	mcplib "github.com/mark3labs/mcp-go/mcp"
 	mcpserver "github.com/mark3labs/mcp-go/server"
+	"github.com/punt-labs/cryptd/internal/observe"
 	"github.com/punt-labs/cryptd/internal/protocol"
 )
 
 // runMCP connects to the daemon and serves an MCP server on stdio.
 // Returns an exit code (0 = clean, 1 = error).
-func runMCP(socketPath, addr string) int {
-	conn, err := dialMCP(socketPath, addr)
+func runMCP(logger *slog.Logger, socketPath, addr string) int {
+	conn, err := dial(logger, socketPath, addr)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "crypt mcp: %v\n", err)
-		return 1
+		return mcpFailure(logger, "MCP bridge could not connect to game daemon", err)
 	}
 	defer func() { _ = conn.Close() }()
 
@@ -29,26 +35,54 @@ func runMCP(socketPath, addr string) int {
 	// Initialize session with the daemon in passthrough mode.
 	initParams, err := json.Marshal(protocol.InitializeParams{Mode: "passthrough"})
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "crypt mcp: marshal init params: %v\n", err)
-		return 1
+		return mcpFailure(logger, "Could not encode MCP game session request", err)
 	}
-	initResult, err := proxy.call("session.init", initParams)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "crypt mcp: session init failed: %v\n", err)
-		return 1
-	}
-	var initResp protocol.InitializeResult
-	if err := json.Unmarshal(initResult, &initResp); err == nil && initResp.SessionID != "" {
-		fmt.Fprintf(os.Stderr, "crypt mcp: session %s\n", initResp.SessionID)
+	if _, err := proxy.call("session.init", initParams); err != nil {
+		return mcpFailure(logger, "Could not initialize MCP game session", err)
 	}
 
-	s := newMCPServer(proxy)
-
-	if err := mcpserver.ServeStdio(s); err != nil {
-		fmt.Fprintf(os.Stderr, "crypt mcp: %v\n", err)
-		return 1
+	s := mcpserver.NewStdioServer(newMCPServer(proxy))
+	s.SetErrorLogger(log.New(io.Discard, "", 0))
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+	logger.Info("Started MCP bridge")
+	if err := s.Listen(ctx, os.Stdin, mcpOutput{Writer: os.Stdout, log: logger}); err != nil {
+		return mcpFailure(logger, "MCP bridge stopped after a transport failure", err)
 	}
+	logger.Info("MCP bridge stopped")
 	return 0
+}
+
+func mcpFailure(log *slog.Logger, message string, err error) int {
+	kind := observe.ErrorKind(err)
+	log.Error(message, "error_kind", kind)
+	fmt.Fprintf(os.Stderr, "crypt: %s (%s); see ~/.punt-labs/cryptd/logs/cryptd.log\n", message, kind)
+	return 1
+}
+
+// mcpOutput observes rejection codes without logging or modifying MCP traffic.
+type mcpOutput struct {
+	io.Writer
+	log *slog.Logger
+}
+
+func (w mcpOutput) Write(p []byte) (int, error) {
+	if bytes.Contains(p, []byte(`"error":`)) {
+		var response struct {
+			Error *struct{ Code int }
+		}
+		if json.Unmarshal(p, &response) == nil && response.Error != nil {
+			switch response.Error.Code {
+			case mcplib.PARSE_ERROR, mcplib.INVALID_REQUEST, mcplib.METHOD_NOT_FOUND, mcplib.INVALID_PARAMS:
+				w.log.Warn("Rejected MCP request", "code", response.Error.Code)
+			}
+		}
+	}
+	n, err := w.Writer.Write(p)
+	if err != nil {
+		w.log.Warn("Could not write MCP response", "error_kind", observe.ErrorKind(err))
+	}
+	return n, err
 }
 
 // daemonProxy is a thread-safe proxy for sending JSON-RPC requests to the daemon.

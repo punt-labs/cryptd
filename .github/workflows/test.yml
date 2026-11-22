@@ -40,8 +40,8 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - name: Run acceptance tests
-        run: go test -race -count=1 -tags acceptance ./e2e/...
+      - name: Run end-to-end and acceptance tests
+        run: go test -race -count=1 -tags 'e2e acceptance' ./e2e/...
 
   coverage:
     name: Engine Coverage
