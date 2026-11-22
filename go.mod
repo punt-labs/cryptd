@@ -9,7 +9,7 @@ require (
 	github.com/ergochat/readline v0.1.3
 	github.com/mark3labs/mcp-go v0.46.0
 	// justification: Shared Punt Labs logging and telemetry policy implementation.
-	github.com/punt-labs/punt-observe-go v0.0.0-20261122183941-8b005646fab7
+	github.com/punt-labs/punt-observe-go v0.0.0-20261122192811-90067f488a2a
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/term v0.41.0
 	gopkg.in/yaml.v3 v3.0.1
