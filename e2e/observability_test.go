@@ -4,6 +4,8 @@ package e2e
 
 import (
 	"bufio"
+	"bytes"
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -14,6 +16,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -21,13 +24,73 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-func TestCryptd_RecordsDiagnosticsAndTelemetry(t *testing.T) {
-	root, home, bin := repoRoot(t), t.TempDir(), t.TempDir()
+func installObservabilityBinaries(t *testing.T, root string) string {
+	t.Helper()
+	bin := t.TempDir()
 	install := exec.CommandContext(t.Context(), "go", "install", "./cmd/cryptd", "./cmd/crypt", "./cmd/crypt-admin")
 	install.Dir = root
 	install.Env = append(os.Environ(), "GOBIN="+bin)
 	out, err := install.CombinedOutput()
 	require.NoError(t, err, "%s", out)
+	return bin
+}
+
+func TestCryptd_ReportsStartupRotationLockTimeout(t *testing.T) {
+	root, home := repoRoot(t), t.TempDir()
+	bin := installObservabilityBinaries(t, root)
+	scenarioPath := filepath.Join(root, "testdata", "scenarios", "minimal.yaml")
+	seed := exec.CommandContext(t.Context(), filepath.Join(bin, "crypt-admin"), "validate", scenarioPath)
+	seed.Env = append(os.Environ(), "HOME="+home, "CRYPTD_TELEMETRY=off")
+	out, err := seed.CombinedOutput()
+	require.NoError(t, err, "%s", out)
+
+	toolDir := filepath.Join(home, ".punt-labs", "cryptd")
+	logPath := filepath.Join(toolDir, "logs", "cryptd.log")
+	previousLog, err := os.ReadFile(logPath)
+	require.NoError(t, err)
+	require.NotEmpty(t, previousLog)
+	locks, err := filepath.Glob(filepath.Join(filepath.Dir(logPath), "*.lock"))
+	require.NoError(t, err)
+	require.Len(t, locks, 1, "expected one rotation lock in the fresh logs directory")
+	lock, err := os.OpenFile(locks[0], os.O_RDWR, 0)
+	require.NoError(t, err, "open the rotation lock created by punt-observe-go")
+	t.Cleanup(func() { require.NoError(t, lock.Close()) })
+	require.NoError(t, syscall.Flock(int(lock.Fd()), syscall.LOCK_EX|syscall.LOCK_NB))
+
+	for _, tc := range []struct {
+		binary string
+		args   []string
+	}{
+		{"cryptd", []string{"serve", "--socket", filepath.Join(home, "d.sock")}},
+		{"crypt", []string{"mcp"}},
+		{"crypt-admin", []string{"validate", scenarioPath}},
+	} {
+		t.Run(tc.binary, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, filepath.Join(bin, tc.binary), tc.args...)
+			cmd.Env = append(os.Environ(), "HOME="+home, "_CRYPTD_DAEMON=", "CRYPTD_TELEMETRY=", "PUNT_TELEMETRY=")
+			var stdout, stderr bytes.Buffer
+			cmd.Stdout, cmd.Stderr = &stdout, &stderr
+			err := cmd.Run()
+			require.NoError(t, ctx.Err(), "%s hung with the rotation lock held", tc.binary)
+			var exit *exec.ExitError
+			require.ErrorAs(t, err, &exit, "stderr: %s", stderr.String())
+			require.Equal(t, 1, exit.ExitCode())
+			require.Empty(t, stdout.String())
+			require.Contains(t, stderr.String(), "timed out waiting for the diagnostic log rotation lock")
+			require.Contains(t, stderr.String(), "~/.punt-labs/cryptd/logs")
+		})
+	}
+	contents, err := os.ReadFile(logPath)
+	require.NoError(t, err)
+	require.Equal(t, previousLog, contents)
+	require.NoFileExists(t, filepath.Join(toolDir, "telemetry.db"))
+}
+
+func TestCryptd_RecordsDiagnosticsAndTelemetry(t *testing.T) {
+	root, home := repoRoot(t), t.TempDir()
+	bin := installObservabilityBinaries(t, root)
 
 	cmd := func(program string, args ...string) *exec.Cmd {
 		c := exec.CommandContext(t.Context(), filepath.Join(bin, program), args...)
@@ -50,7 +113,7 @@ func TestCryptd_RecordsDiagnosticsAndTelemetry(t *testing.T) {
 	}
 
 	launch := cmd("cryptd", "serve", "--socket", socket)
-	out, err = launch.CombinedOutput()
+	out, err := launch.CombinedOutput()
 	require.NoError(t, err, "%s", out)
 	pidMatch := regexp.MustCompile(`spawned daemon \(PID ([0-9]+)\)`).FindSubmatch(out)
 	require.Len(t, pidMatch, 2)
