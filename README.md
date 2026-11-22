@@ -197,9 +197,15 @@ Claude, if `CRYPTD_API_KEY` is set and the key is accepted; then
 built-in parser and templates. Even with a model, commands the built-in parser
 recognizes skip the model, and combat results and errors use the built-in templates.
 
-**Files.** A background server logs to `~/.crypt/cryptd.log` and records its
-process ID in `~/.crypt/cryptd.pid`. Saved games go to `.dungeon/saves/` in the
-server's working directory.
+**Files.** The daemon, clients, and scenario tools share a private rotating
+diagnostic log at `~/.punt-labs/cryptd/logs/cryptd.log`. A background server
+records its process ID in `~/.crypt/cryptd.pid`. Saved games go to
+`.dungeon/saves/` in the server's working directory.
+
+**Usage telemetry.** cryptd stores operation names, durations, and outcomes
+locally in `~/.punt-labs/cryptd/telemetry.db` for 90 days. It does not record
+player data, game content, or paths and does not send telemetry over the network.
+Set `CRYPTD_TELEMETRY=off` or `PUNT_TELEMETRY=off` to disable capture.
 
 **Claude Code.** Register the bridge as an MCP server (a program that gives
 Claude Code tools to call) in your project:

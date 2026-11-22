@@ -4,17 +4,20 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"sync"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/punt-labs/cryptd/cmd/crypt/tui"
+	"github.com/punt-labs/cryptd/internal/observe"
 	"github.com/punt-labs/cryptd/internal/protocol"
 )
 
-func runTUI(socketPath, addr, scenario, charName, charClass, sessionID string) int {
-	conn, err := dial(socketPath, addr)
+func runTUI(log *slog.Logger, socketPath, addr, scenario, charName, charClass, sessionID string) int {
+	conn, err := dial(log, socketPath, addr)
 	if err != nil {
+		log.Error("Could not connect to game daemon", "error_kind", observe.ErrorKind(err))
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
 	}
@@ -75,11 +78,13 @@ func runTUI(socketPath, addr, scenario, charName, charClass, sessionID string) i
 	}
 	initResult, err := send("session.init", initParams)
 	if err != nil {
+		log.Error("Could not initialize game session")
 		fmt.Fprintf(os.Stderr, "session init failed: %v\n", err)
 		return 1
 	}
 	var initResp protocol.InitializeResult
 	if err := json.Unmarshal(initResult, &initResp); err != nil {
+		log.Warn("Rejected malformed game session response")
 		fmt.Fprintf(os.Stderr, "parse init response: %v\n", err)
 		return 1
 	}
@@ -88,6 +93,7 @@ func runTUI(socketPath, addr, scenario, charName, charClass, sessionID string) i
 	var initialResp *protocol.PlayResponse
 	if initResp.HasGame {
 		if !scanner.Scan() {
+			log.Error("Lost game daemon connection during resume")
 			fmt.Fprintf(os.Stderr, "connection lost during resume\n")
 			return 1
 		}
@@ -106,6 +112,7 @@ func runTUI(socketPath, addr, scenario, charName, charClass, sessionID string) i
 	p := tea.NewProgram(app, tea.WithAltScreen())
 
 	if _, err := p.Run(); err != nil {
+		log.Error("Terminal client stopped unexpectedly")
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
 	}

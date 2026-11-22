@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/punt-labs/cryptd/internal/observe"
 	"golang.org/x/term"
 )
 
@@ -15,13 +16,18 @@ func main() {
 		mcpSocket := mcpFS.String("socket", "", "Unix socket path (default ~/.crypt/daemon.sock)")
 		mcpAddr := mcpFS.String("addr", "", "TCP address (e.g. host:9000)")
 		if err := mcpFS.Parse(os.Args[2:]); err != nil {
-			os.Exit(1)
+			if err == flag.ErrHelp {
+				os.Exit(1)
+			}
+			os.Exit(rejectArgs("mcp"))
 		}
 		if *mcpSocket != "" && *mcpAddr != "" {
 			fmt.Fprintln(os.Stderr, "error: --socket and --addr are mutually exclusive")
-			os.Exit(1)
+			os.Exit(rejectArgs("mcp"))
 		}
-		os.Exit(runMCP(*mcpSocket, *mcpAddr))
+		os.Exit(observe.Run("mcp", observe.ServeMCP, func(obs *observe.Runtime) int {
+			return runMCP(obs.Log, *mcpSocket, *mcpAddr)
+		}))
 	}
 
 	fs := flag.NewFlagSet("crypt", flag.ContinueOnError)
@@ -33,18 +39,29 @@ func main() {
 	sessionID := fs.String("session", "", "resume a previous session by ID")
 	plain := fs.Bool("plain", false, "use plain readline interface instead of TUI")
 	if err := fs.Parse(os.Args[1:]); err != nil {
-		os.Exit(1)
+		if err == flag.ErrHelp {
+			os.Exit(1)
+		}
+		os.Exit(rejectArgs("cli"))
 	}
 
 	if *socketPath != "" && *addr != "" {
 		fmt.Fprintln(os.Stderr, "error: --socket and --addr are mutually exclusive")
-		os.Exit(1)
+		os.Exit(rejectArgs("cli"))
 	}
 
 	useTUI := !*plain && term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd()))
-	if useTUI {
-		os.Exit(runTUI(*socketPath, *addr, *scenario, *name, *class, *sessionID))
-	} else {
-		os.Exit(run(*socketPath, *addr, *scenario, *name, *class, *sessionID))
-	}
+	os.Exit(observe.Run("cli", observe.Play, func(obs *observe.Runtime) int {
+		if useTUI {
+			return runTUI(obs.Log, *socketPath, *addr, *scenario, *name, *class, *sessionID)
+		}
+		return run(obs.Log, *socketPath, *addr, *scenario, *name, *class, *sessionID)
+	}))
+}
+
+func rejectArgs(role string) int {
+	return observe.Run(role, "", func(obs *observe.Runtime) int {
+		obs.Log.Warn("Rejected client arguments")
+		return 1
+	})
 }

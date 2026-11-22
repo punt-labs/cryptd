@@ -4,19 +4,22 @@ package narrator
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"sort"
 	"strings"
 
 	"github.com/punt-labs/cryptd/internal/model"
+	"github.com/punt-labs/cryptd/internal/observe"
 )
 
 // Template produces minimal one-sentence narrations from fixed templates.
 // No creativity or external calls required.
-type Template struct{}
+type Template struct{ log *slog.Logger }
 
 // NewTemplate returns a new TemplateNarrator.
-func NewTemplate() *Template { return &Template{} }
+func NewTemplate(loggers ...*slog.Logger) *Template {
+	return &Template{log: observe.LoggerOrDiscard(loggers)}
+}
 
 // Narrate returns a short templated string for the given event.
 func (t *Template) Narrate(_ context.Context, event model.EngineEvent, _ model.GameState) (string, error) {
@@ -62,7 +65,7 @@ func (t *Template) Narrate(_ context.Context, event model.EngineEvent, _ model.G
 		}
 		return "You examine it closely.", nil
 	case "inventory_listed":
-		return inventoryNarration(event.Details), nil
+		return t.inventoryNarration(event.Details), nil
 	case "item_not_found":
 		return "You don't see that here.", nil
 	case "not_in_inventory":
@@ -174,9 +177,9 @@ func (t *Template) Narrate(_ context.Context, event model.EngineEvent, _ model.G
 }
 
 // inventoryNarration formats a Zork-style inventory list from event details.
-func inventoryNarration(details map[string]any) string {
-	items := toItemSlice(details["items"])
-	equipped := toEquippedSet(details["equipped"])
+func (t *Template) inventoryNarration(details map[string]any) string {
+	items := t.toItemSlice(details["items"])
+	equipped := t.toEquippedSet(details["equipped"])
 
 	if len(items) == 0 && len(equipped) == 0 {
 		return "You are empty-handed."
@@ -229,7 +232,7 @@ type inventoryItem struct {
 
 // toItemSlice extracts item id/name pairs from the items detail.
 // Handles both typed Go slices (from the engine) and []any (from JSON round-trip).
-func toItemSlice(v any) []inventoryItem {
+func (t *Template) toItemSlice(v any) []inventoryItem {
 	switch items := v.(type) {
 	case []model.Item:
 		out := make([]inventoryItem, 0, len(items))
@@ -264,7 +267,7 @@ func toItemSlice(v any) []inventoryItem {
 		return out
 	default:
 		if v != nil {
-			log.Printf("narrator: toItemSlice: unexpected type %T", v)
+			t.log.Warn("Inventory details contained an unexpected item type")
 		}
 		return nil
 	}
@@ -272,7 +275,7 @@ func toItemSlice(v any) []inventoryItem {
 
 // toEquippedSet returns a set of item IDs that are currently equipped.
 // Handles both typed model.Equipment (from the engine) and map[string]any (from JSON).
-func toEquippedSet(v any) map[string]bool {
+func (t *Template) toEquippedSet(v any) map[string]bool {
 	set := make(map[string]bool)
 	switch eq := v.(type) {
 	case model.Equipment:
@@ -289,7 +292,7 @@ func toEquippedSet(v any) map[string]bool {
 		}
 	default:
 		if v != nil {
-			log.Printf("narrator: toEquippedSet: unexpected type %T", v)
+			t.log.Warn("Inventory details contained an unexpected equipment type")
 		}
 	}
 	return set

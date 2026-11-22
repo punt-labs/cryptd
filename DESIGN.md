@@ -1870,3 +1870,43 @@ privileges it before the implementation decision is made, so none is named.
 - The per-player capability and turn-ownership design is tracked on bead
   cryptd-90e.2.
 - The M14 epic (cryptd-1qj) covers this capability, with transport left open.
+
+---
+
+## DES-035: Shared Diagnostics and Local Usage
+
+**Date:** 2026-11-22
+**Status:** SETTLED
+**Topic:** Process diagnostics and usage
+
+### Decision
+
+Use `punt-observe-go` instead of maintaining logging and telemetry sinks in
+cryptd. Each binary configures the shared diagnostics handler at its entry
+point, including detached daemon children. Launchers and their children share
+a random launch ID; a spawn record does not imply the child is listening.
+MCP stdout carries only protocol traffic.
+
+Diagnostics are written to `~/.punt-labs/cryptd/logs/cryptd.log`. Log safe
+error categories and recovered panic locations rather than raw error strings
+or crash dumps, which may contain game content or credentials. Refuse to
+start if a private diagnostic sink cannot be initialized; report that failure
+on stderr when available.
+
+Record operation names, durations, and an allowlisted outcome in the separate
+local SQLite store. Capture no scenario, player, or session identifiers and
+configure no network exporter. The shared package owns retention and opt-out.
+
+### Rationale
+
+The shared package supplies rotation across processes, redaction, and schema
+validation without duplicating those implementations. Its Go 1.26 requirement
+raises the minimum toolchain for cryptd.
+
+### Alternatives Considered
+
+- Keep the daemon's stderr log and add usage records to it. Rejected because
+  it leaves other entry points without a private durable sink and mixes usage
+  data with diagnostics.
+- Build rotating logs and a local usage store inside cryptd. Rejected because
+  it duplicates the shared privacy, rotation, and retention mechanisms.

@@ -19,6 +19,7 @@ func serverBinary(t *testing.T) string {
 	cmd.Dir = repoRoot(t)
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, "build cryptd failed: %s", out)
+	t.Setenv("HOME", t.TempDir())
 	return bin
 }
 

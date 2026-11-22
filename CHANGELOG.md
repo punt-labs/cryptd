@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- All shipped binaries use the shared private rotating diagnostics sink at
+  `~/.punt-labs/cryptd/logs/cryptd.log` and record privacy-safe local usage.
+  The daemon no longer writes to `~/.crypt/cryptd.log`; existing logs are left
+  in place. Building from source now requires Go 1.26 or later.
+
 - **Linear is the tracker of record.** Issues live in the Punt Labs team under the `repo:cryptd` label; the seven open epics (M10 Daemon Session Routing, M11 Full DM Mode, M13 Rich World, M14 Multiplayer, M15 Sound System, Two-package distribution, Autonomous development loop) are Linear projects carrying the `cryptd` project label.
 - **Multiplayer is a standalone capability (DES-034).** Multiplayer — a real party of several human players in one game, with the game as the DM — is a capability of the engine and daemon, defined in terms of game state and the daemon protocol: a real `Party []Character`, `character_id` routing on actions, per-player session-to-character binding, turn ownership, and the DM narrating for the full party. The transport by which players connect is a separate implementation choice.
 - **Backfilled three missing ADRs (DES-030, DES-031, DES-032).** DESIGN.md requires every design change to be logged, but three shipped decisions were never recorded. DES-030 corrects the "LLM as DM" framing (DES-009/DES-014): the game engine is the DM, and the LLM enhances it — the engine is always the DM, present at every inference tier, and no client or session is the DM. DES-031 logs the direct JSON-RPC method protocol (`session.init`, `game.*`) with per-session mode selection that replaced the MCP `tools/call` framing and `--passthrough` flag (supersedes that part of DES-025). DES-032 logs the Bubble Tea TUI as the `crypt` client display with a `--plain` readline fallback (extends DES-026/DES-029).

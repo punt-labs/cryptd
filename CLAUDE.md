@@ -120,8 +120,8 @@ The engine knows nothing about interpreters. Interpreters know nothing about nar
 
 Go-specific standards do not yet exist in punt-kit. These are the project conventions:
 
-- **Go 1.25+**. Module path: `github.com/punt-labs/cryptd`.
-- **No external dependencies beyond `testify` and `yaml.v3`** unless there is a strong reason. The engine is intentionally lightweight.
+- **Go 1.26+**. Module path: `github.com/punt-labs/cryptd`.
+- **Avoid new dependencies without a strong reason.** The engine is intentionally lightweight. Shipped entry points use the Punt Labs observability package for private diagnostics and telemetry (DES-035).
 - **Table-driven tests** with `testify/assert` and `testify/require`.
 - **No `interface{}` or `any` in public API** unless unavoidable (e.g., `EngineEvent.Details`).
 - **Errors are values, not strings.** Use typed errors (`NoExitError`, `LockedError`, `ErrVersionMismatch`) for conditions callers need to distinguish. Wrap with `fmt.Errorf("context: %w", err)` for everything else.

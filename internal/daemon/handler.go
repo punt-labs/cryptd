@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"strings"
+	"time"
 
+	"github.com/punt-labs/cryptd/internal/observe"
 	"github.com/punt-labs/cryptd/internal/protocol"
 	"github.com/punt-labs/cryptd/internal/scenariodir"
 )
@@ -33,6 +34,7 @@ func (s *Server) handleConnection(r io.Reader, w io.Writer) {
 
 		var req Request
 		if err := json.Unmarshal(line, &req); err != nil {
+			s.log.Warn("Rejected malformed JSON-RPC request", "code", int(CodeParseError))
 			s.writeResponse(w, Response{
 				JSONRPC: "2.0",
 				ID:      nil,
@@ -42,6 +44,7 @@ func (s *Server) handleConnection(r io.Reader, w io.Writer) {
 		}
 
 		if req.JSONRPC != "2.0" {
+			s.log.Warn("Rejected unsupported JSON-RPC version", "code", int(CodeInvalidRequest))
 			s.writeResponse(w, Response{
 				JSONRPC: "2.0",
 				ID:      req.ID,
@@ -51,6 +54,12 @@ func (s *Server) handleConnection(r io.Reader, w io.Writer) {
 		}
 
 		resp := s.safeHandleRequest(req, &sess)
+		if resp.Error != nil {
+			switch resp.Error.Code {
+			case CodeInvalidRequest, CodeMethodNotFound, CodeInvalidParams:
+				s.log.Warn("Rejected JSON-RPC request", "code", int(resp.Error.Code))
+			}
+		}
 
 		// JSON-RPC 2.0: requests without an ID are notifications — no response.
 		if req.ID == nil {
@@ -82,16 +91,20 @@ func (s *Server) handleConnection(r io.Reader, w io.Writer) {
 	}
 
 	if err := scanner.Err(); err != nil {
-		log.Printf("daemon: connection read error: %v", err)
+		s.log.Debug("Could not read next JSON-RPC record")
 	}
 }
 
 // safeHandleRequest wraps handleRequest with panic recovery so one bad request
 // does not crash the daemon or drop the connection.
 func (s *Server) safeHandleRequest(req Request, sess **Session) (resp Response) {
+	if req.Method == "game.new" && s.observeGame != nil {
+		started := time.Now()
+		defer func() { s.observeGame(started, resp.Error == nil) }()
+	}
 	defer func() {
 		if r := recover(); r != nil {
-			log.Printf("daemon: panic handling %s: %v", req.Method, r)
+			observe.LogPanic(s.log, "JSON-RPC request handler panicked", r)
 			resp = Response{
 				JSONRPC: "2.0",
 				ID:      req.ID,
@@ -109,7 +122,9 @@ func (s *Server) handleRequest(req Request, sess **Session) Response {
 		var params protocol.InitializeParams
 		if len(req.Params) > 0 {
 			// Best-effort parse; missing or malformed params are fine.
-			_ = json.Unmarshal(req.Params, &params)
+			if err := json.Unmarshal(req.Params, &params); err != nil {
+				s.log.Warn("Ignored malformed session initialization parameters")
+			}
 		}
 		var sid string
 		if id := sanitizeSessionID(params.SessionID); id != "" {
@@ -143,7 +158,7 @@ func (s *Server) handleRequest(req Request, sess **Session) Response {
 		s.mu.RLock()
 		pt := (*sess).passthrough
 		s.mu.RUnlock()
-		log.Printf("daemon: session %s established (has_game=%v, passthrough=%v)", sid, hasGame, pt)
+		s.log.Info("Initialized game session", "resumed", hasGame, "passthrough", pt)
 
 		return Response{
 			JSONRPC: "2.0",
@@ -206,19 +221,17 @@ func (s *Server) isNewGameSuccess(req Request, resp Response) bool {
 func (s *Server) runGameLoop(scanner *bufio.Scanner, w io.Writer, sess *Session) {
 	g, rpcErr := s.gameForSession(sess)
 	if rpcErr != nil {
-		log.Printf("daemon: runGameLoop: %s", rpcErr.Message)
+		s.log.Error("Could not start game loop", "code", int(rpcErr.Code))
 		return
 	}
 
-	if rpcErr = g.RunLoop(s.ctx, &RunLoopRequest{
+	_ = g.RunLoop(s.ctx, &RunLoopRequest{
 		Scanner:           scanner,
 		Writer:            w,
 		Interp:            s.interp,
 		Narr:              s.narr,
 		SkipInitialRender: true, // handleNewGamePlay already sent the initial room
-	}); rpcErr != nil {
-		log.Printf("daemon: game loop error: %s", rpcErr.Message)
-	}
+	})
 }
 
 // resumeGameLoop resumes a normal-mode game loop for a reconnected session
@@ -227,20 +240,18 @@ func (s *Server) runGameLoop(scanner *bufio.Scanner, w io.Writer, sess *Session)
 func (s *Server) resumeGameLoop(scanner *bufio.Scanner, w io.Writer, sess *Session) {
 	g, rpcErr := s.gameForSession(sess)
 	if rpcErr != nil {
-		log.Printf("daemon: resumeGameLoop: %s", rpcErr.Message)
+		s.log.Error("Could not resume game loop", "code", int(rpcErr.Code))
 		return
 	}
 
-	log.Printf("daemon: resuming game loop for session %s", sess.id)
+	s.log.Debug("Resuming game loop")
 
-	if rpcErr = g.RunLoop(s.ctx, &RunLoopRequest{
+	_ = g.RunLoop(s.ctx, &RunLoopRequest{
 		Scanner: scanner,
 		Writer:  w,
 		Interp:  s.interp,
 		Narr:    s.narr,
-	}); rpcErr != nil {
-		log.Printf("daemon: resume game loop error: %s", rpcErr.Message)
-	}
+	})
 }
 
 // handleGameCommand dispatches a game.* method to the game goroutine (passthrough mode).
@@ -370,11 +381,11 @@ func (s *Server) handleListScenarios(req Request) Response {
 func (s *Server) writeResponse(w io.Writer, resp Response) {
 	data, err := json.Marshal(resp)
 	if err != nil {
-		log.Printf("daemon: marshal response: %v", err)
+		s.log.Error("Could not encode JSON-RPC response")
 		return
 	}
 	data = append(data, '\n')
 	if _, err := w.Write(data); err != nil {
-		log.Printf("daemon: write response: %v", err)
+		s.log.Debug("Could not write JSON-RPC response")
 	}
 }

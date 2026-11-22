@@ -2,17 +2,19 @@ package narrator
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"strings"
 
 	"github.com/punt-labs/cryptd/internal/inference"
 	"github.com/punt-labs/cryptd/internal/model"
+	"github.com/punt-labs/cryptd/internal/observe"
 )
 
 // LLM uses a large language model (e.g. Claude) to produce atmospheric narration
 // for key game events. Tactical events use the fallback narrator. On inference
 // failure, all events fall back.
 type LLM struct {
+	log      *slog.Logger
 	client   *inference.Client
 	fallback model.Narrator
 }
@@ -20,8 +22,8 @@ type LLM struct {
 // NewLLM creates an LLM narrator that enriches event narration via the
 // inference client and falls back to the provided narrator on failure or
 // for events that don't benefit from atmospheric prose.
-func NewLLM(client *inference.Client, fallback model.Narrator) *LLM {
-	return &LLM{client: client, fallback: fallback}
+func NewLLM(client *inference.Client, fallback model.Narrator, loggers ...*slog.Logger) *LLM {
+	return &LLM{client: client, fallback: fallback, log: observe.LoggerOrDiscard(loggers)}
 }
 
 // llmEventTypes maps event types to their prompt builder and post-processor.
@@ -78,13 +80,13 @@ func (l *LLM) Narrate(ctx context.Context, event model.EngineEvent, state model.
 		if ctx.Err() != nil {
 			return "", ctx.Err()
 		}
-		log.Printf("cryptd: LLM narrate failed, falling back to template: %v", err)
+		l.log.WarnContext(ctx, "Inference narration failed; using template", "error_kind", observe.ErrorKind(err))
 		return l.fallback.Narrate(ctx, event, state)
 	}
 
 	trimmed := strings.TrimSpace(resp)
 	if trimmed == "" {
-		log.Println("cryptd: LLM returned empty response, falling back to template")
+		l.log.WarnContext(ctx, "Inference returned empty narration; using template")
 		return l.fallback.Narrate(ctx, event, state)
 	}
 
@@ -94,4 +96,3 @@ func (l *LLM) Narrate(ctx context.Context, event model.EngineEvent, state model.
 
 	return trimmed, nil
 }
-

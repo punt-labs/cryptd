@@ -4,16 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/punt-labs/cryptd/internal/model"
-	"golang.org/x/term"
+	"github.com/punt-labs/cryptd/internal/observe"
 )
 
 // Server is the game server that exposes game methods over a network connection.
@@ -27,13 +28,15 @@ import (
 // to normal mode unless the client sends mode="passthrough" in session.init.
 // When neither is configured, all sessions default to passthrough.
 type Server struct {
-	interp      model.CommandInterpreter
-	narr        model.Narrator
+	log             *slog.Logger
+	observeGame     func(time.Time, bool)
+	interp          model.CommandInterpreter
+	narr            model.Narrator
 	network         string // "unix" or "tcp"
 	address         string // socket path or host:port
 	scenarioDir     string
 	defaultScenario string // scenario ID used when new_game omits scenario_id
-	listener    net.Listener
+	listener        net.Listener
 
 	// Session and game registries. Protected by mu.
 	mu       sync.RWMutex
@@ -47,6 +50,16 @@ type Server struct {
 
 // ServerOption configures a Server.
 type ServerOption func(*Server)
+
+// WithLogger configures the daemon's diagnostic logger.
+func WithLogger(log *slog.Logger) ServerOption {
+	return func(s *Server) { s.log = log }
+}
+
+// WithGameObserver reports the duration and outcome of each game creation.
+func WithGameObserver(observe func(time.Time, bool)) ServerOption {
+	return func(s *Server) { s.observeGame = observe }
+}
 
 // WithInterpreter sets the command interpreter for normal mode.
 func WithInterpreter(interp model.CommandInterpreter) ServerOption {
@@ -69,6 +82,7 @@ func WithDefaultScenario(id string) ServerOption {
 func NewServer(socketPath, scenarioDir string, opts ...ServerOption) *Server {
 	ctx, cancel := context.WithCancel(context.Background())
 	s := &Server{
+		log:         slog.New(slog.DiscardHandler),
 		network:     "unix",
 		address:     socketPath,
 		scenarioDir: scenarioDir,
@@ -88,6 +102,7 @@ func NewServer(socketPath, scenarioDir string, opts ...ServerOption) *Server {
 func NewTCPServer(listenAddr, scenarioDir string, opts ...ServerOption) *Server {
 	ctx, cancel := context.WithCancel(context.Background())
 	s := &Server{
+		log:         slog.New(slog.DiscardHandler),
 		network:     "tcp",
 		address:     listenAddr,
 		scenarioDir: scenarioDir,
@@ -138,6 +153,7 @@ func (s *Server) listenUnix() error {
 
 	// Restrict socket permissions to owner only, independent of umask.
 	if err := os.Chmod(s.address, 0o600); err != nil {
+		s.log.Warn("Could not restrict Unix socket permissions")
 		_ = ln.Close() // best-effort close on chmod failure
 		return fmt.Errorf("set unix socket permissions: %w", err)
 	}
@@ -153,7 +169,7 @@ func (s *Server) listenTCP() error {
 	if err != nil {
 		return fmt.Errorf("listen tcp: %w", err)
 	}
-	log.Println("daemon: WARNING: TCP mode has no authentication — do not expose to untrusted networks")
+	s.log.Warn("TCP listener has no authentication; do not expose it to untrusted networks")
 	return s.Serve(ln)
 }
 
@@ -173,20 +189,15 @@ func (s *Server) Serve(ln net.Listener) error {
 		close(sigCh)
 	}()
 	go func() {
-		sig, ok := <-sigCh
+		_, ok := <-sigCh
 		if !ok {
 			return
 		}
-		// When stderr is a terminal, print a newline so the shutdown
-		// message starts on a clean line after the terminal's ^C echo.
-		if term.IsTerminal(int(os.Stderr.Fd())) {
-			_, _ = fmt.Fprintln(os.Stderr)
-		}
-		log.Printf("daemon: received %s, shutting down", sig)
+		s.log.Info("Received shutdown signal")
 		_ = ln.Close() // trigger accept loop exit
 	}()
 
-	log.Printf("daemon: listening on %s %s", s.network, s.address)
+	s.log.Info("Game daemon is listening", "network", ln.Addr().Network())
 
 	var (
 		wg      sync.WaitGroup
@@ -204,6 +215,22 @@ func (s *Server) Serve(ln net.Listener) error {
 		}
 		connsMu.Unlock()
 		wg.Wait()
+		s.mu.RLock()
+		games := make([]*Game, 0, len(s.games))
+		for _, g := range s.games {
+			games = append(games, g)
+		}
+		s.mu.RUnlock()
+		stop := time.NewTimer(5 * time.Second)
+		defer stop.Stop()
+		for _, g := range games {
+			select {
+			case <-g.done:
+			case <-stop.C:
+				s.log.Warn("Timed out waiting for game shutdown")
+				return
+			}
+		}
 	}
 
 	for {
@@ -216,7 +243,7 @@ func (s *Server) Serve(ln net.Listener) error {
 			shutdown()
 			return fmt.Errorf("accept: %w", err)
 		}
-		log.Println("daemon: client connected")
+		s.log.Debug("Client connected")
 
 		connsMu.Lock()
 		conns[conn] = struct{}{}
@@ -227,15 +254,15 @@ func (s *Server) Serve(ln net.Listener) error {
 			defer wg.Done()
 			defer func() {
 				if r := recover(); r != nil {
-					log.Printf("daemon: connection handler panicked: %v", r)
+					observe.LogPanic(s.log, "Connection handler panicked", r)
 				}
 				connsMu.Lock()
 				delete(conns, c)
 				connsMu.Unlock()
 				if err := c.Close(); err != nil {
-					log.Printf("daemon: conn close: %v", err)
+					s.log.Debug("Could not close client connection")
 				}
-				log.Println("daemon: client disconnected")
+				s.log.Debug("Client disconnected")
 			}()
 			s.handleConnection(c, c)
 		}(conn)
@@ -267,7 +294,7 @@ func (s *Server) createAndStartGame() (*Game, error) {
 	if err != nil {
 		return nil, err
 	}
-	g := newGame(s.ctx, id, s.scenarioDir, s.defaultScenario)
+	g := newGame(s.ctx, s.log.With("component", "cryptd.game"), id, s.scenarioDir, s.defaultScenario)
 	s.mu.Lock()
 	s.games[id] = g
 	s.mu.Unlock()

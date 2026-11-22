@@ -106,6 +106,17 @@ type chatResponse struct {
 	} `json:"choices"`
 }
 
+type httpStatusError struct {
+	status int
+	detail string
+}
+
+func (e httpStatusError) Error() string {
+	return fmt.Sprintf("inference: server returned %d: %s", e.status, e.detail)
+}
+
+func (e httpStatusError) HTTPStatusCode() int { return e.status }
+
 // ChatCompletion sends a chat completion request and returns the model's
 // response text. Callers own JSON parsing of the response content.
 func (c *Client) ChatCompletion(ctx context.Context, messages []Message, opts *Options) (string, error) {
@@ -148,7 +159,7 @@ func (c *Client) ChatCompletion(ctx context.Context, messages []Message, opts *O
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("inference: server returned %d: %s", resp.StatusCode, truncate(respBody, 200))
+		return "", httpStatusError{status: resp.StatusCode, detail: truncate(respBody, 200)}
 	}
 
 	var chatResp chatResponse

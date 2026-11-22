@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"os"
 	"os/exec"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/ergochat/readline"
+	"github.com/punt-labs/cryptd/internal/observe"
 	"github.com/punt-labs/cryptd/internal/protocol"
 )
 
@@ -22,9 +24,10 @@ var errConnLost = errors.New("connection lost")
 
 // run connects to the server and starts the interactive session.
 // Returns an exit code (0 = clean, 1 = error).
-func run(socketPath, addr, scenario, charName, charClass, sessionID string) int {
-	conn, err := dial(socketPath, addr)
+func run(log *slog.Logger, socketPath, addr, scenario, charName, charClass, sessionID string) int {
+	conn, err := dial(log, socketPath, addr)
 	if err != nil {
+		log.Error("Could not connect to game daemon", "error_kind", observe.ErrorKind(err))
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
 	}
@@ -33,21 +36,8 @@ func run(socketPath, addr, scenario, charName, charClass, sessionID string) int 
 	return session(conn, os.Stdin, os.Stdout, os.Stderr, scenario, charName, charClass, sessionID)
 }
 
-// dial connects to the server via TCP or Unix socket.
-func dial(socketPath, addr string) (net.Conn, error) {
-	return dialWithFlags(socketPath, addr)
-}
-
-// dialMCP connects to the server for MCP mode. Passthrough mode is now set
-// per-session during session.init, so no extra server flags are needed.
-func dialMCP(socketPath, addr string) (net.Conn, error) {
-	return dialWithFlags(socketPath, addr)
-}
-
-// dialWithFlags connects to the server via TCP (if addr is set) or Unix socket,
-// auto-starting cryptd serve with the given extra flags if the socket is not
-// already listening.
-func dialWithFlags(socketPath, addr string, extraFlags ...string) (net.Conn, error) {
+// dial connects via TCP or Unix socket, auto-starting the local daemon if needed.
+func dial(log *slog.Logger, socketPath, addr string) (net.Conn, error) {
 	if addr != "" {
 		conn, err := net.DialTimeout("tcp", addr, 5*time.Second)
 		if err != nil {
@@ -64,12 +54,11 @@ func dialWithFlags(socketPath, addr string, extraFlags ...string) (net.Conn, err
 			return nil, fmt.Errorf("cannot determine home directory: %w", err)
 		}
 	}
-	return dialOrStart(sock, extraFlags...)
+	return dialOrStart(log, sock)
 }
 
 // dialOrStart connects to the Unix socket, starting cryptd serve if needed.
-// Any extraFlags are appended to the serve command (e.g. "--passthrough").
-func dialOrStart(socketPath string, extraFlags ...string) (net.Conn, error) {
+func dialOrStart(log *slog.Logger, socketPath string) (net.Conn, error) {
 	conn, err := net.DialTimeout("unix", socketPath, time.Second)
 	if err == nil {
 		return conn, nil
@@ -80,16 +69,17 @@ func dialOrStart(socketPath string, extraFlags ...string) (net.Conn, error) {
 		return nil, fmt.Errorf("cryptd not found in PATH — install it or start the server manually")
 	}
 
-	// Start in foreground mode so this process IS the server — kill and
-	// wait target the right PID (not a daemonize parent that already exited).
-	// Capture stderr in a buffer — server log output on the client terminal
-	// corrupts readline's raw-mode state, but we need diagnostics on failure.
-	args := []string{"serve", "-f", "--socket", socketPath}
-	args = append(args, extraFlags...)
+	// Use foreground mode so Wait and Kill target the actual server.
+	// Keep stderr for a user-facing startup error, not as a durable sink.
+	id := observe.NewLaunchID()
+	log = log.With("launch_id", id)
 	var stderrBuf bytes.Buffer
-	cmd := exec.Command(cryptd, args...)
+	cmd := exec.Command(cryptd, "serve", "-f", "--socket", socketPath)
+	cmd.Env = append(os.Environ(), observe.LaunchIDEnv+"="+id)
 	cmd.Stderr = &stderrBuf
+	log.Info("Spawning local game daemon")
 	if err := cmd.Start(); err != nil {
+		log.Warn("Could not spawn local game daemon", "error_kind", observe.ErrorKind(err))
 		return nil, fmt.Errorf("failed to start cryptd: %w", err)
 	}
 
@@ -102,6 +92,7 @@ func dialOrStart(socketPath string, extraFlags ...string) (net.Conn, error) {
 		// Check if the server exited before the socket appeared.
 		select {
 		case err := <-waitCh:
+			log.Warn("Local game daemon exited before it was ready")
 			msg := strings.TrimSpace(stderrBuf.String())
 			if msg != "" {
 				return nil, fmt.Errorf("cryptd exited before socket ready: %s", msg)
@@ -119,6 +110,7 @@ func dialOrStart(socketPath string, extraFlags ...string) (net.Conn, error) {
 	// Socket never appeared — kill the server.
 	_ = cmd.Process.Kill()
 	<-waitCh
+	log.Warn("Local game daemon did not become ready before timeout")
 	return nil, fmt.Errorf("cryptd started but socket %s not ready within 5s", socketPath)
 }
 
@@ -158,7 +150,7 @@ func session(conn net.Conn, in io.Reader, out, errOut io.Writer, scenario, charN
 			return nil, errConnLost
 		}
 		var resp struct {
-			Result json.RawMessage  `json:"result"`
+			Result json.RawMessage    `json:"result"`
 			Error  *protocol.RPCError `json:"error"`
 		}
 		if err := json.Unmarshal(scanner.Bytes(), &resp); err != nil {
@@ -353,7 +345,6 @@ func startGame(send func(string, any) (json.RawMessage, error), out, errOut io.W
 	displayPlayResponse(out, playResp)
 	return nil
 }
-
 
 const helpText = `commands:
   new <scenario> <name> <class>   Start a new game
