@@ -171,6 +171,36 @@ func TestCryptd_RecordsDiagnosticsAndTelemetry(t *testing.T) {
 	require.Contains(t, lines[0], `"code":-32700`)
 	require.Contains(t, lines[1], `"serverInfo"`)
 
+	for _, sig := range []os.Signal{os.Interrupt, syscall.SIGTERM} {
+		t.Run(sig.String(), func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+			defer cancel()
+			bridge := exec.CommandContext(ctx, mcp.Path, mcp.Args[1:]...)
+			bridge.Dir, bridge.Env = mcp.Dir, mcp.Env
+			stdin, err := bridge.StdinPipe()
+			require.NoError(t, err)
+			stdout, err := bridge.StdoutPipe()
+			require.NoError(t, err)
+			var stderr bytes.Buffer
+			bridge.Stderr = &stderr
+			require.NoError(t, bridge.Start())
+			defer func() {
+				if bridge.ProcessState == nil {
+					_ = bridge.Process.Kill()
+					_ = bridge.Wait()
+				}
+			}()
+			_, err = fmt.Fprintln(stdin, `{"jsonrpc":"2.0","id":1,"method":"ping"}`)
+			require.NoError(t, err)
+			response := bufio.NewScanner(stdout)
+			require.True(t, response.Scan(), "missing MCP ping reply: %v", response.Err())
+			require.JSONEq(t, `{"jsonrpc":"2.0","id":1,"result":{}}`, response.Text())
+			require.NoError(t, bridge.Process.Signal(sig))
+			require.NoError(t, bridge.Wait(), "stderr: %s", stderr.String())
+			require.Empty(t, stderr.String())
+		})
+	}
+
 	play := cmd("crypt", "--socket", socket, "--plain")
 	play.Stdin = strings.NewReader("quit\n")
 	out, err = play.CombinedOutput()
@@ -225,6 +255,8 @@ func TestCryptd_RecordsDiagnosticsAndTelemetry(t *testing.T) {
 	log := logText()
 	require.Contains(t, log, "[WARNING] cryptd.daemon: Rejected malformed JSON-RPC request")
 	require.Contains(t, log, "[WARNING] cryptd.mcp: Rejected MCP request")
+	require.Equal(t, 3, strings.Count(log, "[INFO] cryptd.mcp: MCP bridge stopped outcome=ok"))
+	require.NotContains(t, log, "MCP bridge stopped after a transport failure")
 	require.Regexp(t, `\[ERROR\] cryptd.daemon: Game daemon stopped after a listener failure[^\n]*error_kind=not_a_directory`, log)
 	require.Contains(t, log, "Finished scenario administration command")
 	require.NotContains(t, log, private)
@@ -272,7 +304,7 @@ func TestCryptd_RecordsDiagnosticsAndTelemetry(t *testing.T) {
 		"cryptd.launcher.spawn":  {"ok", "ok"},
 		"cryptd.cli.play":        {"ok"},
 		"cryptd.cli.headless":    {"ok"},
-		"cryptd.mcp.serve":       {"ok"},
+		"cryptd.mcp.serve":       {"ok", "ok", "ok"},
 		"cryptd.admin.validate":  {"failed", "ok"},
 	}
 	require.Len(t, outcomes, len(expected))

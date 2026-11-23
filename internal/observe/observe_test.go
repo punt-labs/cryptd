@@ -10,12 +10,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestErrorKindOmitsPath(t *testing.T) {
+func TestErrorKind_OmitsPath(t *testing.T) {
 	err := &os.PathError{Op: "mkdir", Path: "/private", Err: syscall.ENOTDIR}
 	require.Equal(t, "not_a_directory", ErrorKind(err))
 }
 
-func TestLogPanicOmitsValue(t *testing.T) {
+func TestLogPanic_OmitsValue(t *testing.T) {
 	var out bytes.Buffer
 	log := slog.New(slog.NewTextHandler(&out, nil))
 	func() {
@@ -25,6 +25,6 @@ func TestLogPanicOmitsValue(t *testing.T) {
 		panic("private-panic-content")
 	}()
 	require.Contains(t, out.String(), "panic_type=string")
-	require.Contains(t, out.String(), "function=github.com/punt-labs/cryptd/internal/observe.TestLogPanicOmitsValue")
+	require.Contains(t, out.String(), "function=github.com/punt-labs/cryptd/internal/observe.TestLogPanic_OmitsValue")
 	require.NotContains(t, out.String(), "private-panic-content")
 }

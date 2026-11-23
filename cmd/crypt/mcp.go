@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -46,10 +47,11 @@ func runMCP(logger *slog.Logger, socketPath, addr string) int {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	logger.Info("Started MCP bridge")
-	if err := s.Listen(ctx, os.Stdin, mcpOutput{Writer: os.Stdout, log: logger}); err != nil {
+	if err := s.Listen(ctx, os.Stdin, mcpOutput{Writer: os.Stdout, log: logger}); err != nil &&
+		!(errors.Is(err, context.Canceled) && ctx.Err() == context.Canceled) {
 		return mcpFailure(logger, "MCP bridge stopped after a transport failure", err)
 	}
-	logger.Info("MCP bridge stopped")
+	logger.Info("MCP bridge stopped", "outcome", "ok")
 	return 0
 }
 
