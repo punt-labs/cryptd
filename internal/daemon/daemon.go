@@ -269,11 +269,6 @@ func (s *Server) Serve(ln net.Listener) error {
 	}
 }
 
-// Address returns the configured listen address.
-func (s *Server) Address() string {
-	return s.address
-}
-
 // --- registry methods ---
 
 // getOrCreateSession returns an existing session by ID, or creates a new one.

@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Removed the unused internal daemon listen-address accessor.
+
 - **Agent edit checks are advisory (DES-036).** The project `crypt-go` check
   set runs advisory gofmt, tagged vet and package tests per Go edit instead
   of a blocking full gate (~6 s → ~1.4–2.4 s warm). Blocking `make check`
