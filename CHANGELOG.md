@@ -6,8 +6,6 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- Removed the unused internal daemon listen-address accessor.
-
 - **Agent edit checks are advisory (DES-036).** The project `crypt-go` check
   set runs advisory gofmt, tagged vet and package tests per Go edit instead
   of a blocking full gate (~6 s → ~1.4–2.4 s warm). Blocking `make check`
@@ -92,6 +90,8 @@ All notable changes to this project will be documented in this file.
 - CI `staticcheck` pin bumped from v0.7.0 to v0.8.1 — v0.7.0 can't parse the Go 1.27+ stdlib export data format, so `make check` failed on any machine with Go 1.27 as the default local toolchain.
 
 ### Removed
+
+- The unused internal daemon listen-address accessor.
 
 - **Lux renderer integration (abandoned).** Deleted the `internal/lux` wire-protocol client, the `renderer.Lux` renderer and its element/transport translation layer, the `FakeLuxServer`/`LuxElementDisplay` test doubles, the Lux integration tests, and the `cryptd serve -t --lux` flag (~3,300 lines). The game's player-facing display is the `crypt` client's Bubble Tea TUI, fed typed state over the twin-renderer wire (DES-026); the engine keeps `CLIRenderer` and `Autoplay`. The Go Lux client had drifted to wire protocol `0.1` against Lux 0.33.1 and no play mode shipped on it. See DES-029; operator ruling 2026-11-08 (bead cryptd-oal). The M5 Lux HUD and M12 Lux HUD Release Pass milestones are abandoned.
 - `cmd/crypt/embedded.go` — deleted fat client that embedded the game engine. Engine access is always through the server.
