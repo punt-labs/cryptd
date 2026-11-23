@@ -198,8 +198,10 @@ built-in parser and templates. Even with a model, commands the built-in parser
 recognizes skip the model, and combat results and errors use the built-in templates.
 
 **Files.** The daemon, clients, and scenario tools share a private rotating
-diagnostic log at `~/.punt-labs/cryptd/logs/cryptd.log`. A background server
-records its process ID in `~/.crypt/cryptd.pid`. Saved games go to
+diagnostic log at `~/.punt-labs/cryptd/logs/cryptd.log`. If waiting for the
+rotation lock times out at startup, the process exits and reports the timeout
+when stderr is available. Retry after the lock is released. A background
+server records its process ID in `~/.crypt/cryptd.pid`. Saved games go to
 `.dungeon/saves/` in the server's working directory.
 
 **Usage telemetry.** cryptd stores operation names, durations, and outcomes

@@ -69,7 +69,11 @@ type Runtime struct {
 func Run(role string, op Operation, run func(*Runtime) int) int {
 	h, err := logging.New(Tool, role)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "cryptd: cannot initialize private diagnostic log (%s); check ~/.punt-labs/cryptd/logs\n", ErrorKind(err))
+		if errors.Is(err, context.DeadlineExceeded) {
+			fmt.Fprintln(os.Stderr, "cryptd: timed out waiting for the diagnostic log rotation lock in ~/.punt-labs/cryptd/logs; retry after the lock is released")
+		} else {
+			fmt.Fprintf(os.Stderr, "cryptd: cannot initialize private diagnostic log (%s); check ~/.punt-labs/cryptd/logs\n", ErrorKind(err))
+		}
 		return 1
 	}
 	defer h.Close()
