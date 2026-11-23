@@ -9,7 +9,7 @@ All notable changes to this project will be documented in this file.
 - **Agent edit checks are advisory (DES-036).** The project `crypt-go` check
   set runs advisory gofmt, tagged vet and package tests per Go edit instead
   of a blocking full gate (~6 s → ~1.4–2.4 s warm). Blocking `make check`
-  now runs at commit and handoff. Requires the ethos release after v5.1.1.
+  now runs at commit and handoff. Requires ethos v5.2.0 or later.
 
 - All shipped binaries use the shared private rotating diagnostics sink at
   `~/.punt-labs/cryptd/logs/cryptd.log` and record privacy-safe local usage.

@@ -1927,7 +1927,7 @@ receive advisory `gofmt -l`, tagged package vet and race-enabled package tests
 with integration tests included. Vet also compiles E2E and acceptance tests;
 package test execution excludes the E2E subprocess suites. Shell edits receive
 advisory shellcheck. Generated agents call `ethos hook post-edit --agent <handle>`.
-Requires the ethos release after v5.1.1; tested on ethos main `f4f884f`.
+Requires ethos v5.2.0 or later; tested on ethos main `d43e70e` (v5.2.0 code).
 
 Run blocking `make check` at commit and handoff, not after every edit. Commit
 enforces the existing before-every-commit rule; handoff gates completed work
