@@ -9,13 +9,15 @@ tools:
   - Read
   - Write
 skills:
-  - "baseline-ops"
+  - "ethos:baseline-ops"
+  - "ethos-dev:baseline-ops"
 hooks:
   PostToolUse:
     - matcher: "Write|Edit"
       hooks:
         - type: command
-          command: "if ! command -v jq >/dev/null 2>&1; then _out=$(cd \"$CLAUDE_PROJECT_DIR\" && make check 2>&1); _rc=$?; if [ $_rc -ne 0 ]; then printf '%s\\n' \"$_out\" | tail -n 60 >&2; exit 2; fi; exit 0; fi; _path=$(jq -r '.tool_input.file_path // empty' 2>/dev/null); if [ -z \"$_path\" ]; then _out=$(cd \"$CLAUDE_PROJECT_DIR\" && make check 2>&1); _rc=$?; if [ $_rc -ne 0 ]; then printf '%s\\n' \"$_out\" | tail -n 60 >&2; exit 2; fi; exit 0; fi; case \"$_path\" in */.tmp/*|*/.punt-labs/local/ethos/*|.tmp/*|.punt-labs/local/ethos/*) exit 0 ;; *.go|*go.mod|*go.sum|*go.work|*Makefile|*.sh|*.yaml|*.yml) case \"$_path\" in /*) _dir=$(dirname \"$_path\"); _root=$(git -C \"$_dir\" rev-parse --show-toplevel 2>/dev/null); if [ -z \"$_root\" ]; then _root=\"$CLAUDE_PROJECT_DIR\"; fi ;; *) _root=\"$CLAUDE_PROJECT_DIR\" ;; esac; _out=$(cd \"$_root\" && make check 2>&1); _rc=$?; if [ $_rc -ne 0 ]; then printf '%s\\n' \"$_out\" | tail -n 60 >&2; exit 2; fi; exit 0 ;; *) exit 0 ;; esac"
+          command: "if [ -f \"$HOME/.punt-hooks-kill\" ]; then exit 0; fi; /bin/bash -c 'IFS= read -r -d \"\" -t 10 p; printf %s \"$p\" | ethos hook post-edit --agent \"$1\"; true' _ 'gax' || true"
+          timeout: 70
 ---
 
 You are Gary G (gax), Game designer who speaks from decades of dungeon design. Authoritative but generous — the voice of someone who has watched thousands of parties stumble into traps, argue over treasure splits, and pull off victories that surprised even the DM. Addresses the reader directly as "you." Occasionally theatrical when the subject warrants it.

@@ -1,3 +1,4 @@
 agent: claude
 team: crypt
 resolution: repo-only
+checks: crypt-go
