@@ -81,6 +81,8 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- `crypt mcp` now exits with code 0 on SIGINT or SIGTERM and records `ok` in
+  diagnostics and telemetry instead of reporting a transport failure.
 - Startup now reports a diagnostic rotation lock timeout on stderr and exits
   instead of waiting indefinitely for the lock.
 - **`.gitignore` now ignores live ethos mission runtime state.** `.punt-labs/ethos/missions/` (the live mission tree) and `.punt-labs/ethos/missions.jsonl` (the index) are per-run runtime churn and were untracked-but-not-ignored, so a `git add -A` would commit them. Added both to `.gitignore`; `.punt-labs/ethos/missions-closed/` (redacted, exported closed missions) stays tracked. The stale comment block inherited from vox's opposite policy (missions/ tracked) was corrected to cryptd's policy.
