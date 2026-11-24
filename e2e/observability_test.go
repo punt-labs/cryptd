@@ -42,8 +42,10 @@ func TestCrypt_AutoStartsDaemonOnDefaultSocket(t *testing.T) {
 	home, err := os.MkdirTemp("", "cryptd-")
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = os.RemoveAll(home) })
-	runDir := filepath.Join(home, ".punt-labs", "cryptd", "run")
+	toolDir := filepath.Join(home, ".punt-labs", "cryptd")
+	runDir := filepath.Join(toolDir, "run")
 	socket := filepath.Join(runDir, "daemon.sock")
+	pidPath := filepath.Join(runDir, "cryptd.pid")
 	require.NoDirExists(t, runDir)
 
 	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
@@ -62,15 +64,39 @@ func TestCrypt_AutoStartsDaemonOnDefaultSocket(t *testing.T) {
 	require.NoError(t, cmd.Start())
 	t.Cleanup(func() {
 		pgid := -cmd.Process.Pid
-		if err := syscall.Kill(pgid, syscall.SIGTERM); err == nil {
+		if err := syscall.Kill(pgid, syscall.SIGTERM); err != nil {
+			assert.ErrorIs(t, err, syscall.ESRCH)
+		}
+		pidData, err := os.ReadFile(pidPath)
+		if os.IsNotExist(err) {
+			log, _ := os.ReadFile(filepath.Join(toolDir, "logs", "cryptd.log"))
+			if bytes.Contains(log, []byte("Spawning detached daemon")) {
+				for deadline := time.Now().Add(5 * time.Second); os.IsNotExist(err) && time.Now().Before(deadline); {
+					time.Sleep(20 * time.Millisecond)
+					pidData, err = os.ReadFile(pidPath)
+				}
+			}
+		}
+		if !os.IsNotExist(err) {
+			require.NoError(t, err)
+			pid, err := strconv.Atoi(strings.TrimSpace(string(pidData)))
+			require.NoError(t, err)
+			require.Greater(t, pid, 1)
+			if err := syscall.Kill(pid, syscall.SIGTERM); err != nil {
+				assert.ErrorIs(t, err, syscall.ESRCH)
+			}
 			if !assert.Eventually(t, func() bool {
-				_, err := os.Lstat(socket)
+				_, err := os.Lstat(pidPath)
 				return os.IsNotExist(err)
 			}, 5*time.Second, 20*time.Millisecond) {
-				_ = syscall.Kill(pgid, syscall.SIGKILL)
+				_ = syscall.Kill(pid, syscall.SIGKILL)
 			}
-		} else {
-			assert.ErrorIs(t, err, syscall.ESRCH)
+		}
+		if !assert.Eventually(t, func() bool {
+			_, err := os.Lstat(socket)
+			return os.IsNotExist(err)
+		}, 5*time.Second, 20*time.Millisecond) {
+			_ = syscall.Kill(pgid, syscall.SIGKILL)
 		}
 	})
 	require.NoError(t, cmd.Wait(), "%s", output.String())
@@ -78,7 +104,7 @@ func TestCrypt_AutoStartsDaemonOnDefaultSocket(t *testing.T) {
 	info, err := os.Lstat(socket)
 	require.NoError(t, err)
 	require.NotZero(t, info.Mode()&os.ModeSocket)
-	require.NoFileExists(t, filepath.Join(runDir, "cryptd.pid"))
+	require.NoFileExists(t, pidPath)
 }
 
 func TestCryptd_ReportsStartupRotationLockTimeout(t *testing.T) {
