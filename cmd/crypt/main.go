@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/punt-labs/cryptd/internal/layout"
 	"github.com/punt-labs/cryptd/internal/observe"
 	"golang.org/x/term"
 )
@@ -13,7 +14,7 @@ func main() {
 	// Check for subcommands before flag parsing.
 	if len(os.Args) > 1 && os.Args[1] == "mcp" {
 		mcpFS := flag.NewFlagSet("mcp", flag.ContinueOnError)
-		mcpSocket := mcpFS.String("socket", "", "Unix socket path (default ~/.crypt/daemon.sock)")
+		mcpSocket := mcpFS.String("socket", "", layout.DefaultSocketHelp)
 		mcpAddr := mcpFS.String("addr", "", "TCP address (e.g. host:9000)")
 		if err := mcpFS.Parse(os.Args[2:]); err != nil {
 			if err == flag.ErrHelp {
@@ -31,7 +32,7 @@ func main() {
 	}
 
 	fs := flag.NewFlagSet("crypt", flag.ContinueOnError)
-	socketPath := fs.String("socket", "", "Unix socket path (default ~/.crypt/daemon.sock)")
+	socketPath := fs.String("socket", "", layout.DefaultSocketHelp)
 	addr := fs.String("addr", "", "TCP address (e.g. host:9000)")
 	scenario := fs.String("scenario", "", "auto-start game with this scenario ID")
 	name := fs.String("name", "Adventurer", "character name (used with --scenario)")

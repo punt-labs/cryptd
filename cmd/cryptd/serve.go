@@ -19,6 +19,7 @@ import (
 	"github.com/punt-labs/cryptd/internal/game"
 	"github.com/punt-labs/cryptd/internal/inference"
 	"github.com/punt-labs/cryptd/internal/interpreter"
+	"github.com/punt-labs/cryptd/internal/layout"
 	"github.com/punt-labs/cryptd/internal/model"
 	"github.com/punt-labs/cryptd/internal/narrator"
 	"github.com/punt-labs/cryptd/internal/observe"
@@ -30,7 +31,7 @@ func runServe(args []string) int {
 	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
 
 	// Network flags.
-	socketPath := fs.String("socket", "", "Unix socket path (default ~/.crypt/daemon.sock)")
+	socketPath := fs.String("socket", "", layout.DefaultSocketHelp)
 	listenAddr := fs.String("listen", "", "TCP listen address (e.g. :9000)")
 
 	// Daemon flags.
@@ -142,7 +143,7 @@ func serveDaemon(log *slog.Logger, obs *observe.Runtime, socketPath, listenAddr,
 	} else {
 		if socketPath == "" {
 			var err error
-			socketPath, err = daemon.DefaultSocketPath()
+			socketPath, err = layout.DefaultSocketPath()
 			if err != nil {
 				log.Error("Could not resolve default socket path", "error_kind", observe.ErrorKind(err))
 				fmt.Fprintf(os.Stderr, "error: cannot determine home directory: %v\nUse --socket or --listen to specify an address explicitly.\n", err)

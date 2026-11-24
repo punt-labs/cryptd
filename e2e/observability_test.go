@@ -89,12 +89,16 @@ func TestCryptd_ReportsStartupRotationLockTimeout(t *testing.T) {
 }
 
 func TestCryptd_RecordsDiagnosticsAndTelemetry(t *testing.T) {
-	root, home := repoRoot(t), t.TempDir()
+	root := repoRoot(t)
+	home, err := os.MkdirTemp("", "cryptd-")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(home) })
+	cwd := t.TempDir()
 	bin := installObservabilityBinaries(t, root)
 
 	cmd := func(program string, args ...string) *exec.Cmd {
 		c := exec.CommandContext(t.Context(), filepath.Join(bin, program), args...)
-		c.Dir = home
+		c.Dir = cwd
 		c.Env = append(os.Environ(),
 			"HOME="+home, "CRYPT_SCENARIO_DIR="+filepath.Join(root, "testdata", "scenarios"),
 			"CRYPTD_API_KEY=", "CRYPTD_TELEMETRY=", "PUNT_TELEMETRY=",
@@ -105,14 +109,20 @@ func TestCryptd_RecordsDiagnosticsAndTelemetry(t *testing.T) {
 	logDir := filepath.Join(toolDir, "logs")
 	logPath := filepath.Join(logDir, "cryptd.log")
 	dbPath := filepath.Join(toolDir, "telemetry.db")
-	socket := filepath.Join(home, "d.sock")
-	pidPath := filepath.Join(home, ".crypt", "cryptd.pid")
+	runDir := filepath.Join(toolDir, "run")
+	socket := filepath.Join(runDir, "daemon.sock")
+	pidPath := filepath.Join(runDir, "cryptd.pid")
+	legacy := filepath.Join(home, ".crypt")
+	require.NoError(t, os.Mkdir(legacy, 0o700))
+	for _, name := range []string{"daemon.sock", "cryptd.pid"} {
+		require.NoError(t, os.WriteFile(filepath.Join(legacy, name), []byte("legacy fixture"), 0o600))
+	}
 	logText := func() string {
 		b, _ := os.ReadFile(logPath)
 		return string(b)
 	}
 
-	launch := cmd("cryptd", "serve", "--socket", socket)
+	launch := cmd("cryptd", "serve")
 	out, err := launch.CombinedOutput()
 	require.NoError(t, err, "%s", out)
 	pidMatch := regexp.MustCompile(`spawned daemon \(PID ([0-9]+)\)`).FindSubmatch(out)
@@ -121,14 +131,22 @@ func TestCryptd_RecordsDiagnosticsAndTelemetry(t *testing.T) {
 	require.NoError(t, err)
 	child, err := os.FindProcess(pid)
 	require.NoError(t, err)
+	childStopped := false
 	t.Cleanup(func() {
-		if _, err := os.Stat(pidPath); err == nil {
+		if !childStopped {
 			_ = child.Kill()
 		}
 	})
 	require.Eventually(t, func() bool {
 		return strings.Contains(logText(), "Game daemon is listening")
 	}, 10*time.Second, 20*time.Millisecond)
+
+	pidData, err := os.ReadFile(pidPath)
+	require.NoError(t, err)
+	require.Equal(t, strconv.Itoa(pid)+"\n", string(pidData))
+	info, err := os.Stat(runDir)
+	require.NoError(t, err)
+	require.Equal(t, os.FileMode(0o700), info.Mode().Perm())
 
 	const private = "private-fixture@example.invalid"
 	conn, err := net.DialTimeout("unix", socket, time.Second)
@@ -157,7 +175,7 @@ func TestCryptd_RecordsDiagnosticsAndTelemetry(t *testing.T) {
 	send(`{"jsonrpc":"2.0","id":2,"method":"game.new","params":{"scenario_id":"missing","character_name":"`+private+`","character_class":"fighter"}}`, -32602)
 	send(`{"jsonrpc":"2.0","id":3,"method":"game.new","params":{"scenario_id":"minimal","character_name":"`+private+`","character_class":"fighter"}}`, 0)
 
-	mcp := cmd("crypt", "mcp", "--socket", socket)
+	mcp := cmd("crypt", "mcp")
 	mcp.Stdin = strings.NewReader(private + "\n" +
 		`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"smoke","version":"1"}}}` + "\n")
 	mcp.Stderr = nil // Equivalent to an MCP host discarding stderr.
@@ -201,7 +219,7 @@ func TestCryptd_RecordsDiagnosticsAndTelemetry(t *testing.T) {
 		})
 	}
 
-	play := cmd("crypt", "--socket", socket, "--plain")
+	play := cmd("crypt", "--plain")
 	play.Stdin = strings.NewReader("quit\n")
 	out, err = play.CombinedOutput()
 	require.NoError(t, err, "%s", out)
@@ -243,7 +261,9 @@ func TestCryptd_RecordsDiagnosticsAndTelemetry(t *testing.T) {
 		}, 10*time.Second, 20*time.Millisecond)
 	}
 	waitForDaemonRows(1)
+	childStopped = true
 	require.NoFileExists(t, pidPath)
+	require.NoFileExists(t, socket)
 
 	badSocket := filepath.Join(home, "not-a-directory", "d.sock")
 	require.NoError(t, os.WriteFile(filepath.Dir(badSocket), nil, 0o600))
@@ -262,6 +282,11 @@ func TestCryptd_RecordsDiagnosticsAndTelemetry(t *testing.T) {
 	require.NotContains(t, log, private)
 	require.NotContains(t, log, home)
 	require.NoFileExists(t, filepath.Join(home, ".crypt", "cryptd.log"))
+	for _, name := range []string{"daemon.sock", "cryptd.pid"} {
+		data, err := os.ReadFile(filepath.Join(legacy, name))
+		require.NoError(t, err)
+		require.Equal(t, "legacy fixture", string(data))
+	}
 	launches := regexp.MustCompile(`Spawning detached daemon.*launch_id=([0-9a-f]{32})`).FindAllStringSubmatch(log, -1)
 	require.Len(t, launches, 2, "%s", log)
 	for i, stages := range [][]string{

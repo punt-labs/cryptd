@@ -10,6 +10,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/punt-labs/cryptd/internal/layout"
 	"github.com/punt-labs/cryptd/internal/observe"
 )
 
@@ -43,13 +44,12 @@ func daemonize(log *slog.Logger) int {
 }
 
 func daemonPIDPath() (string, error) {
-	home, err := os.UserHomeDir()
+	dir, err := layout.RunDir()
 	if err != nil {
 		return "", fmt.Errorf("cannot determine home directory: %w", err)
 	}
-	dir := filepath.Join(home, ".crypt")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return "", fmt.Errorf("create ~/.crypt: %w", err)
+		return "", fmt.Errorf("create runtime directory: %w", err)
 	}
 	return filepath.Join(dir, "cryptd.pid"), nil
 }

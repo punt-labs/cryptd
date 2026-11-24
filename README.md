@@ -146,7 +146,7 @@ phrasings also work.
 
 | Command | What it does |
 |---------|-------------|
-| `cryptd serve` | Start the server in the background on `~/.crypt/daemon.sock` |
+| `cryptd serve` | Start the server in the background on `~/.punt-labs/cryptd/run/daemon.sock` |
 | `cryptd serve -f` | Run the server in the foreground |
 | `cryptd serve --listen :9000` | Listen on TCP instead of the Unix socket |
 | `cryptd serve --scenario <id>` | Set the default scenario for new games |
@@ -179,7 +179,7 @@ The man pages (`man cryptd`, `man crypt`, `man crypt-admin`) list every flag.
 |---------|---------|---------|
 | `CRYPT_SCENARIO_DIR` | `scenarios` in the current directory | Where the server looks for scenarios |
 | `CRYPTD_API_KEY` | unset | Anthropic API key; enables Claude for parsing and descriptions |
-| `--socket` | `~/.crypt/daemon.sock` | Unix socket for server and client |
+| `--socket` | `~/.punt-labs/cryptd/run/daemon.sock` | Unix socket for `cryptd serve`, `crypt`, and `crypt mcp` |
 
 **Scenarios.** The bundled scenarios are in the repository's `scenarios/`
 directory: `unix-catacombs` (9 rooms) and `unix-megadungeon` (53 rooms). The
@@ -201,8 +201,18 @@ recognizes skip the model, and combat results and errors use the built-in templa
 diagnostic log at `~/.punt-labs/cryptd/logs/cryptd.log`. If waiting for the
 rotation lock times out at startup, the process exits and reports the timeout
 when stderr is available. Retry after the lock is released. A background
-server records its process ID in `~/.crypt/cryptd.pid`. Saved games go to
+server records its process ID in `~/.punt-labs/cryptd/run/cryptd.pid`, even
+when using a custom socket or TCP address. Saved games go to
 `.dungeon/saves/` in the server's working directory.
+
+**Upgrading from `~/.crypt/`.** Stop the old daemon before switching to the
+new default. Update any service or stop script that refers to the old socket
+or PID file. Neither file should be copied to the new directory, and cryptd
+does not migrate or remove the old directory.
+
+If a long home directory makes the default path exceed your OS's Unix
+socket length limit, pass the same shorter `--socket` path to the daemon and
+its clients. Use a directory only you can write to.
 
 **Usage telemetry.** cryptd stores operation names, durations, and outcomes
 locally in `~/.punt-labs/cryptd/telemetry.db` for 90 days. It does not record

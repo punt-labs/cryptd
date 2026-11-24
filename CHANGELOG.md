@@ -6,6 +6,14 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- **Breaking: daemon runtime paths moved (PL-1455).** The default socket and
+  detached-server PID file moved from `~/.crypt/daemon.sock` and
+  `~/.crypt/cryptd.pid` to `~/.punt-labs/cryptd/run/daemon.sock` and
+  `~/.punt-labs/cryptd/run/cryptd.pid`. Stop the old daemon, update any scripts
+  or service configurations that use the old paths, and restart. Do not copy
+  the socket or PID file; they are generated at runtime. The legacy directory
+  is left untouched, and explicit `--socket` overrides still work.
+
 - **Agent edit checks are advisory (DES-036).** The project `crypt-go` check
   set runs advisory gofmt, tagged vet and package tests per Go edit instead
   of a blocking full gate (~6 s → ~1.4–2.4 s warm). Blocking `make check`

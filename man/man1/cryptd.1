@@ -48,7 +48,9 @@ Used by the Crypt plugin for Claude Code.
 .B serve
 Start the game server. By default, daemonizes and listens on a Unix
 socket at
-.IR ~/.crypt/daemon.sock .
+.IR ~/.punt-labs/cryptd/run/daemon.sock .
+When detached, records its process ID in
+.IR ~/.punt-labs/cryptd/run/cryptd.pid .
 .TP
 .B validate
 Validate a scenario YAML file.
@@ -61,7 +63,7 @@ validate instead.
 .TP
 .BI \-\-socket " path"
 Unix socket path. Default:
-.IR ~/.crypt/daemon.sock .
+.IR ~/.punt-labs/cryptd/run/daemon.sock .
 Mutually exclusive with
 .BR \-\-listen .
 .TP
