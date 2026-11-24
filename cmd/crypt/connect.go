@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/ergochat/readline"
+	"github.com/punt-labs/cryptd/internal/layout"
 	"github.com/punt-labs/cryptd/internal/observe"
 	"github.com/punt-labs/cryptd/internal/protocol"
 )
@@ -49,7 +50,7 @@ func dial(log *slog.Logger, socketPath, addr string) (net.Conn, error) {
 	sock := socketPath
 	if sock == "" {
 		var err error
-		sock, err = protocol.DefaultSocketPath()
+		sock, err = layout.DefaultSocketPath()
 		if err != nil {
 			return nil, fmt.Errorf("cannot determine home directory: %w", err)
 		}

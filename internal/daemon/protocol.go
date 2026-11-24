@@ -24,9 +24,6 @@ type (
 	ListSessionsResult  = protocol.ListSessionsResult
 )
 
-// DefaultSocketPath re-exports protocol.DefaultSocketPath.
-var DefaultSocketPath = protocol.DefaultSocketPath
-
 // Re-export error code constants.
 const (
 	CodeParseError     = protocol.CodeParseError

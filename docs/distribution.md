@@ -92,7 +92,7 @@ The `crypt` plugin's `install.sh` handles `cryptd` installation:
    GitHub Release (or a pinned version)
 3. Download and verify SHA256 checksum
 4. Extract the binary to a known location on `$PATH`
-   (e.g., `~/.local/bin/cryptd` or `~/.crypt/bin/cryptd`)
+   (e.g., `~/.local/bin/cryptd`)
 5. Verify the binary runs: `cryptd --version` (exit 0)
 
 The install script lives in the `crypt` plugin repo, not here. This repo

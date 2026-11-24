@@ -16,11 +16,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/punt-labs/cryptd/internal/layout"
 	"github.com/punt-labs/punt-observe-go/logging"
 	"github.com/punt-labs/punt-observe-go/telemetry"
 )
-
-const Tool = "cryptd"
 
 type Operation string
 
@@ -67,7 +66,7 @@ type Runtime struct {
 // Run opens diagnostics at the entry point and flushes usage before the caller exits.
 // An empty operation configures diagnostics only, for argument errors.
 func Run(role string, op Operation, run func(*Runtime) int) int {
-	h, err := logging.New(Tool, role)
+	h, err := logging.New(layout.Tool, role)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			fmt.Fprintln(os.Stderr, "cryptd: timed out waiting for the diagnostic log rotation lock in ~/.punt-labs/cryptd/logs; retry after the lock is released")
@@ -77,10 +76,10 @@ func Run(role string, op Operation, run func(*Runtime) int) int {
 		return 1
 	}
 	defer h.Close()
-	log := slog.New(h).With("component", Tool+"."+role)
+	log := slog.New(h).With("component", layout.Tool+"."+role)
 	runtime := &Runtime{Log: log}
 	if op != "" {
-		runtime.capture = telemetry.New(Tool, telemetry.Config{Diagnostics: log}, schemas()...)
+		runtime.capture = telemetry.New(layout.Tool, telemetry.Config{Diagnostics: log}, schemas()...)
 		defer func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancel()

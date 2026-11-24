@@ -1285,12 +1285,25 @@ crypt — the game client (telnet, but better)
 ```
 
 `cryptd serve` daemonizes by default (fork, detach, PID file) like sshd, nginx, and named.
+The default Unix socket and detached daemon's PID file live in the shared
+`~/.punt-labs/cryptd/run/` directory.
 `-f` keeps it in the foreground, attached to the terminal. `-t` runs the engine on
 stdin/stdout with no network layer (implies `-f`) — this replaces the old `headless` and
 `autoplay` subcommands.
 
 `crypt` connects to `cryptd serve`. It sends text, displays text. If the server is not
 running and the target is a local Unix socket, it forks `cryptd serve` automatically.
+
+**Rejected alternatives for the runtime directory (PL-1455):**
+
+- Automatically use a shorter socket path when the home path exceeds the OS
+  limit. This would make the default runtime location machine-dependent and
+  split the socket from the PID file. The daemon and clients can instead use
+  the same explicit `--socket` override.
+- Read or migrate the old `~/.crypt/` paths. A socket and PID describe a
+  running process, not data to carry forward; reusing them could connect to
+  an old daemon or identify the wrong process. FS-6 also leaves the legacy
+  directory under the user's control.
 
 ### Two daemon modes
 
