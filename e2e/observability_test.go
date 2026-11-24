@@ -36,12 +36,18 @@ func installObservabilityBinaries(t *testing.T, root string) string {
 	return bin
 }
 
+func shortSocketHome(t *testing.T) string {
+	t.Helper()
+	home, err := os.MkdirTemp("/tmp", "cd")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(home) })
+	return home
+}
+
 func TestCrypt_AutoStartsDaemonOnDefaultSocket(t *testing.T) {
 	root := repoRoot(t)
 	bin := installObservabilityBinaries(t, root)
-	home, err := os.MkdirTemp("", "cryptd-")
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.RemoveAll(home) })
+	home := shortSocketHome(t)
 	toolDir := filepath.Join(home, ".punt-labs", "cryptd")
 	runDir := filepath.Join(toolDir, "run")
 	socket := filepath.Join(runDir, "daemon.sock")
@@ -162,9 +168,7 @@ func TestCryptd_ReportsStartupRotationLockTimeout(t *testing.T) {
 
 func TestCryptd_RecordsDiagnosticsAndTelemetry(t *testing.T) {
 	root := repoRoot(t)
-	home, err := os.MkdirTemp("", "cryptd-")
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.RemoveAll(home) })
+	home := shortSocketHome(t)
 	cwd := t.TempDir()
 	bin := installObservabilityBinaries(t, root)
 
