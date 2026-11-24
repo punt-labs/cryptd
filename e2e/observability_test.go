@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	_ "modernc.org/sqlite"
 )
@@ -33,6 +34,51 @@ func installObservabilityBinaries(t *testing.T, root string) string {
 	out, err := install.CombinedOutput()
 	require.NoError(t, err, "%s", out)
 	return bin
+}
+
+func TestCrypt_AutoStartsDaemonOnDefaultSocket(t *testing.T) {
+	root := repoRoot(t)
+	bin := installObservabilityBinaries(t, root)
+	home, err := os.MkdirTemp("", "cryptd-")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(home) })
+	runDir := filepath.Join(home, ".punt-labs", "cryptd", "run")
+	socket := filepath.Join(runDir, "daemon.sock")
+	require.NoDirExists(t, runDir)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, filepath.Join(bin, "crypt"), "--plain")
+	cmd.Dir = t.TempDir()
+	cmd.Env = append(os.Environ(),
+		"HOME="+home, "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"CRYPT_SCENARIO_DIR="+filepath.Join(root, "testdata", "scenarios"),
+		"_CRYPTD_DAEMON=", "CRYPTD_API_KEY=", "CRYPTD_TELEMETRY=off",
+	)
+	cmd.Stdin = strings.NewReader("quit\n")
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	var output bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &output, &output
+	require.NoError(t, cmd.Start())
+	t.Cleanup(func() {
+		pgid := -cmd.Process.Pid
+		if err := syscall.Kill(pgid, syscall.SIGTERM); err == nil {
+			if !assert.Eventually(t, func() bool {
+				_, err := os.Lstat(socket)
+				return os.IsNotExist(err)
+			}, 5*time.Second, 20*time.Millisecond) {
+				_ = syscall.Kill(pgid, syscall.SIGKILL)
+			}
+		} else {
+			assert.ErrorIs(t, err, syscall.ESRCH)
+		}
+	})
+	require.NoError(t, cmd.Wait(), "%s", output.String())
+	require.Contains(t, output.String(), "Farewell")
+	info, err := os.Lstat(socket)
+	require.NoError(t, err)
+	require.NotZero(t, info.Mode()&os.ModeSocket)
+	require.NoFileExists(t, filepath.Join(runDir, "cryptd.pid"))
 }
 
 func TestCryptd_ReportsStartupRotationLockTimeout(t *testing.T) {
