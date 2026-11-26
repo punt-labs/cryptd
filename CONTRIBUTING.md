@@ -51,6 +51,32 @@ placing it in `~/.punt-labs/ethos/runtimes/`. The handoff itself never
 downloads the archive and runs the same blocking `make check` as a live
 checkout.
 
+If your branch changes the pin before its release is published, build the
+archive locally and verify it against the branch's sidecar before placing it
+in Ethos's digest store. Use Go 1.26.10, Node.js 24.22.3, GNU tar, and
+[Mike Farah yq v4](https://github.com/mikefarah/yq). From the checkout:
+
+```bash
+(
+  set -eu
+  platform=linux-amd64 # Use darwin-arm64 on macOS arm64.
+  output=$(mktemp -d)
+  trap 'rm -rf -- "$output"' EXIT
+  bash scripts/build-handoff-runtime.sh "$platform" "$output"
+  archive="$output/cryptd-handoff-$platform.tar.gz"
+  pin='.checks["handoff-gate"].runtime.platforms[strenv(PLATFORM)]'
+  sidecar=.punt-labs/ethos/checks/snapshots/crypt-go.yaml
+  sha=$(PLATFORM="$platform" yq -er "$pin.sha256" "$sidecar")
+  printf '%s  %s\n' "$sha" "$archive" | shasum -a 256 -c -
+  store="$HOME/.punt-labs/ethos/runtimes"
+  mkdir -p "$store"
+  install -m 0600 "$archive" "$store/$sha.tar.gz"
+  ethos handoff fetch-runtime
+)
+```
+
+Ethos reuses the verified archive already in the store without downloading it.
+
 ## Playing From a Checkout
 
 The `play` targets build the binaries and set `CRYPT_SCENARIO_DIR` for you.
