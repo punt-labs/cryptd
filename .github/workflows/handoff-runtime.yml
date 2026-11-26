@@ -95,13 +95,24 @@ jobs:
         with:
           name: runtime-darwin-arm64
           path: runtime-assets
-      - name: Verify bundled tools run on macOS arm64
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version: "1.26.10"
+          cache: false
+      - name: Build Ethos with fetch-runtime support
+        run: |
+          GOBIN="$RUNNER_TEMP/ethos-bin" CGO_ENABLED=0 go install \
+            github.com/punt-labs/ethos/v4/cmd/ethos@49dce1dd76f3f075d9d0b35e160b5326d69a7822
+      - name: Verify local install and bundled tools on macOS arm64
         run: |
           scratch=$(mktemp -d)
           trap 'chmod -R u+w "$scratch" && rm -rf -- "$scratch"' EXIT
           sha=$(yq -er '.checks["handoff-gate"].runtime.platforms.darwin-arm64.sha256' \
             .punt-labs/ethos/checks/snapshots/crypt-go.yaml)
-          archive=runtime-assets/cryptd-handoff-darwin-arm64.tar.gz
+          mkdir "$scratch/home"
+          archive=$(HOME="$scratch/home" "$RUNNER_TEMP/ethos-bin/ethos" handoff fetch-runtime \
+            --file runtime-assets/cryptd-handoff-darwin-arm64.tar.gz)
+          [[ "$archive" == "$scratch/home/.punt-labs/ethos/runtimes/$sha.tar.gz" ]]
           printf '%s  %s\n' "$sha" "$archive" | shasum -a 256 -c -
           tar -xzf "$archive" -C "$scratch"
           GOTOOLCHAIN=local "$scratch/go/bin/go" version
@@ -165,7 +176,7 @@ jobs:
       - name: Build Ethos with fetch-runtime support
         run: |
           GOBIN="$RUNNER_TEMP/ethos-bin" CGO_ENABLED=0 go install \
-            github.com/punt-labs/ethos/v4/cmd/ethos@c837cd17b9bfa755029cd42ff4fd4b4874e8a7b5
+            github.com/punt-labs/ethos/v4/cmd/ethos@49dce1dd76f3f075d9d0b35e160b5326d69a7822
       - name: Verify download and installation from the published release
         env:
           PLATFORM: ${{ matrix.platform }}

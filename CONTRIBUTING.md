@@ -52,11 +52,10 @@ downloads the archive and runs the same blocking `make check` as a live
 checkout.
 
 If your branch changes the pin before its release is published, build the
-archive locally and verify it against the branch's sidecar before placing it
-in Ethos's digest store. Use Go 1.26.10, Node.js 24.22.3, GNU tar, and
-[Mike Farah yq v4](https://github.com/mikefarah/yq). Byte-identical rebuilds
-also require GNU gzip on `PATH`, not macOS's system gzip. The Linux CI build
-is the reference for both platform archives. From the checkout:
+archive locally and use an Ethos version that supports
+`handoff fetch-runtime --file`. Use Go 1.26.10, Node.js 24.22.3, GNU tar,
+and GNU gzip on `PATH`, not macOS's system gzip. The Linux CI build is the
+reference for both platform archives. From the checkout:
 
 ```bash
 (
@@ -66,23 +65,12 @@ is the reference for both platform archives. From the checkout:
   output=$(mktemp -d .tmp/handoff-runtime.XXXXXX)
   trap 'rm -rf -- "$output"' EXIT
   bash scripts/build-handoff-runtime.sh "$platform" "$output"
-  archive="$output/cryptd-handoff-$platform.tar.gz"
-  pin='.checks["handoff-gate"].runtime.platforms[strenv(PLATFORM)]'
-  sidecar=.punt-labs/ethos/checks/snapshots/crypt-go.yaml
-  sha=$(PLATFORM="$platform" yq -er "$pin.sha256" "$sidecar")
-  if command -v sha256sum >/dev/null; then
-    printf '%s  %s\n' "$sha" "$archive" | sha256sum -c -
-  else
-    printf '%s  %s\n' "$sha" "$archive" | shasum -a 256 -c -
-  fi
-  store="$HOME/.punt-labs/ethos/runtimes"
-  mkdir -p "$store"
-  install -m 0600 "$archive" "$store/$sha.tar.gz"
-  ethos handoff fetch-runtime
+  ethos handoff fetch-runtime --file "$output/cryptd-handoff-$platform.tar.gz"
 )
 ```
 
-Ethos reuses the verified archive already in the store without downloading it.
+Ethos verifies the local archive against the branch's pin and installs it in
+the digest store without downloading anything.
 
 ## Playing From a Checkout
 
