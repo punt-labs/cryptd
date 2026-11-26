@@ -177,7 +177,7 @@ jobs:
         run: |
           GOBIN="$RUNNER_TEMP/ethos-bin" CGO_ENABLED=0 go install \
             github.com/punt-labs/ethos/v4/cmd/ethos@038e901628e9772add514350b24c8d8f6fb6d0f6
-      - name: Verify download and installation from the published release
+      - name: Verify the published runtime and replay the Linux handoff
         env:
           PLATFORM: ${{ matrix.platform }}
         run: |
@@ -188,3 +188,20 @@ jobs:
           archive=$(HOME="$scratch" "$RUNNER_TEMP/ethos-bin/ethos" handoff fetch-runtime)
           [[ "$archive" == "$scratch/.punt-labs/ethos/runtimes/$sha.tar.gz" ]]
           printf '%s  %s\n' "$sha" "$archive" | shasum -a 256 -c -
+          if [[ "$PLATFORM" == linux-amd64 ]]; then
+            # First-run Ethos storage repair can update .gitignore.
+            if ! git diff --quiet -- .gitignore; then
+              git archive HEAD .gitignore | tar -xf -
+            fi
+            [[ -z "$(git status --porcelain)" ]]
+            printf '%s\n' '{"session_id":"replay","agent_id":"worker","agent_type":"implementer"}' |
+              HOME="$scratch" ETHOS_SESSION=replay ETHOS_AGENT_ID=worker CLAUDE_AGENT_TYPE=implementer \
+              "$RUNNER_TEMP/ethos-bin/ethos" hook subagent-stop > "$scratch/replay.json"
+            if [[ -s "$scratch/replay.json" ]]; then
+              cat "$scratch/replay.json" >&2
+              exit 1
+            fi
+            log="$scratch/.punt-labs/ethos/logs/ethos.log"
+            grep -F 'stage=handoff check=handoff-gate outcome=launched ' "$log"
+            grep -F 'stage=handoff check=handoff-gate outcome=completed ' "$log"
+          fi

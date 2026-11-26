@@ -47,9 +47,11 @@ ethos handoff fetch-runtime
 ```
 
 Ethos verifies the archive against the project's snapshot profile before
-placing it in `~/.punt-labs/ethos/runtimes/`. The handoff itself never
-downloads the archive and runs the same blocking `make check` as a live
-checkout.
+placing it in `~/.punt-labs/ethos/runtimes/`. The snapshot runner is Linux-only
+for now. On Linux it runs the same blocking `make check` as a live checkout
+and never downloads the archive during handoff. On macOS, installing the
+bundle does not enable snapshot handoffs: the hook defers, so run
+`make check` directly until the Darwin adapter ships.
 
 If your branch changes the pin before its release is published, build the
 archive locally and use an Ethos version that supports
