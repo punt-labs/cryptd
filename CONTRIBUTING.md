@@ -70,7 +70,11 @@ is the reference for both platform archives. From the checkout:
   pin='.checks["handoff-gate"].runtime.platforms[strenv(PLATFORM)]'
   sidecar=.punt-labs/ethos/checks/snapshots/crypt-go.yaml
   sha=$(PLATFORM="$platform" yq -er "$pin.sha256" "$sidecar")
-  printf '%s  %s\n' "$sha" "$archive" | shasum -a 256 -c -
+  if command -v sha256sum >/dev/null; then
+    printf '%s  %s\n' "$sha" "$archive" | sha256sum -c -
+  else
+    printf '%s  %s\n' "$sha" "$archive" | shasum -a 256 -c -
+  fi
   store="$HOME/.punt-labs/ethos/runtimes"
   mkdir -p "$store"
   install -m 0600 "$archive" "$store/$sha.tar.gz"
