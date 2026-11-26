@@ -9,7 +9,6 @@ on:
       - go.mod
       - go.sum
       - scripts/build-handoff-runtime.sh
-      - scripts/install-handoff-runtime.sh
       - scripts/handoff-runtime/**
   workflow_dispatch:
     inputs:
@@ -71,9 +70,7 @@ jobs:
           scratch=$(mktemp -d)
           trap 'chmod -R u+w "$scratch" && rm -rf -- "$scratch"' EXIT
           mkdir "$scratch/runtime" "$scratch/home"
-          archive=$(HOME="$scratch/home" bash scripts/install-handoff-runtime.sh \
-            runtime-assets/cryptd-handoff-linux-amd64.tar.gz)
-          tar -xzf "$archive" -C "$scratch/runtime"
+          tar -xzf runtime-assets/cryptd-handoff-linux-amd64.tar.gz -C "$scratch/runtime"
           sudo --non-interactive unshare --net --setgid "$(id -g)" --setuid "$(id -u)" -- \
             env -i HOME="$scratch/home" PATH="$scratch/runtime/node/bin:/usr/bin:/bin" \
             npm_config_cache="$scratch/npm" npm_config_offline=true make markdownlint
@@ -98,16 +95,18 @@ jobs:
         with:
           name: runtime-darwin-arm64
           path: runtime-assets
-      - name: Verify local archive installation on macOS arm64
+      - name: Verify bundled tools run on macOS arm64
         run: |
           scratch=$(mktemp -d)
-          trap 'rm -rf -- "$scratch"' EXIT
+          trap 'chmod -R u+w "$scratch" && rm -rf -- "$scratch"' EXIT
           sha=$(yq -er '.checks["handoff-gate"].runtime.platforms.darwin-arm64.sha256' \
             .punt-labs/ethos/checks/snapshots/crypt-go.yaml)
-          archive=$(HOME="$scratch" bash scripts/install-handoff-runtime.sh \
-            runtime-assets/cryptd-handoff-darwin-arm64.tar.gz)
-          [[ "$archive" == "$scratch/.punt-labs/ethos/runtimes/$sha.tar.gz" ]]
+          archive=runtime-assets/cryptd-handoff-darwin-arm64.tar.gz
           printf '%s  %s\n' "$sha" "$archive" | shasum -a 256 -c -
+          tar -xzf "$archive" -C "$scratch"
+          GOTOOLCHAIN=local "$scratch/go/bin/go" version
+          "$scratch/bin/staticcheck" -version
+          "$scratch/node/bin/node" --version
 
   publish:
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
@@ -146,7 +145,7 @@ jobs:
     permissions:
       contents: read
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 10
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -159,6 +158,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version: "1.26.10"
+          cache: false
+      - name: Build Ethos with fetch-runtime support
+        run: |
+          GOBIN="$RUNNER_TEMP/ethos-bin" CGO_ENABLED=0 go install \
+            github.com/punt-labs/ethos/v4/cmd/ethos@c837cd17b9bfa755029cd42ff4fd4b4874e8a7b5
       - name: Verify download and installation from the published release
         env:
           PLATFORM: ${{ matrix.platform }}
@@ -167,6 +174,6 @@ jobs:
           trap 'rm -rf -- "$scratch"' EXIT
           pin='.checks["handoff-gate"].runtime.platforms[strenv(PLATFORM)]'
           sha=$(yq -er "$pin.sha256" .punt-labs/ethos/checks/snapshots/crypt-go.yaml)
-          archive=$(HOME="$scratch" bash scripts/install-handoff-runtime.sh)
+          archive=$(HOME="$scratch" "$RUNNER_TEMP/ethos-bin/ethos" handoff fetch-runtime)
           [[ "$archive" == "$scratch/.punt-labs/ethos/runtimes/$sha.tar.gz" ]]
           printf '%s  %s\n' "$sha" "$archive" | shasum -a 256 -c -

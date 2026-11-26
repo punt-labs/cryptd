@@ -37,20 +37,19 @@ Both gates must finish with zero errors and zero failing tests.
 
 ### Ethos handoff snapshot
 
-With a version of Ethos that supports DES-086 snapshots, install the pinned
-runtime before the first handoff and whenever the pin changes. On Linux amd64
-or macOS arm64, install [Mike Farah yq v4](https://github.com/mikefarah/yq)
-and run:
+With an Ethos version that supports the DES-086 snapshot profile and
+`handoff fetch-runtime`, fetch the published runtime before the first handoff
+and whenever the pin changes. From the cryptd checkout on Linux amd64 or
+macOS arm64, run:
 
 ```bash
-bash scripts/install-handoff-runtime.sh
+ethos handoff fetch-runtime
 ```
 
-The installer verifies the archive against the project's snapshot profile
-before placing it in `~/.punt-labs/ethos/runtimes/`. Ethos does not download
-the archive during handoff. To use a locally built archive before the matching
-release is published, pass its path to the same command; the pin is still
-checked. The snapshot runs the same blocking `make check` as a live checkout.
+Ethos verifies the archive against the project's snapshot profile before
+placing it in `~/.punt-labs/ethos/runtimes/`. The handoff itself never
+downloads the archive and runs the same blocking `make check` as a live
+checkout.
 
 ## Playing From a Checkout
 
