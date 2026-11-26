@@ -35,6 +35,11 @@ if [[ $("$tar_tool" --version) != *'GNU tar'* ]]; then
     printf 'GNU tar is required (gtar on macOS).\n' >&2
     exit 1
 fi
+gzip_tool=$(command -v gzip || true)
+if [[ -z $gzip_tool || $("$gzip_tool" --version 2>/dev/null) != *'Free Software Foundation'* ]]; then
+    printf 'GNU gzip is required; put it first on PATH or build on Linux as CI does.\n' >&2
+    exit 1
+fi
 sha_tool=(shasum -a 256)
 if command -v sha256sum >/dev/null; then
     sha_tool=(sha256sum)
@@ -88,7 +93,7 @@ ln -s ../lib/node_modules/markdownlint-cli2/markdownlint-cli2-bin.mjs "$runtime/
 
 archive=$output/cryptd-handoff-$platform.tar.gz
 "$tar_tool" --format=gnu --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner --hard-dereference \
-    -C "$runtime" -cf - bin cache go licenses node | gzip -n -6 > "$work/runtime.tar.gz"
+    -C "$runtime" -cf - bin cache go licenses node | "$gzip_tool" -n -6 > "$work/runtime.tar.gz"
 "${sha_tool[@]}" "$work/runtime.tar.gz" | awk '{print "SHA-256: " $1}' >&2
 mv -- "$work/runtime.tar.gz" "$archive"
 printf '%s\n' "$archive"

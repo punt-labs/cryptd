@@ -54,7 +54,9 @@ checkout.
 If your branch changes the pin before its release is published, build the
 archive locally and verify it against the branch's sidecar before placing it
 in Ethos's digest store. Use Go 1.26.10, Node.js 24.22.3, GNU tar, and
-[Mike Farah yq v4](https://github.com/mikefarah/yq). From the checkout:
+[Mike Farah yq v4](https://github.com/mikefarah/yq). Byte-identical rebuilds
+also require GNU gzip on `PATH`, not macOS's system gzip. The Linux CI build
+is the reference for both platform archives. From the checkout:
 
 ```bash
 (
