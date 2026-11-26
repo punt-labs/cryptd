@@ -35,6 +35,45 @@ make check-full
 
 Both gates must finish with zero errors and zero failing tests.
 
+### Ethos handoff snapshot
+
+With an Ethos version that supports the DES-086 snapshot profile and
+`handoff fetch-runtime`, fetch the published runtime before the first handoff
+and whenever the pin changes. From the cryptd checkout on Linux amd64 or
+macOS arm64, run:
+
+```bash
+ethos handoff fetch-runtime
+```
+
+Ethos verifies the archive against the project's snapshot profile before
+placing it in `~/.punt-labs/ethos/runtimes/`. The snapshot runner is Linux-only
+for now. On Linux it runs the same blocking `make check` as a live checkout
+and never downloads the archive during handoff. On macOS, installing the
+bundle does not enable snapshot handoffs: the hook defers, so run
+`make check` directly until the Darwin adapter ships.
+
+If your branch changes the pin before its release is published, build the
+archive locally and use an Ethos version that supports
+`handoff fetch-runtime --file`. Use Go 1.26.10, Node.js 24.22.3, GNU tar,
+and GNU gzip on `PATH`, not macOS's system gzip. The Linux CI build is the
+reference for both platform archives. From the checkout:
+
+```bash
+(
+  set -eu
+  platform=linux-amd64 # Use darwin-arm64 on macOS arm64.
+  mkdir -p .tmp
+  output=$(mktemp -d .tmp/handoff-runtime.XXXXXX)
+  trap 'rm -rf -- "$output"' EXIT
+  bash scripts/build-handoff-runtime.sh "$platform" "$output"
+  ethos handoff fetch-runtime --file "$output/cryptd-handoff-$platform.tar.gz"
+)
+```
+
+Ethos verifies the local archive against the branch's pin and installs it in
+the digest store without downloading anything.
+
 ## Playing From a Checkout
 
 The `play` targets build the binaries and set `CRYPT_SCENARIO_DIR` for you.

@@ -1971,3 +1971,42 @@ test limit; daemon vet/tests hit their 20 s/30 s limits. Keep those bounded
 budgets; full checks still gate commit and handoff. Every commit now pays
 the full quick-gate cost (~6 s warm). Integration/E2E/acceptance/coverage
 full-suite gates remain under `make check-full`.
+
+## DES-037: Pinned Offline Runtime for Ethos Handoffs
+
+**Date:** 2026-11-26
+**Status:** SETTLED
+**Topic:** Handoff snapshot dependencies
+
+### Decision
+
+Use a nested Ethos DES-086 snapshot profile for the unchanged blocking
+`make check` handoff gate. Pin one cryptd runtime archive per supported
+platform (Linux amd64 and Darwin arm64) by SHA-256. The archive supplies
+Go, staticcheck, Node, Markdownlint, and the Go module seed. Keep system
+tools such as make and the native C toolchain declared as host inputs.
+
+### Rationale
+
+The snapshot needs the same checks as a live checkout, including the race
+detector and Markdown lint. Pinning the archive fixes tool and dependency
+versions without a registry lookup during the check. Private writable
+caches preserve a read-only checkout, and loopback remains available for
+tests that start local servers.
+
+### Alternatives Considered
+
+- Use host toolchains and dependency caches via `system.dirs`. Rejected
+  because installed versions and cache contents would vary by workstation
+  and would need to be provisioned separately.
+- Fetch tools and dependencies during the gate. Rejected because it
+  conflicts with loopback-only networking and makes the verdict depend on
+  registry availability and mutable inputs.
+
+### Consequences
+
+Contributors install the matching archive before the hook runs; the hook
+does not download it. Tool or dependency changes that alter archive contents
+require a rebuild, updated pins, and publication of the matching assets.
+Snapshot execution requires a version of Ethos with DES-086 runner support;
+the profile does not change the gate's recipes or blocking policy.
