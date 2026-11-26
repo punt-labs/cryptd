@@ -1,0 +1,36 @@
+checks:
+  handoff-gate:
+    profile: linux-worktree-v1
+    epoch: cryptd-v1
+    sources:
+      mode: worktree
+    network: loopback
+    system:
+      tools: [make, sh, env, cc, gcc, as, ld]
+    scratch:
+      seed:
+        "{scratch}/go-mod": "{runtime}/cache/go-mod"
+    runtime:
+      platforms:
+        linux-amd64:
+          bundle: cryptd-handoff-linux-amd64.tar.gz
+          sha256: 03061b884358a7624de4174b533eca637756801ce144bab8706aebf268277f22
+          url: https://github.com/punt-labs/cryptd/releases/download/handoff-runtime-v1/cryptd-handoff-linux-amd64.tar.gz
+          path: &runtime-path ["{runtime}/go/bin", "{runtime}/bin", "{runtime}/node/bin"]
+          env: &runtime-env
+            CC: cc
+            CGO_ENABLED: "1"
+            GOENV: "off"
+            GOWORK: "off"
+            GOTOOLCHAIN: local
+            GOPROXY: "off"
+            GOCACHE: "{scratch}/go-build"
+            GOMODCACHE: "{scratch}/go-mod"
+            npm_config_cache: "{scratch}/npm"
+            npm_config_offline: "true"
+        darwin-arm64:
+          bundle: cryptd-handoff-darwin-arm64.tar.gz
+          sha256: b3163bd0eee77cebe5ecb8af3a561fa735cc4d9a531abd6be4bf5441f1bf58bc
+          url: https://github.com/punt-labs/cryptd/releases/download/handoff-runtime-v1/cryptd-handoff-darwin-arm64.tar.gz
+          path: *runtime-path
+          env: *runtime-env
