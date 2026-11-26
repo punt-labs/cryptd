@@ -45,7 +45,8 @@ if command -v sha256sum >/dev/null; then
     sha_tool=(sha256sum)
 fi
 
-work=$(mktemp -d "$output/.cryptd-runtime.XXXXXX")
+mkdir -p "$repo/.tmp"
+work=$(mktemp -d "$repo/.tmp/cryptd-runtime.XXXXXX")
 trap 'chmod -R u+w "$work" && rm -rf -- "$work"' EXIT
 runtime=$work/runtime
 mkdir -p "$runtime/bin" "$runtime/node" "$runtime/cache/go-mod" "$runtime/licenses" "$work/home" "$work/npm"

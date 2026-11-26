@@ -62,7 +62,8 @@ is the reference for both platform archives. From the checkout:
 (
   set -eu
   platform=linux-amd64 # Use darwin-arm64 on macOS arm64.
-  output=$(mktemp -d)
+  mkdir -p .tmp
+  output=$(mktemp -d .tmp/handoff-runtime.XXXXXX)
   trap 'rm -rf -- "$output"' EXIT
   bash scripts/build-handoff-runtime.sh "$platform" "$output"
   archive="$output/cryptd-handoff-$platform.tar.gz"
