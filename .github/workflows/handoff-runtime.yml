@@ -9,6 +9,7 @@ on:
       - go.mod
       - go.sum
       - scripts/build-handoff-runtime.sh
+      - scripts/smoke-handoff-snapshot.sh
       - scripts/handoff-runtime/**
   workflow_dispatch:
     inputs:
@@ -119,9 +120,41 @@ jobs:
           "$scratch/bin/staticcheck" -version
           "$scratch/node/bin/node" --version
 
+  smoke-linux:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    needs: build
+    permissions:
+      contents: read
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: runtime-linux-amd64
+          path: ${{ runner.temp }}/runtime-assets
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version: "1.26.10"
+          cache: false
+      - name: Build Ethos with fetch-runtime support
+        run: |
+          GOBIN="$RUNNER_TEMP/ethos-bin" CGO_ENABLED=0 go install \
+            github.com/punt-labs/ethos/v4/cmd/ethos@038e901628e9772add514350b24c8d8f6fb6d0f6
+      - name: Verify the Linux handoff with the built runtime
+        run: |
+          scratch=$(mktemp -d)
+          trap 'rm -rf -- "$scratch"' EXIT
+          ethos="$RUNNER_TEMP/ethos-bin/ethos"
+          HOME="$scratch" "$ethos" handoff fetch-runtime \
+            --file "$RUNNER_TEMP/runtime-assets/cryptd-handoff-linux-amd64.tar.gz"
+          bash scripts/smoke-handoff-snapshot.sh "$ethos" "$scratch"
+
   publish:
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
-    needs: [build, smoke-darwin]
+    needs: [build, smoke-darwin, smoke-linux]
     concurrency: handoff-runtime-release
     permissions:
       contents: write
@@ -189,19 +222,5 @@ jobs:
           [[ "$archive" == "$scratch/.punt-labs/ethos/runtimes/$sha.tar.gz" ]]
           printf '%s  %s\n' "$sha" "$archive" | shasum -a 256 -c -
           if [[ "$PLATFORM" == linux-amd64 ]]; then
-            # First-run Ethos storage repair can update .gitignore.
-            if ! git diff --quiet -- .gitignore; then
-              git archive HEAD .gitignore | tar -xf -
-            fi
-            [[ -z "$(git status --porcelain)" ]]
-            printf '%s\n' '{"session_id":"replay","agent_id":"worker","agent_type":"implementer"}' |
-              HOME="$scratch" ETHOS_SESSION=replay ETHOS_AGENT_ID=worker CLAUDE_AGENT_TYPE=implementer \
-              "$RUNNER_TEMP/ethos-bin/ethos" hook subagent-stop > "$scratch/replay.json"
-            if [[ -s "$scratch/replay.json" ]]; then
-              cat "$scratch/replay.json" >&2
-              exit 1
-            fi
-            log="$scratch/.punt-labs/ethos/logs/ethos.log"
-            grep -F 'stage=handoff check=handoff-gate outcome=launched ' "$log"
-            grep -F 'stage=handoff check=handoff-gate outcome=completed ' "$log"
+            bash scripts/smoke-handoff-snapshot.sh "$RUNNER_TEMP/ethos-bin/ethos" "$scratch"
           fi
