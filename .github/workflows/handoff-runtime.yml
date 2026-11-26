@@ -102,7 +102,7 @@ jobs:
       - name: Build Ethos with fetch-runtime support
         run: |
           GOBIN="$RUNNER_TEMP/ethos-bin" CGO_ENABLED=0 go install \
-            github.com/punt-labs/ethos/v4/cmd/ethos@49dce1dd76f3f075d9d0b35e160b5326d69a7822
+            github.com/punt-labs/ethos/v4/cmd/ethos@038e901628e9772add514350b24c8d8f6fb6d0f6
       - name: Verify local install and bundled tools on macOS arm64
         run: |
           scratch=$(mktemp -d)
@@ -176,7 +176,7 @@ jobs:
       - name: Build Ethos with fetch-runtime support
         run: |
           GOBIN="$RUNNER_TEMP/ethos-bin" CGO_ENABLED=0 go install \
-            github.com/punt-labs/ethos/v4/cmd/ethos@49dce1dd76f3f075d9d0b35e160b5326d69a7822
+            github.com/punt-labs/ethos/v4/cmd/ethos@038e901628e9772add514350b24c8d8f6fb6d0f6
       - name: Verify download and installation from the published release
         env:
           PLATFORM: ${{ matrix.platform }}
