@@ -121,7 +121,7 @@ jobs:
           "$scratch/node/bin/node" --version
 
   smoke-linux:
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     needs: build
     permissions:
       contents: read
@@ -145,8 +145,9 @@ jobs:
             github.com/punt-labs/ethos/v4/cmd/ethos@038e901628e9772add514350b24c8d8f6fb6d0f6
       - name: Verify the Linux handoff with the built runtime
         run: |
-          scratch=$(mktemp -d)
-          trap 'rm -rf -- "$scratch"' EXIT
+          mkdir -p .tmp
+          scratch=$(mktemp -d "$PWD/.tmp/handoff-runtime.XXXXXX")
+          trap 'chmod -R u+w "$scratch" && rm -rf -- "$scratch"' EXIT
           ethos="$RUNNER_TEMP/ethos-bin/ethos"
           HOME="$scratch" "$ethos" handoff fetch-runtime \
             --file "$RUNNER_TEMP/runtime-assets/cryptd-handoff-linux-amd64.tar.gz"
