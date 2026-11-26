@@ -28,7 +28,7 @@ go_version=1.26.10
 node_version=24.22.3
 staticcheck_version=v0.8.1
 
-repo=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
+repo=$(cd -- "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 output=$(cd -- "$2" && pwd -P)
 tar_tool=$(command -v gtar || command -v tar)
 if [[ $("$tar_tool" --version) != *'GNU tar'* ]]; then

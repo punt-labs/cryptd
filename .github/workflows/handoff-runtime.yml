@@ -9,6 +9,7 @@ on:
       - go.mod
       - go.sum
       - scripts/build-handoff-runtime.sh
+      - scripts/install-handoff-runtime.sh
       - scripts/handoff-runtime/**
   workflow_dispatch:
     inputs:
@@ -26,6 +27,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     strategy:
+      fail-fast: false
       matrix:
         platform: [linux-amd64, darwin-arm64]
     steps:
@@ -67,9 +69,11 @@ jobs:
         if: matrix.platform == 'linux-amd64'
         run: |
           scratch=$(mktemp -d)
-          trap 'rm -rf "$scratch"' EXIT
+          trap 'chmod -R u+w "$scratch" && rm -rf -- "$scratch"' EXIT
           mkdir "$scratch/runtime" "$scratch/home"
-          tar -xzf runtime-assets/cryptd-handoff-linux-amd64.tar.gz -C "$scratch/runtime"
+          archive=$(HOME="$scratch/home" bash scripts/install-handoff-runtime.sh \
+            runtime-assets/cryptd-handoff-linux-amd64.tar.gz)
+          tar -xzf "$archive" -C "$scratch/runtime"
           sudo --non-interactive unshare --net --setgid "$(id -g)" --setuid "$(id -u)" -- \
             env -i HOME="$scratch/home" PATH="$scratch/runtime/node/bin:/usr/bin:/bin" \
             npm_config_cache="$scratch/npm" npm_config_offline=true make markdownlint
